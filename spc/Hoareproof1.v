@@ -326,13 +326,13 @@ Section CANCEL.
     pattern fuel. eapply well_founded_induction. { eapply wf_opair_lt. } clear fuel.
     intros fuel IH. i.
     rewrite unfold_APC.
-    mstep.
+    steps.
     destruct x.
-    { mstep. } 
-    mstep.
+    { steps. } 
+    steps.
     hexploit (stb_find_iff s). i. des.
-    { rewrite NONE. mstep. }
-    { rewrite FIND. mstep. unfold unwrapU. steps. eapply x1; et. }
+    { rewrite NONE. steps. }
+    { rewrite FIND. steps. unfold unwrapU. steps. eapply x1; et. }
     rewrite STB. hstep.
     rewrite FINDMID. unfold fun_to_mid. hstep.
    rewrite idK_spec at 1.
