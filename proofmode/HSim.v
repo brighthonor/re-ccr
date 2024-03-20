@@ -5,7 +5,7 @@ Require Import ModSem.
 Require Import Skeleton.
 Require Import PCM.
 Require Import Any.
-Require Import HoareDef STB SimModSem.
+Require Import HoareDef OpenDef STB SimModSem.
 
 Require Import Relation_Definitions.
 Require Import Relation_Operators.
@@ -120,158 +120,159 @@ Section SIM.
   Inductive _hsim
             (hsim: forall R_src R_tgt
                           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                          (ctx: Σ),
+                          (fmr: Σ),
                 option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
             {R_src R_tgt}
             (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-            (ctx: Σ)
+            (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hsim_ret
       v_src v_tgt
       st_src st_tgt
       fuel f_src f_tgt
-      (RET: current_iProp ctx (Q st_src st_tgt v_src v_tgt))
+      (RET: current_iProp fmr (Q st_src st_tgt v_src v_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, (Ret v_src)) (st_tgt, (Ret v_tgt))
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, (Ret v_src)) (st_tgt, (Ret v_tgt))
   | hsim_call
       fsp (x: fsp.(meta)) w0 FR
       fn arg_src arg_tgt
       st_src0 st_tgt0 ktr_src ktr_tgt
       fuel f_src f_tgt
       (SPEC: stb fn = Some fsp)
-      (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+      (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
       (MEASURE: o = ord_top)
       (NPURE: fsp.(measure) x = ord_top)
-      (POST: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                    (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-          hsim _ _ Q ctx1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt))
+      (POST: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                    (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+          hsim _ _ Q fmr1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src0, trigger (Call fn arg_src) >>= ktr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src0, trigger (Call fn arg_src) >>= ktr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
   | hsim_apc_start
       fuel1
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: _hsim hsim Q ctx (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
+      (SIM: _hsim hsim Q fmr (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, trigger (hAPC) >>= ktr_src) (st_tgt, itr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, trigger (hAPC) >>= ktr_src) (st_tgt, itr_tgt)
   | hsim_apc_step
       fsp (x: fsp.(meta)) w0 FR arg_src
       fn arg_tgt
       st_src0 st_tgt0 itr_src ktr_tgt
       fuel0 f_src f_tgt
       (SPEC: stb fn = Some fsp)
-      (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+      (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
       (MEASURE: ord_lt (fsp.(measure) x) o)
       (PURE: is_pure (fsp.(measure) x))
       (POST: exists fuel1,
           (<<FUEL: Ord.lt fuel1 fuel0>>) /\
-          (<<SIM: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                         (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-              hsim _ _ Q ctx1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>))
+          (<<SIM: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                         (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+              hsim _ _ Q fmr1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>))
     :
-      _hsim hsim Q ctx (Some fuel0) f_src f_tgt (st_src0, itr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
+      _hsim hsim Q fmr (Some fuel0) f_src f_tgt (st_src0, itr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
   | hsim_syscall
       fn arg rvs
       st_src st_tgt ktr_src ktr_tgt
       fuel f_src f_tgt
       (POST: forall ret,
-          hsim _ _ Q ctx None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret))
+          hsim _ _ Q fmr None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, trigger (Syscall fn arg rvs) >>= ktr_src) (st_tgt, trigger (Syscall fn arg rvs) >>= ktr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, trigger (Syscall fn arg rvs) >>= ktr_src) (st_tgt, trigger (Syscall fn arg rvs) >>= ktr_tgt)
+
   | hsim_inline_src
     fsp fn f arg_src
     st_src st_tgt ktr_src itr_tgt
     fuel f_src f_tgt
     (SPEC: stb fn = Some fsp)
     (FUN: alist_find fn fl_src = Some f)
-    (SIM: _hsim hsim Q ctx fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
+    (SIM: _hsim hsim Q fmr fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
   :
-    _hsim hsim Q ctx fuel f_src f_tgt (st_src, trigger (Call fn arg_src) >>= ktr_src) (st_tgt, itr_tgt)
+    _hsim hsim Q fmr fuel f_src f_tgt (st_src, trigger (Call fn arg_src) >>= ktr_src) (st_tgt, itr_tgt)
   | hsim_inline_tgt
     fsp fn f arg_tgt
     st_src st_tgt itr_src ktr_tgt
     fuel f_src f_tgt
     (SPEC: stb fn = Some fsp)
     (FUN: alist_find fn fl_tgt = Some f)
-    (SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
+    (SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
   :
-    _hsim hsim Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Call fn arg_tgt) >>= ktr_tgt)
+    _hsim hsim Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Call fn arg_tgt) >>= ktr_tgt)
   | hsim_tau_src
       st_src st_tgt itr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: _hsim hsim Q ctx None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
+      (SIM: _hsim hsim Q fmr None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, tau;; itr_src) (st_tgt, itr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, tau;; itr_src) (st_tgt, itr_tgt)
   | hsim_tau_tgt
       st_src st_tgt itr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
+      (SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, tau;; itr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, tau;; itr_tgt)
   | hsim_choose_src
       X
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: exists x, _hsim hsim Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
+      (SIM: exists x, _hsim hsim Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, trigger (Choose X) >>= ktr_src) (st_tgt, itr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, trigger (Choose X) >>= ktr_src) (st_tgt, itr_tgt)
   | hsim_choose_tgt
       X
       st_src st_tgt itr_src ktr_tgt
       fuel f_src f_tgt
-      (SIM: forall x, _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
+      (SIM: forall x, _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Choose X) >>= ktr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Choose X) >>= ktr_tgt)
   | hsim_take_src
       X
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: forall x, _hsim hsim Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
+      (SIM: forall x, _hsim hsim Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, trigger (Take X) >>= ktr_src) (st_tgt, itr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, trigger (Take X) >>= ktr_src) (st_tgt, itr_tgt)
   | hsim_take_tgt
       X
       st_src st_tgt itr_src ktr_tgt
       fuel f_src f_tgt
-      (SIM: exists x, _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
+      (SIM: exists x, _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Take X) >>= ktr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Take X) >>= ktr_tgt)
   | hsim_supdate_src
       X
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
       (run: Any.t -> Any.t * X)
-      (SIM: _hsim hsim Q ctx None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
+      (SIM: _hsim hsim Q fmr None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, trigger (SUpdate run) >>= ktr_src) (st_tgt, itr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, trigger (SUpdate run) >>= ktr_src) (st_tgt, itr_tgt)
   | hsim_supdate_tgt
       X
       st_src st_tgt itr_src ktr_tgt
       fuel f_src f_tgt
       (run: Any.t -> Any.t * X)
-      (SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
+      (SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
     :
-      _hsim hsim Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (SUpdate run) >>= ktr_tgt)
+      _hsim hsim Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (SUpdate run) >>= ktr_tgt)
   | hsim_progress
       st_src st_tgt itr_src itr_tgt
       fuel
-      (SIM: hsim _ _ Q ctx fuel false false (st_src, itr_src) (st_tgt, itr_tgt))
+      (SIM: hsim _ _ Q fmr fuel false false (st_src, itr_src) (st_tgt, itr_tgt))
     :
-      _hsim hsim Q ctx fuel true true (st_src, itr_src) (st_tgt, itr_tgt)
+      _hsim hsim Q fmr fuel true true (st_src, itr_src) (st_tgt, itr_tgt)
   .
 
   Lemma _hsim_ind2
         (hsim: forall R_src R_tgt
                       (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                      (ctx: Σ),
+                      (fmr: Σ),
             option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
-        R_src R_tgt Q ctx
+        R_src R_tgt Q fmr
         (P: option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
         (RET: forall
             v_src v_tgt
             st_src st_tgt
             fuel f_src f_tgt
-            (RET: current_iProp ctx (Q st_src st_tgt v_src v_tgt)),
+            (RET: current_iProp fmr (Q st_src st_tgt v_src v_tgt)),
             P fuel f_src f_tgt (st_src, (Ret v_src)) (st_tgt, (Ret v_tgt)))
         (CALL: forall
             fsp (x: fsp.(meta)) w0 FR
@@ -279,18 +280,18 @@ Section SIM.
             st_src0 st_tgt0 ktr_src ktr_tgt
             fuel f_src f_tgt
             (SPEC: stb fn = Some fsp)
-            (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+            (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
             (MEASURE: o = ord_top)
             (NPURE: fsp.(measure) x = ord_top)
-            (POST: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                          (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-                hsim _ _ Q ctx1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt)),
+            (POST: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                          (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+                hsim _ _ Q fmr1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt)),
             P fuel f_src f_tgt (st_src0, trigger (Call fn arg_src) >>= ktr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt))
         (APCSTART: forall
             fuel1
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: _hsim hsim Q ctx (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
+            (SIM: _hsim hsim Q fmr (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
             (IH: P (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt)),
             P fuel f_src f_tgt (st_src, trigger (hAPC) >>= ktr_src) (st_tgt, itr_tgt))
         (APCSTEP: forall
@@ -299,21 +300,21 @@ Section SIM.
             st_src0 st_tgt0 itr_src ktr_tgt
             fuel0 f_src f_tgt
             (SPEC: stb fn = Some fsp)
-            (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+            (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
             (MEASURE: ord_lt (fsp.(measure) x) o)
             (PURE: is_pure (fsp.(measure) x))
             (POST: exists fuel1,
                 (<<FUEL: Ord.lt fuel1 fuel0>>) /\
-                (<<SIM: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                               (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-                    hsim _ _ Q ctx1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>)),
+                (<<SIM: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                               (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+                    hsim _ _ Q fmr1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>)),
             P (Some fuel0) f_src f_tgt (st_src0, itr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt))
         (SYSCALL: forall
             fn arg rvs
             st_src st_tgt ktr_src ktr_tgt
             fuel f_src f_tgt
             (POST: forall ret,
-                hsim _ _ Q ctx None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret)),
+                hsim _ _ Q fmr None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret)),
             P fuel f_src f_tgt (st_src, trigger (Syscall fn arg rvs) >>= ktr_src) (st_tgt, trigger (Syscall fn arg rvs) >>= ktr_tgt))
         (INLINESRC: forall
             fsp fn f arg_src
@@ -321,7 +322,7 @@ Section SIM.
             fuel f_src f_tgt
             (SPEC: stb fn = Some fsp)
             (FUN: alist_find fn fl_src = Some f)
-            (SIM: _hsim hsim Q ctx fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
+            (SIM: _hsim hsim Q fmr fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
             (IH: P fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
           ,
             P fuel f_src f_tgt (st_src, trigger (Call fn arg_src) >>= ktr_src) (st_tgt, itr_tgt))
@@ -331,52 +332,52 @@ Section SIM.
             fuel f_src f_tgt
             (SPEC: stb fn = Some fsp)
             (FUN: alist_find fn fl_tgt = Some f)
-            (SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
+            (SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
             (IH: P fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Call fn arg_tgt) >>= ktr_tgt))        
         (TAUSRC: forall
             st_src st_tgt itr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: _hsim hsim Q ctx None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
+            (SIM: _hsim hsim Q fmr None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
             (IH: P None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
           ,
             P fuel f_src f_tgt (st_src, tau;; itr_src) (st_tgt, itr_tgt))
         (TAUTGT: forall
             st_src st_tgt itr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
+            (SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
             (IH: P fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, tau;; itr_tgt))
         (CHOOSESRC: forall
             X
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: exists x, (<<SIM: _hsim hsim Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
+            (SIM: exists x, (<<SIM: _hsim hsim Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
             P fuel f_src f_tgt (st_src, trigger (Choose X) >>= ktr_src) (st_tgt, itr_tgt))
         (CHOOSETGT: forall
             X
             st_src st_tgt itr_src ktr_tgt
             fuel f_src f_tgt
-            (SIM: forall x, (<<SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
+            (SIM: forall x, (<<SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Choose X) >>= ktr_tgt))
         (TAKESRC: forall
             X
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: forall x, (<<SIM: _hsim hsim Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
+            (SIM: forall x, (<<SIM: _hsim hsim Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
             P fuel f_src f_tgt (st_src, trigger (Take X) >>= ktr_src) (st_tgt, itr_tgt))
         (TAKETGT: forall
             X
             st_src st_tgt itr_src ktr_tgt
             fuel f_src f_tgt
-            (SIM: exists x, (<<SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
+            (SIM: exists x, (<<SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Take X) >>= ktr_tgt))
         (SUPDATESRC: forall
             X
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
             (run: Any.t -> Any.t * X)
-            (SIM: _hsim hsim Q ctx None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
+            (SIM: _hsim hsim Q fmr None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
             (IH: P None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt)),
             P fuel f_src f_tgt (st_src, trigger (SUpdate run) >>= ktr_src) (st_tgt, itr_tgt))
         (SUPDATETGT: forall
@@ -384,17 +385,17 @@ Section SIM.
             st_src st_tgt itr_src ktr_tgt
             fuel f_src f_tgt
             (run: Any.t -> Any.t * X)
-            (SIM: _hsim hsim Q ctx fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
+            (SIM: _hsim hsim Q fmr fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
             (IH: P fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt)))),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (SUpdate run) >>= ktr_tgt))
         (PROGRESS: forall
             st_src st_tgt itr_src itr_tgt
             fuel
-            (SIM: hsim _ _ Q ctx fuel false false (st_src, itr_src) (st_tgt, itr_tgt)),
+            (SIM: hsim _ _ Q fmr fuel false false (st_src, itr_src) (st_tgt, itr_tgt)),
             P fuel true true (st_src, itr_src) (st_tgt, itr_tgt))
     :
       forall fuel f_src f_tgt st_src st_tgt
-             (SIM: @_hsim hsim _ _ Q ctx fuel f_src f_tgt st_src st_tgt),
+             (SIM: @_hsim hsim _ _ Q fmr fuel f_src f_tgt st_src st_tgt),
         P fuel f_src f_tgt st_src st_tgt.
   Proof.
     fix IH 6. i. inv SIM.
@@ -442,13 +443,13 @@ Section SIM.
   Hint Resolve _hsim_mon: paco.
 
   Lemma hsim_ind
-        R_src R_tgt Q ctx
+        R_src R_tgt Q fmr
         (P: option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
         (RET: forall
             v_src v_tgt
             st_src st_tgt
             fuel f_src f_tgt
-            (RET: current_iProp ctx (Q st_src st_tgt v_src v_tgt)),
+            (RET: current_iProp fmr (Q st_src st_tgt v_src v_tgt)),
             P fuel f_src f_tgt (st_src, (Ret v_src)) (st_tgt, (Ret v_tgt)))
         (CALL: forall
             fsp (x: fsp.(meta)) w0 FR
@@ -456,18 +457,18 @@ Section SIM.
             st_src0 st_tgt0 ktr_src ktr_tgt
             fuel f_src f_tgt
             (SPEC: stb fn = Some fsp)
-            (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+            (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
             (MEASURE: o = ord_top)
             (NPURE: fsp.(measure) x = ord_top)
-            (POST: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                          (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-                hsim Q ctx1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt)),
+            (POST: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                          (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+                hsim Q fmr1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt)),
             P fuel f_src f_tgt (st_src0, trigger (Call fn arg_src) >>= ktr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt))
         (APCSTART: forall
             fuel1
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: hsim Q ctx (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
+            (SIM: hsim Q fmr (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
             (IH: P (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt)),
             P fuel f_src f_tgt (st_src, trigger (hAPC) >>= ktr_src) (st_tgt, itr_tgt))
         (APCSTEP: forall
@@ -476,21 +477,21 @@ Section SIM.
             st_src0 st_tgt0 itr_src ktr_tgt
             fuel0 f_src f_tgt
             (SPEC: stb fn = Some fsp)
-            (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+            (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
             (MEASURE: ord_lt (fsp.(measure) x) o)
             (PURE: is_pure (fsp.(measure) x))
             (POST: exists fuel1,
                 (<<FUEL: Ord.lt fuel1 fuel0>>) /\
-                (<<SIM: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                               (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-                    hsim Q ctx1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>)),
+                (<<SIM: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                               (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+                    hsim Q fmr1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>)),
             P (Some fuel0) f_src f_tgt (st_src0, itr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt))
         (SYSCALL: forall
             fn arg rvs
             st_src st_tgt ktr_src ktr_tgt
             fuel f_src f_tgt
             (POST: forall ret,
-                hsim Q ctx None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret)),
+                hsim Q fmr None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret)),
             P fuel f_src f_tgt (st_src, trigger (Syscall fn arg rvs) >>= ktr_src) (st_tgt, trigger (Syscall fn arg rvs) >>= ktr_tgt))
         (INLINESRC: forall
             fsp fn f arg_src
@@ -498,7 +499,7 @@ Section SIM.
             fuel f_src f_tgt
             (SPEC: stb fn = Some fsp)
             (FUN: alist_find fn fl_src = Some f)
-            (SIM: hsim Q ctx fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
+            (SIM: hsim Q fmr fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
             (IH: P fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
           ,
             P fuel f_src f_tgt (st_src, trigger (Call fn arg_src) >>= ktr_src) (st_tgt, itr_tgt))
@@ -508,52 +509,52 @@ Section SIM.
             fuel f_src f_tgt
             (SPEC: stb fn = Some fsp)
             (FUN: alist_find fn fl_tgt = Some f)
-            (SIM: hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
+            (SIM: hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
             (IH: P fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Call fn arg_tgt) >>= ktr_tgt))            
         (TAUSRC: forall
             st_src st_tgt itr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: hsim Q ctx None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
+            (SIM: hsim Q fmr None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
             (IH: P None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
           ,
             P fuel f_src f_tgt (st_src, tau;; itr_src) (st_tgt, itr_tgt))
         (TAUTGT: forall
             st_src st_tgt itr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
+            (SIM: hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
             (IH: P fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, tau;; itr_tgt))
         (CHOOSESRC: forall
             X
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: exists x, (<<SIM: hsim Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
+            (SIM: exists x, (<<SIM: hsim Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
             P fuel f_src f_tgt (st_src, trigger (Choose X) >>= ktr_src) (st_tgt, itr_tgt))
         (CHOOSETGT: forall
             X
             st_src st_tgt itr_src ktr_tgt
             fuel f_src f_tgt
-            (SIM: forall x, (<<SIM: hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
+            (SIM: forall x, (<<SIM: hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Choose X) >>= ktr_tgt))
         (TAKESRC: forall
             X
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
-            (SIM: forall x, (<<SIM: hsim Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
+            (SIM: forall x, (<<SIM: hsim Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>) /\ (<<IH: P None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt)>>)),
             P fuel f_src f_tgt (st_src, trigger (Take X) >>= ktr_src) (st_tgt, itr_tgt))
         (TAKETGT: forall
             X
             st_src st_tgt itr_src ktr_tgt
             fuel f_src f_tgt
-            (SIM: exists x, (<<SIM: hsim Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
+            (SIM: exists x, (<<SIM: hsim Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>) /\ (<<IH: P fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x)>>)),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Take X) >>= ktr_tgt))
         (SUPDATESRC: forall
             X
             st_src st_tgt ktr_src itr_tgt
             fuel f_src f_tgt
             (run: Any.t -> Any.t * X)
-            (SIM: hsim Q ctx None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
+            (SIM: hsim Q fmr None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
             (IH: P None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt)),
             P fuel f_src f_tgt (st_src, trigger (SUpdate run) >>= ktr_src) (st_tgt, itr_tgt))
         (SUPDATETGT: forall
@@ -561,17 +562,17 @@ Section SIM.
             st_src st_tgt itr_src ktr_tgt
             fuel f_src f_tgt
             (run: Any.t -> Any.t * X)
-            (SIM: hsim Q ctx fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
+            (SIM: hsim Q fmr fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
             (IH: P fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt)))),
             P fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (SUpdate run) >>= ktr_tgt))
         (PROGRESS: forall
             st_src st_tgt itr_src itr_tgt
             fuel
-            (SIM: hsim Q ctx fuel false false (st_src, itr_src) (st_tgt, itr_tgt)),
+            (SIM: hsim Q fmr fuel false false (st_src, itr_src) (st_tgt, itr_tgt)),
             P fuel true true (st_src, itr_src) (st_tgt, itr_tgt))
     :
       forall fuel f_src f_tgt st_src st_tgt
-             (SIM: hsim Q ctx fuel f_src f_tgt st_src st_tgt),
+             (SIM: hsim Q fmr fuel f_src f_tgt st_src st_tgt),
         P fuel f_src f_tgt st_src st_tgt.
   Proof.
     i. punfold SIM. induction SIM using _hsim_ind2.
@@ -594,22 +595,22 @@ Section SIM.
   Qed.
 
   Definition mylift (fuel: option Ord.t) X (x: X)
-             ctx
+             fr
              (Q: X -> Any.t -> Any.t -> iProp) (itr_src: itree hEs Any.t): itree Es Any.t :=
     match fuel with
     | None =>
-      (interp_hCallE_tgt stb o (interp_hEs_tgt itr_src) ctx) >>= (HoareFunRet Q x)
+      (interp_hCallE_tgt stb o (interp_hEs_tgt itr_src) fr) >>= (HoareFunRet Q x)
     | Some fuel =>
-      r0 <- (interp_hCallE_tgt stb o (_APC fuel) ctx);;
+      r0 <- (interp_hCallE_tgt stb o (_APC fuel) fr);;
       r1 <- (interp_hCallE_tgt stb o (tau;; Ret (snd r0)) (fst r0));;
       r2 <- (interp_hCallE_tgt stb o (interp_hEs_tgt itr_src) (fst r1));;
       (HoareFunRet Q x r2)
     end.
 
-  Lemma current_iPropL_convert ctx P
-        (CUR: current_iProp ctx P)
+  Lemma current_iPropL_convert fmr P
+        (CUR: current_iProp fmr P)
     :
-      current_iPropL ctx [("H", P)].
+      current_iPropL fmr [("H", P)].
   Proof.
     unfold current_iPropL. ss. unfold from_iPropL.
     eapply current_iProp_entail; eauto.
@@ -617,16 +618,16 @@ Section SIM.
 
   Lemma hsim_adequacy_aux `{PreOrder _ le}:
     forall
-      f_src f_tgt st_src st_tgt fl_src fl_tgt (itr_src: itree (hAPCE +' Es) Any.t) itr_tgt mr_src ctx X (x: X) Q fuel w0
+      f_src f_tgt st_src st_tgt fl_src fl_tgt (itr_src: itree (hAPCE +' Es) Any.t) itr_tgt (mr_src: Σ) fr X (x: X) Q fuel w0
       (SIM: hsim (fun st_src st_tgt ret_src ret_tgt =>
-                    (inv_with w0 st_src st_tgt) ** (Q x ret_src ret_tgt: iProp)) ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, itr_tgt)),
+                    (inv_with w0 st_src st_tgt) ** (Q x ret_src ret_tgt: iProp)) (fr ⋅ mr_src) fuel f_src f_tgt (st_src, itr_src) (st_tgt, itr_tgt)),
       paco8 (_sim_itree (mk_wf I) le fl_src fl_tgt) bot8 Any.t Any.t (lift_rel (mk_wf I) le w0 (@eq Any.t))
             f_src f_tgt w0
-            (Any.pair st_src mr_src,
-             mylift fuel x ctx Q itr_src)
+            (Any.pair st_src mr_src↑,
+             mylift fuel x fr Q itr_src)
             (st_tgt, itr_tgt).
-  Proof.
-    ginit. gcofix CIH. i.
+  Proof. Admitted.
+    (* ginit. gcofix CIH. i.
     remember (st_src, itr_src). remember (st_tgt, itr_tgt).
     revert st_src st_tgt itr_src itr_tgt Heqp Heqp0 CIH.
     induction SIM using hsim_ind; i; clarify.
@@ -637,32 +638,31 @@ Section SIM.
       { unfold inv_with in RET. mDesAll. hret _; eauto.
         iModIntro. iSplitL "H"; auto. }
     }
-    {  eapply current_iPropL_convert in PRE. mDesAll. destruct fuel; steps_safe_l. 
-      { astop. steps_safe_l.
-        rewrite SPEC. steps_safe_l. destruct fsp. ss. 
-        unfold inv_with in PRE.  mDesAll. hcall _ _ with "A A1". 
+    { eapply current_iPropL_convert in PRE. mDesAll. destruct fuel; steps_safe. 
+      { astop. steps_safe. rewrite SPEC. steps_safe. destruct fsp. ss. 
+        unfold inv_with in PRE. mDesAll. hcall _ _ with "A A1". 
         { iModIntro. iSplitL "A1"; eauto. }
         { rewrite MEASURE in *. splits; ss. unfold ord_lt. des_ifs. }
         { steps. gbase. hexploit CIH.
           { eapply POST. eapply current_iProp_entail; [eauto|].
             start_ipm_proof. iSplitR "POST".
-            { iSplitL "H"; eauto. iExists a1. iSplit; eauto. iPureIntro. etrans; eauto. }
+            { iSplitL "H"; eauto. iExists a1. iSplit; eauto. }
             { iApply "POST". }
           }
-          i. ss. eauto.
+          i. ss; eauto.
         }
       }
-      { rewrite SPEC. steps_safe_l. destruct fsp. ss.
+      { rewrite SPEC. steps_safe. destruct fsp. ss.
         unfold inv_with in PRE. mDesAll. hcall _ _ with "A A1".
         { iModIntro. iSplitL "A1"; eauto. }
         { rewrite MEASURE in *. splits; ss. unfold ord_lt. des_ifs. }
         { steps. gbase. hexploit CIH.
           { eapply POST. eapply current_iProp_entail; [eauto|].
             start_ipm_proof. iSplitR "POST".
-            { iSplitL "H"; eauto. iExists a1. iSplit; eauto. iPureIntro. etrans; eauto. }
+            { iSplitL "H"; eauto. iExists a1. iSplit; eauto. }
             { iApply "POST". }
           }
-          i. ss. eauto.
+          i. ss; eauto.
         }
       }
     }
@@ -694,12 +694,12 @@ Section SIM.
         { astop. steps. }
       }
     }
-    { des. steps_safe_l. rewrite unfold_APC. steps_safe_l.
-      force_l. exists false. steps_safe_l.
-      force_l. exists fuel1. steps_safe_l.
-      force_l; [eauto|..]. steps_safe_l.
-      force_l. exists (fn, arg_src). steps_safe_l.
-      rewrite SPEC. steps_safe_l.
+    { des. steps_safe. rewrite unfold_APC. steps_safe.
+      force_l. exists false. steps_safe.
+      force_l. exists fuel1. steps_safe.
+      force_l; [eauto|..]. steps_safe.
+      force_l. exists (fn, arg_src). steps_safe.
+      rewrite SPEC. steps_safe.
       eapply current_iPropL_convert in PRE. mDesAll.
       destruct fsp. ss. unfold inv_with in PRE. mDesAll.
       hcall _ _ with "A A1".
@@ -708,22 +708,18 @@ Section SIM.
       { steps. gbase. hexploit CIH.
         { eapply SIM. eapply current_iProp_entail; [eauto|].
           start_ipm_proof. iSplitR "POST".
-          { iSplitL "H"; eauto. iExists a1. iSplit; eauto. iPureIntro. etrans; eauto. }
+          { iSplitL "H"; eauto. iExists a1. iSplit; eauto. }
           { iApply "POST". }
         }
-        i. ss. eauto.
+        i. ss; eauto.
       }
     }
     { destruct fuel; steps.
       { astop. steps. gbase. hexploit CIH; eauto. }
       { gbase. hexploit CIH; eauto. }
     }
-    { destruct fuel; steps.
-      { astop. steps. rewrite SPEC. steps.
-      } 
-    
-    }
-    { steps. } 
+    { admit. }
+    { admit. } 
 
     { destruct fuel; steps.
       { astop. steps. exploit IHSIM; eauto. }
@@ -747,39 +743,39 @@ Section SIM.
     }
     { steps. exploit IHSIM; et. }
     { deflag. gbase. eapply CIH; eauto. }
-  Qed.
+  Qed. *)
 
   Lemma hsim_adequacy `{PreOrder _ le}:
     forall
-      f_src f_tgt st_src st_tgt fl_src fl_tgt (itr_src: itree (hAPCE +' Es) Any.t) itr_tgt mr_src ctx X (x: X) Q w0
+      f_src f_tgt st_src st_tgt fl_src fl_tgt (itr_src: itree (hAPCE +' Es) Any.t) itr_tgt (mr_src: Σ) fr X (x: X) Q w0
       (SIM: hsim (fun st_src st_tgt ret_src ret_tgt =>
-                    (inv_with w0 st_src st_tgt) ** (Q x ret_src ret_tgt: iProp)) ctx None f_src f_tgt (st_src, itr_src) (st_tgt, itr_tgt)),
+                    (inv_with w0 st_src st_tgt) ** (Q x ret_src ret_tgt: iProp)) (fr ⋅ mr_src) None f_src f_tgt (st_src, itr_src) (st_tgt, itr_tgt)),
       paco8 (_sim_itree (mk_wf I) le fl_src fl_tgt) bot8 Any.t Any.t (lift_rel (mk_wf I) le w0 (@eq Any.t))
             f_src f_tgt w0
-            (Any.pair st_src mr_src,
-             (interp_hCallE_tgt stb o (interp_hEs_tgt itr_src) ctx) >>= (HoareFunRet Q x))
+            (Any.pair st_src mr_src↑,
+             (interp_hCallE_tgt stb o (interp_hEs_tgt itr_src) fr) >>= (HoareFunRet Q x))
             (st_tgt, itr_tgt).
   Proof.
     i. hexploit hsim_adequacy_aux; eauto.
   Qed.
 
-  Lemma hsim_progress_flag R_src R_tgt r g Q ctx fuel st_src st_tgt
-        (SIM: gpaco9 _hsim (cpn9 _hsim) g g R_src R_tgt Q ctx fuel false false st_src st_tgt)
+  Lemma hsim_progress_flag R_src R_tgt r g Q fmr fuel st_src st_tgt
+        (SIM: gpaco9 _hsim (cpn9 _hsim) g g R_src R_tgt Q fmr fuel false false st_src st_tgt)
     :
-      gpaco9 _hsim (cpn9 _hsim) r g _ _ Q ctx fuel true true st_src st_tgt.
+      gpaco9 _hsim (cpn9 _hsim) r g _ _ Q fmr fuel true true st_src st_tgt.
   Proof.
     destruct st_src, st_tgt. gstep. eapply hsim_progress; eauto.
   Qed.
 
   Lemma _hsim_flag_mon
         r
-        R_src R_tgt Q ctx
+        R_src R_tgt Q fmr
         fuel f_src0 f_tgt0 f_src1 f_tgt1 st_src st_tgt
-        (SIM: @_hsim r R_src R_tgt Q ctx fuel f_src0 f_tgt0 st_src st_tgt)
+        (SIM: @_hsim r R_src R_tgt Q fmr fuel f_src0 f_tgt0 st_src st_tgt)
         (SRC: f_src0 = true -> f_src1 = true)
         (TGT: f_tgt0 = true -> f_tgt1 = true)
     :
-      @_hsim r R_src R_tgt Q ctx fuel f_src1 f_tgt1 st_src st_tgt.
+      @_hsim r R_src R_tgt Q fmr fuel f_src1 f_tgt1 st_src st_tgt.
   Proof.
     revert f_src1 f_tgt1 SRC TGT.
     induction SIM using _hsim_ind2; i; clarify.
@@ -788,32 +784,34 @@ Section SIM.
     { econs 3. eapply IHSIM; eauto. }
     { econs 4; eauto. }
     { econs 5; eauto. }
-    { econs 6. eapply IHSIM; eauto. }
-    { econs 7; eauto. }
-    { econs 8; eauto. des. esplits. eapply IH; eauto. }
-    { econs 9; eauto. i. hexploit SIM; eauto. i. des. eauto. }
-    { econs 10; eauto. i. hexploit SIM; eauto. i. des. eapply IH; eauto. }
-    { econs 11; eauto. des. esplits; eauto. }
-    { econs 12. eapply IHSIM; auto. }
-    { econs 13. eapply IHSIM; auto. }
-    { exploit SRC; auto. exploit TGT; auto. i. clarify. econs 14; eauto. }
+    { econs 6; et. }
+    { econs 7; et. }
+    { econs 8. eapply IHSIM; eauto. }
+    { econs 9; eauto. }
+    { econs 10; eauto. des. esplits. eapply IH; eauto. }
+    { econs 11; eauto. i. hexploit SIM; eauto. i. des. eauto. }
+    { econs 12; eauto. i. hexploit SIM; eauto. i. des. eapply IH; eauto. }
+    { econs 13; eauto. des. esplits; eauto. }
+    { econs 14. eapply IHSIM; auto. }
+    { econs 15. eapply IHSIM; auto. }
+    { exploit SRC; auto. exploit TGT; auto. i. clarify. econs 16; eauto. }
   Qed.
 
   Variant fuelC (r: forall R_src R_tgt
                            (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                           (ctx: Σ),
+                           (fmr: Σ),
                     option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | fuelC_intro
       f_src f_tgt fuel0 fuel1
       st_src st_tgt
-      (SIM: r _ _ Q ctx fuel0 f_src f_tgt st_src st_tgt)
+      (SIM: r _ _ Q fmr fuel0 f_src f_tgt st_src st_tgt)
       (ORD: option_Ord_le fuel0 fuel1)
     :
-      fuelC r Q ctx fuel1 f_src f_tgt st_src st_tgt
+      fuelC r Q fmr fuel1 f_src f_tgt st_src st_tgt
   .
 
   Lemma fuelC_mon:
@@ -834,34 +832,36 @@ Section SIM.
       { i. eapply rclo9_base. eauto. }
     }
     { econs 5; eauto. i. eapply rclo9_base. auto. }
-    { econs 6; eauto. eapply _hsim_mon; eauto. i. apply rclo9_base. auto. }
-    { econs 7; eauto. }
-    { econs 8; eauto. des. esplits; eauto. eapply _hsim_mon; eauto. i. apply rclo9_base. auto. }
-    { econs 9; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { econs 10; eauto. i. hexploit SIM; eauto. i. des. eapply _hsim_mon; eauto. i. eapply rclo9_base; auto. }
-    { econs 11; eauto. des. esplits; eauto. }
-    { econs 12; eauto. eapply _hsim_mon; et. i. apply rclo9_base. et. }
-    { econs 13; eauto. }
-    { econs 14; eauto. eapply rclo9_clo_base. econs; eauto. }
+    { econs 6; et. }
+    { econs 7; et. }
+    { econs 8; eauto. eapply _hsim_mon; eauto. i. apply rclo9_base. auto. }
+    { econs 9; eauto. }
+    { econs 10; eauto. des. esplits; eauto. eapply _hsim_mon; eauto. i. apply rclo9_base. auto. }
+    { econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 12; eauto. i. hexploit SIM; eauto. i. des. eapply _hsim_mon; eauto. i. eapply rclo9_base; auto. }
+    { econs 13; eauto. des. esplits; eauto. }
+    { econs 14; eauto. eapply _hsim_mon; et. i. apply rclo9_base. et. }
+    { econs 15; eauto. }
+    { econs 16; eauto. eapply rclo9_clo_base. econs; eauto. }
   Qed.
 
   Variant hflagC (r: forall R_src R_tgt
                             (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                            (ctx: Σ),
+                            (fmr: Σ),
                      option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hflagC_intro
       f_src0 f_src1 f_tgt0 f_tgt1 fuel0 fuel1
       st_src st_tgt
-      (SIM: r _ _ Q ctx fuel0 f_src0 f_tgt0 st_src st_tgt)
+      (SIM: r _ _ Q fmr fuel0 f_src0 f_tgt0 st_src st_tgt)
       (SRC: f_src0 = true -> f_src1 = true)
       (TGT: f_tgt0 = true -> f_tgt1 = true)
       (ORD: option_Ord_le fuel0 fuel1)
     :
-      hflagC r Q ctx fuel1 f_src1 f_tgt1 st_src st_tgt
+      hflagC r Q fmr fuel1 f_src1 f_tgt1 st_src st_tgt
   .
 
   Lemma hflagC_mon:
@@ -917,126 +917,145 @@ Section SIM.
   Variant hsimC
           (r g: forall R_src R_tgt
                        (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                       (ctx: Σ),
+                       (fmr: Σ),
               option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hsimC_ret
       v_src v_tgt
       st_src st_tgt
       fuel f_src f_tgt
-      (RET: current_iProp ctx (Q st_src st_tgt v_src v_tgt))
+      (RET: current_iProp fmr (Q st_src st_tgt v_src v_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, (Ret v_src)) (st_tgt, (Ret v_tgt))
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, (Ret v_src)) (st_tgt, (Ret v_tgt))
   | hsimC_call
       fsp (x: fsp.(meta)) w0 FR
       fn arg_src arg_tgt
       st_src0 st_tgt0 ktr_src ktr_tgt
       fuel f_src f_tgt
       (SPEC: stb fn = Some fsp)
-      (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+      (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
       (MEASURE: o = ord_top)
       (NPURE: fsp.(measure) x = ord_top)
-      (POST: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                    (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-          g _ _ Q ctx1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt))
+      (POST: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                    (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+          g _ _ Q fmr1 None true true (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src0, trigger (Call fn arg_src) >>= ktr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src0, trigger (Call fn arg_src) >>= ktr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
   | hsimC_apc_start
       fuel1
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: r _ _ Q ctx (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
+      (SIM: r _ _ Q fmr (fuel1) true f_tgt (st_src, ktr_src tt) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, trigger (hAPC) >>= ktr_src) (st_tgt, itr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, trigger (hAPC) >>= ktr_src) (st_tgt, itr_tgt)
   | hsimC_apc_step
       fsp (x: fsp.(meta)) w0 FR arg_src
       fn arg_tgt
       st_src0 st_tgt0 itr_src ktr_tgt
       fuel0 f_src f_tgt
       (SPEC: stb fn = Some fsp)
-      (PRE: current_iProp ctx (FR ** inv_with w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
+      (PRE: current_iProp fmr (FR ** I w0 st_src0 st_tgt0 ** fsp.(precond) x arg_src arg_tgt))
       (MEASURE: ord_lt (fsp.(measure) x) o)
       (PURE: is_pure (fsp.(measure) x))
       (POST: exists fuel1,
           (<<FUEL: Ord.lt fuel1 fuel0>>) /\
-          (<<SIM: forall ctx1 w0 st_src1 st_tgt1 ret_src ret_tgt
-                         (ACC: current_iProp ctx1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
-              g _ _ Q ctx1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>))
+          (<<SIM: forall fmr1 w0 st_src1 st_tgt1 ret_src ret_tgt
+                         (ACC: current_iProp fmr1 (FR ** inv_with w0 st_src1 st_tgt1 ** fsp.(postcond) x ret_src ret_tgt)),
+              g _ _ Q fmr1 (Some fuel1) true true (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt)>>))
     :
-      hsimC r g Q ctx (Some fuel0) f_src f_tgt (st_src0, itr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
+      hsimC r g Q fmr (Some fuel0) f_src f_tgt (st_src0, itr_src) (st_tgt0, trigger (Call fn arg_tgt) >>= ktr_tgt)
   | hsimC_syscall
       fn arg rvs
       st_src st_tgt ktr_src ktr_tgt
       fuel f_src f_tgt
       (POST: forall ret,
-          g _ _ Q ctx None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret))
+          g _ _ Q fmr None true true (st_src, ktr_src ret) (st_tgt, ktr_tgt ret))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, trigger (Syscall fn arg rvs) >>= ktr_src) (st_tgt, trigger (Syscall fn arg rvs) >>= ktr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, trigger (Syscall fn arg rvs) >>= ktr_src) (st_tgt, trigger (Syscall fn arg rvs) >>= ktr_tgt)
+  | hsimC_inline_src
+      fsp fn f arg_src
+      st_src st_tgt ktr_src itr_tgt
+      fuel f_src f_tgt
+      (SPEC: stb fn = Some fsp)
+      (FUN: alist_find fn fl_src = Some f)
+      (SIM: r _ _ Q fmr fuel true f_tgt (st_src, (f arg_src) >>= ktr_src) (st_tgt, itr_tgt))
+    :
+      hsimC _ _ Q fmr fuel f_src f_tgt (st_src, trigger (Call fn arg_src) >>= ktr_src) (st_tgt, itr_tgt)
+  | hsimC_inline_tgt
+      fsp fn f arg_tgt
+      st_src st_tgt itr_src ktr_tgt
+      fuel f_src f_tgt
+      (SPEC: stb fn = Some fsp)
+      (FUN: alist_find fn fl_tgt = Some f)
+      (SIM: r _ _ Q fmr fuel f_src true (st_src, itr_src) (st_tgt, (f arg_tgt) >>= ktr_tgt))
+    :
+      hsimC _ _ Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Call fn arg_tgt) >>= ktr_tgt)      
+    
   | hsimC_tau_src
       st_src st_tgt itr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: r _ _ Q ctx None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
+      (SIM: r _ _ Q fmr None true f_tgt (st_src, itr_src) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, tau;; itr_src) (st_tgt, itr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, tau;; itr_src) (st_tgt, itr_tgt)
   | hsimC_tau_tgt
       st_src st_tgt itr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: r _ _ Q ctx fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
+      (SIM: r _ _ Q fmr fuel f_src true (st_src, itr_src) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, tau;; itr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, tau;; itr_tgt)
   | hsimC_choose_src
       X
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: exists x, r _ _ Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
+      (SIM: exists x, r _ _ Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, trigger (Choose X) >>= ktr_src) (st_tgt, itr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, trigger (Choose X) >>= ktr_src) (st_tgt, itr_tgt)
   | hsimC_choose_tgt
       X
       st_src st_tgt itr_src ktr_tgt
       fuel f_src f_tgt
-      (SIM: forall x, r _ _ Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
+      (SIM: forall x, r _ _ Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Choose X) >>= ktr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Choose X) >>= ktr_tgt)
   | hsimC_take_src
       X
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
-      (SIM: forall x, r _ _ Q ctx None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
+      (SIM: forall x, r _ _ Q fmr None true f_tgt (st_src, ktr_src x) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, trigger (Take X) >>= ktr_src) (st_tgt, itr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, trigger (Take X) >>= ktr_src) (st_tgt, itr_tgt)
   | hsimC_take_tgt
       X
       st_src st_tgt itr_src ktr_tgt
       fuel f_src f_tgt
-      (SIM: exists x, r _ _ Q ctx fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
+      (SIM: exists x, r _ _ Q fmr fuel f_src true (st_src, itr_src) (st_tgt, ktr_tgt x))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Take X) >>= ktr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (Take X) >>= ktr_tgt)
   | hsimC_supdate_src
       X
       st_src st_tgt ktr_src itr_tgt
       fuel f_src f_tgt
       (run: Any.t -> Any.t * X)
-      (SIM: r _ _ Q ctx None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
+      (SIM: r _ _ Q fmr None true f_tgt (fst (run st_src), ktr_src (snd (run st_src))) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, trigger (SUpdate run) >>= ktr_src) (st_tgt, itr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, trigger (SUpdate run) >>= ktr_src) (st_tgt, itr_tgt)
   | hsimC_supdate_tgt
       X
       st_src st_tgt itr_src ktr_tgt
       fuel f_src f_tgt
       (run: Any.t -> Any.t * X)
-      (SIM: r _ _ Q ctx fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
+      (SIM: r _ _ Q fmr fuel f_src true (st_src, itr_src) (fst (run st_tgt), ktr_tgt (snd (run st_tgt))))
     :
-      hsimC r g Q ctx fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (SUpdate run) >>= ktr_tgt)
+      hsimC r g Q fmr fuel f_src f_tgt (st_src, itr_src) (st_tgt, trigger (SUpdate run) >>= ktr_tgt)
   | hsimC_progress
       st_src st_tgt itr_src itr_tgt
       fuel
-      (SIM: g _ _ Q ctx fuel false false (st_src, itr_src) (st_tgt, itr_tgt))
+      (SIM: g _ _ Q fmr fuel false false (st_src, itr_src) (st_tgt, itr_tgt))
     :
-      hsimC r g Q ctx fuel true true (st_src, itr_src) (st_tgt, itr_tgt)
+      hsimC r g Q fmr fuel true true (st_src, itr_src) (st_tgt, itr_tgt)
   .
 
   Lemma hsim_indC_mon_gen r0 r1 g0 g1
@@ -1053,13 +1072,15 @@ Section SIM.
     { econs 5; eauto. }
     { econs 6; eauto. }
     { econs 7; eauto. }
-    { econs 8; eauto. des. esplits; eauto. }
+    { econs 8; eauto. }
     { econs 9; eauto. }
-    { econs 10; eauto. }
-    { econs 11; eauto. des. esplits; eauto. }
+    { econs 10; eauto. des. esplits; eauto. }
+    { econs 11; eauto. }
     { econs 12; eauto. }
-    { econs 13; eauto. }
+    { econs 13; eauto. des. esplits; eauto. }
     { econs 14; eauto. }
+    { econs 15; eauto. }
+    { econs 16; eauto. }
   Qed.
 
   Lemma hsim_indC_mon: monotone9 (fun r => @hsimC r r).
@@ -1080,13 +1101,15 @@ Section SIM.
     { econs 5; eauto. i. eapply rclo9_base. eauto. }
     { econs 6; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
     { econs 7; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 8; eauto. des. esplits; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 9; eauto. i. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 10; eauto. i. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 11; eauto. des. esplits; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 12; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 13; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
-    { econs 14; eauto. eapply rclo9_base. eauto. }
+    { econs 8; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 9; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 10; eauto. des. esplits; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 11; eauto. i. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 12; eauto. i. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 13; eauto. des. esplits; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 14; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 15; eauto. eapply _hsim_mon; eauto. i. eapply rclo9_base. eauto. }
+    { econs 16; eauto. eapply rclo9_base. eauto. }
   Qed.
 
   Lemma hsimC_spec:
@@ -1100,13 +1123,15 @@ Section SIM.
     { gstep. econs 5; eauto. i. gbase. eauto. }
     { guclo hsim_indC_spec. ss. econs 6; eauto. gbase. eauto. }
     { guclo hsim_indC_spec. ss. econs 7; eauto. gbase. eauto. }
-    { guclo hsim_indC_spec. ss. econs 8; eauto. des. esplits; eauto. gbase. eauto. }
+    { guclo hsim_indC_spec. ss. econs 8; eauto. gbase. eauto. }
     { guclo hsim_indC_spec. ss. econs 9; eauto. gbase. eauto. }
-    { guclo hsim_indC_spec. ss. econs 10; eauto. gbase. eauto. }
-    { guclo hsim_indC_spec. ss. econs 11; eauto. des. esplits; eauto. gbase. eauto. }
+    { guclo hsim_indC_spec. ss. econs 10; eauto. des. esplits; eauto. gbase. eauto. }
+    { guclo hsim_indC_spec. ss. econs 11; eauto. gbase. eauto. }
     { guclo hsim_indC_spec. ss. econs 12; eauto. gbase. eauto. }
-    { guclo hsim_indC_spec. ss. econs 13; eauto. gbase. eauto. }
-    { gstep. econs 14; eauto. i. gbase. eauto. }
+    { guclo hsim_indC_spec. ss. econs 13; eauto. des. esplits; eauto. gbase. eauto. }
+    { guclo hsim_indC_spec. ss. econs 14; eauto. gbase. eauto. }
+    { guclo hsim_indC_spec. ss. econs 15; eauto. gbase. eauto. }
+    { gstep. econs 16; eauto. i. gbase. eauto. }
   Qed.
 
   Lemma hsimC_uclo r g:
@@ -1119,22 +1144,22 @@ Section SIM.
 
   Variant hbindC (r: forall R_src R_tgt
                             (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                            (ctx: Σ),
+                            (fmr: Σ),
                      option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hbindC_intro
       S_src S_tgt
       (P: Any.t -> Any.t -> S_src -> S_tgt -> iProp)
       fuel f_src f_tgt st_src0 st_tgt0 itr_src itr_tgt ktr_src ktr_tgt
-      (SIM: @r S_src S_tgt P ctx fuel f_src f_tgt (st_src0, itr_src) (st_tgt0, itr_tgt))
-      (SIMK: forall ctx1 st_src1 st_tgt1 ret_src ret_tgt
-                    (POST: current_iProp ctx1 (P st_src1 st_tgt1 ret_src ret_tgt)),
-          @r R_src R_tgt Q ctx1 None false false (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt))
+      (SIM: @r S_src S_tgt P fmr fuel f_src f_tgt (st_src0, itr_src) (st_tgt0, itr_tgt))
+      (SIMK: forall fmr1 st_src1 st_tgt1 ret_src ret_tgt
+                    (POST: current_iProp fmr1 (P st_src1 st_tgt1 ret_src ret_tgt)),
+          @r R_src R_tgt Q fmr1 None false false (st_src1, ktr_src ret_src) (st_tgt1, ktr_tgt ret_tgt))
     :
-      hbindC r Q ctx fuel f_src f_tgt (st_src0, itr_src >>= ktr_src) (st_tgt0, itr_tgt >>= ktr_tgt)
+      hbindC r Q fmr fuel f_src f_tgt (st_src0, itr_src >>= ktr_src) (st_tgt0, itr_tgt >>= ktr_tgt)
   .
 
   Lemma hbindC_mon:
@@ -1164,35 +1189,37 @@ Section SIM.
       hexploit SIM; eauto. i. gbase. eapply rclo9_clo_base. left. econs; eauto.
     }
     { gstep. econs 5; eauto. i. gbase. eapply rclo9_clo_base. left. econs; eauto. }
-    { eapply hsimC_uclo. econs 6; eauto. }
-    { eapply hsimC_uclo. econs 7; eauto. }
-    { des. eapply hsimC_uclo. econs 8; eauto. }
-    { eapply hsimC_uclo. econs 9; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { eapply hsimC_uclo. econs 10; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { des. eapply hsimC_uclo. econs 11; eauto. }
-    { eapply hsimC_uclo. econs 12; eauto. }
-    { eapply hsimC_uclo. econs 13; eauto. }
-    { gstep. econs 14; eauto. gbase. eapply rclo9_clo_base. left. econs; eauto. }
+    { exploit IHSIM; et. rewrite bind_bind. i. eapply hsimC_uclo. econs 6; eauto. }
+    { exploit IHSIM; et. rewrite bind_bind. i. eapply hsimC_uclo. econs 7; eauto. }
+    { eapply hsimC_uclo. econs 8; eauto. }
+    { eapply hsimC_uclo. econs 9; eauto. }
+    { des. eapply hsimC_uclo. econs 10; eauto. }
+    { eapply hsimC_uclo. econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { eapply hsimC_uclo. econs 12; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { des. eapply hsimC_uclo. econs 13; eauto. }
+    { eapply hsimC_uclo. econs 14; eauto. }
+    { eapply hsimC_uclo. econs 15; eauto. }
+    { gstep. econs 16; eauto. gbase. eapply rclo9_clo_base. left. econs; eauto. }
   Qed.
 
   Variant hbind_rightC (r: forall R_src R_tgt
                                   (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                                  (ctx: Σ),
+                                  (fmr: Σ),
                            option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hbind_rightC_intro
       S_tgt
       (P: Any.t -> Any.t -> S_tgt -> iProp)
       fuel f_src f_tgt st_src0 st_tgt0 itr_src itr_tgt ktr_tgt
-      (SIM: @r unit S_tgt (fun st_src st_tgt _ ret_tgt => P st_src st_tgt ret_tgt) ctx None f_src f_tgt (st_src0, Ret tt) (st_tgt0, itr_tgt))
-      (SIMK: forall ctx1 st_src1 st_tgt1 ret_tgt
-                    (POST: current_iProp ctx1 (P st_src1 st_tgt1 ret_tgt)),
-          @r R_src R_tgt Q ctx1 fuel false false (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt))
+      (SIM: @r unit S_tgt (fun st_src st_tgt _ ret_tgt => P st_src st_tgt ret_tgt) fmr None f_src f_tgt (st_src0, Ret tt) (st_tgt0, itr_tgt))
+      (SIMK: forall fmr1 st_src1 st_tgt1 ret_tgt
+                    (POST: current_iProp fmr1 (P st_src1 st_tgt1 ret_tgt)),
+          @r R_src R_tgt Q fmr1 fuel false false (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt))
     :
-      hbind_rightC r Q ctx fuel f_src f_tgt (st_src0, itr_src) (st_tgt0, itr_tgt >>= ktr_tgt)
+      hbind_rightC r Q fmr fuel f_src f_tgt (st_src0, itr_src) (st_tgt0, itr_tgt >>= ktr_tgt)
   .
 
   Lemma hbind_rightC_mon:
@@ -1217,34 +1244,36 @@ Section SIM.
     { apply f_equal with (f:=_observe) in H0. ss. }
     { apply f_equal with (f:=_observe) in H0. ss. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { eapply hsimC_uclo. econs 7; eauto. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { eapply hsimC_uclo. econs 9; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { exploit IHSIM; et. rewrite bind_bind. i.  eapply hsimC_uclo. econs 7; eauto. }
+    { eapply hsimC_uclo. econs 9; eauto. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { des. eapply hsimC_uclo. econs 11; eauto. }
+    { eapply hsimC_uclo. econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { eapply hsimC_uclo. econs 13; eauto. }
-    { gstep. econs 14; eauto. gbase. eapply rclo9_clo_base. left. econs; eauto. }
+    { des. eapply hsimC_uclo. econs 13; eauto. }
+    { apply f_equal with (f:=_observe) in H0. ss. }
+    { eapply hsimC_uclo. econs 15; eauto. }
+    { gstep. econs 16; eauto. gbase. eapply rclo9_clo_base. left. econs; eauto. }
   Qed.
 
   Variant hsplitC (r: forall R_src R_tgt
                              (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                             (ctx: Σ),
+                             (fmr: Σ),
                       option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hsplitC_intro
       S_tgt
       (P: Any.t -> Any.t -> S_tgt -> iProp)
       fuel0 fuel1 f_src f_tgt st_src0 st_tgt0 itr_src itr_tgt ktr_tgt
-      (SIM: @r unit S_tgt (fun st_src st_tgt _ ret_tgt => P st_src st_tgt ret_tgt) ctx (Some fuel0) f_src f_tgt (st_src0, Ret tt) (st_tgt0, itr_tgt))
-      (SIMK: forall ctx1 st_src1 st_tgt1 ret_tgt
-                    (POST: current_iProp ctx1 (P st_src1 st_tgt1 ret_tgt)),
-          @r R_src R_tgt Q ctx1 (Some fuel1) false false (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt))
+      (SIM: @r unit S_tgt (fun st_src st_tgt _ ret_tgt => P st_src st_tgt ret_tgt) fmr (Some fuel0) f_src f_tgt (st_src0, Ret tt) (st_tgt0, itr_tgt))
+      (SIMK: forall fmr1 st_src1 st_tgt1 ret_tgt
+                    (POST: current_iProp fmr1 (P st_src1 st_tgt1 ret_tgt)),
+          @r R_src R_tgt Q fmr1 (Some fuel1) false false (st_src1, itr_src) (st_tgt1, ktr_tgt ret_tgt))
     :
-      hsplitC r Q ctx (Some (fuel1 + fuel0)%ord) f_src f_tgt (st_src0, itr_src) (st_tgt0, itr_tgt >>= ktr_tgt)
+      hsplitC r Q fmr (Some (fuel1 + fuel0)%ord) f_src f_tgt (st_src0, itr_src) (st_tgt0, itr_tgt >>= ktr_tgt)
   .
 
   Lemma hsplitC_mon:
@@ -1273,32 +1302,34 @@ Section SIM.
       i. hexploit SIM; eauto. i. gbase. eapply rclo9_clo_base. left. econs; eauto.
     }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { eapply hsimC_uclo. econs 7; eauto. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { eapply hsimC_uclo. econs 9; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { exploit IHSIM; et. rewrite bind_bind. i. eapply hsimC_uclo. econs 7; eauto. }
+    { eapply hsimC_uclo. econs 9; eauto. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { des. eapply hsimC_uclo. econs 11; eauto. }
+    { eapply hsimC_uclo. econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
     { apply f_equal with (f:=_observe) in H0. ss. }
-    { eapply hsimC_uclo. econs 13; eauto. }
-    { gstep. econs 14; eauto. gbase. eapply rclo9_clo_base. left. econs; eauto. }
+    { des. eapply hsimC_uclo. econs 13; eauto. }
+    { apply f_equal with (f:=_observe) in H0. ss. }
+    { eapply hsimC_uclo. econs 15; eauto. }
+    { gstep. econs 16; eauto. gbase. eapply rclo9_clo_base. left. econs; eauto. }
   Qed.
 
   Variant hmonoC (r: forall R_src R_tgt
                             (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                            (ctx: Σ),
+                            (fmr: Σ),
                      option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hmonoC_intro
       f_src f_tgt fuel Q0
       st_src st_tgt
-      (SIM: r _ _ Q0 ctx fuel f_src f_tgt st_src st_tgt)
+      (SIM: r _ _ Q0 fmr fuel f_src f_tgt st_src st_tgt)
       (MONO: forall st_src st_tgt ret_src ret_tgt,
           (bi_entails (Q0 st_src st_tgt ret_src ret_tgt) (#=> Q st_src st_tgt ret_src ret_tgt)))
     :
-      hmonoC r Q ctx fuel f_src f_tgt st_src st_tgt
+      hmonoC r Q fmr fuel f_src f_tgt st_src st_tgt
   .
 
   Lemma hmonoC_mon:
@@ -1320,13 +1351,15 @@ Section SIM.
     { econs 5; eauto. i. eapply rclo9_clo_base. econs; eauto. }
     { econs 6; eauto. }
     { econs 7; eauto. }
-    { econs 8; eauto. des. esplits; eauto. }
-    { econs 9; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { econs 10; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { econs 11; eauto. des. esplits; eauto. }
-    { econs 12; eauto. }
-    { econs 13; eauto. }
-    { econs 14; eauto. eapply rclo9_clo_base. econs; eauto. }
+    { econs 8; eauto. }
+    { econs 9; eauto. }
+    { econs 10; eauto. des. esplits; eauto. }
+    { econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 12; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 13; eauto. des. esplits; eauto. }
+    { econs 14; eauto. }
+    { econs 15; eauto. }
+    { econs 16; eauto. eapply rclo9_clo_base. econs; eauto. }
   Qed.
 
   Variant hframeC_aux (r: forall R_src R_tgt
@@ -1335,16 +1368,18 @@ Section SIM.
                       option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (res: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hframeC_aux_intro
-      res
+      res0 frm
       f_src f_tgt fuel
       st_src st_tgt
-      (PRE: URA.wf (ctx ⋅ res))
-      (SIM: r _ _ (fun st_src st_tgt ret_src ret_tgt => Own res -* #=> Q st_src st_tgt ret_src ret_tgt) (ctx ⋅ res) fuel f_src f_tgt st_src st_tgt)
+      (PRE: URA.wf res)
+      (UPD: URA.updatable res (res0 ⋅ frm))
+      (SIM: r _ _ (fun st_src st_tgt ret_src ret_tgt => Own frm -* #=> Q st_src st_tgt ret_src ret_tgt)
+              res0 fuel f_src f_tgt st_src st_tgt)
     :
-      hframeC_aux r Q ctx fuel f_src f_tgt st_src st_tgt
+      hframeC_aux r Q res fuel f_src f_tgt st_src st_tgt
   .
 
   Lemma hframeC_aux_mon:
@@ -1352,46 +1387,62 @@ Section SIM.
   Proof. ii. inv IN; econs; et. Qed.
   Hint Resolve hframeC_aux_mon: paco.
 
-  Lemma current_iProp_frame_own ctx0 ctx1 P
-        (CUR: current_iProp (ctx0 ⋅ ctx1) (Own ctx1 -* P))
+  Lemma current_iProp_updatable (res0 res1: Σ) P
+        (WF: URA.wf res1)
+        (UPD: URA.updatable res1 res0)
+        (CUR: current_iProp res0 P)
     :
-      current_iProp ctx0 P.
+      current_iProp res1 P.
+  Proof.
+    inv CUR. econs; try eassumption. etrans; et.  
+Qed.
+
+  Lemma current_iProp_frame_own res0 res1 P
+        (WF: URA.wf ((res0 ⋅ res1): Σ))
+        (CUR: current_iProp (res0) (Own res1 -* P))
+    :
+      current_iProp (res0 ⋅ res1) P.
   Proof.
     inv CUR. uipropall. hexploit IPROP.
-    2:{ exists URA.unit. eapply URA.unit_id. }
-    { eapply URA.wf_mon. instantiate (1:=ctx0). r_wf GWF. }
-    i. econs; [|eauto]. r_wf GWF.
+    2:{ refl. }
+    { eapply URA.updatable_wf; try apply WF; et. eapply URA.updatable_add; et. refl. }
+    i. econs; eauto. eapply URA.updatable_add; et. refl.
   Qed.
 
-  Lemma current_iProp_frame_own_rev ctx0 ctx1 P
-        (CUR: current_iProp ctx0 (Own ctx1 ** P))
+  Lemma current_iProp_frame_own_rev res0 res1 P
+        (CUR: current_iProp res0 (Own res1 ** P))
     :
-      current_iProp (ctx0 ⋅ ctx1) P.
+      exists res2, URA.wf res0 /\ URA.updatable res0 (res2 ⋅ res1) ∧ current_iProp res2 P.
   Proof.
     inv CUR. uipropall.
     unfold URA.extends in *. des; clarify.
-    econs; [|eauto]. eapply URA.wf_mon.
-    instantiate (1:=ctx). r_wf GWF.
+    exists (ctx ⋅ b). esplits; et.
+    { etrans; et. replace (ctx ⋅ b ⋅ res1) with (res1 ⋅ ctx ⋅ b) by r_solve; ss. }
+    econs; eauto.
+    { eapply URA.updatable_wf; et. etrans; et. eapply URA.extends_updatable. exists res1. r_solve. }
+    { eapply URA.extends_updatable. exists ctx. r_solve. }
   Qed.
 
-  Lemma current_iProp_own_wf ctx res
-        (CUR: current_iProp ctx (Own res))
-    :
-      URA.wf (ctx ⋅ res).
-  Proof.
-    inv CUR. uipropall. unfold URA.extends in *. des. clarify.
-    eapply URA.wf_mon.
-    instantiate (1:=ctx0). r_wf GWF.
-  Qed.
+  (* Lemma current_iProp_own_wf ctx res *)
+  (*       (CUR: current_iProp ctx (Own res)) *)
+  (*   : *)
+  (*     URA.wf (ctx ⋅ res). *)
+  (* Proof. *)
+  (*   inv CUR. uipropall. unfold URA.extends in *. des. clarify. *)
+  (*   eapply URA.wf_mon. *)
+  (*   instantiate (1:=ctx0). r_wf GWF. *)
+  (* Qed. *)
 
   Lemma hframeC_aux_spec: hframeC_aux <10= gupaco9 (_hsim) (cpn9 _hsim).
   Proof.
     eapply wrespect9_uclo; eauto with paco.
     econs; eauto with paco. i. inv PR. eapply GF in SIM.
     induction SIM using _hsim_ind2; i; clarify; ired_both.
-    { econs 1; eauto. eapply current_iProp_upd. eapply current_iProp_frame_own; eauto. }
+    { econs 1; eauto. eapply current_iProp_upd. eapply current_iProp_updatable; et.
+      eapply current_iProp_frame_own in RET; eauto. eapply URA.updatable_wf; et. }
     { econs 2; eauto.
-      { eapply current_iProp_frame_own.
+      { eapply current_iProp_updatable; et. eapply current_iProp_frame_own; eauto.
+        { eapply URA.updatable_wf; et. }
         eapply current_iProp_entail.
         { eapply PRE0. }
         iIntros "[[H0 H1] H2] H3".
@@ -1401,84 +1452,73 @@ Section SIM.
         iSplitL "H0"; [iExact "H0"|].
         iExact "H3".
       }
-      { i. eapply rclo9_clo_base. econs.
-        { instantiate (1:=res). eapply current_iProp_own_wf.
-          eapply current_iProp_entail.
-          { eapply ACC. }
-          iIntros "[[[H0 H1] H2] H3]". ss.
-        }
+      { i. eapply rclo9_clo_base.
+          eapply current_iProp_entail in ACC; cycle 1.
+        { iIntros "[[[H0 H1] H2] H3]". iCombine "H1 H0 H2 H3" as "H". iExact "H". }
+        eapply current_iProp_frame_own_rev in ACC. des.
+        econs; et.
         { eapply POST; eauto.
-          eapply current_iProp_frame_own_rev.
-          eapply current_iProp_entail.
-          { eapply ACC. }
-          iIntros "[[[H0 H1] H2] H3]".
-          iSplitL "H1"; [iExact "H1"|].
-          iSplitR "H3"; [|iExact "H3"].
-          iSplitR "H2"; [|iExact "H2"].
-          iExact "H0".
+                    eapply current_iProp_entail.
+          { eapply ACC1. }
+          iIntros "[H0 [H1 H2]]".
+          iFrame.
         }
       }
     }
     { econs 3; eauto. }
     { econs 4; eauto.
-      { eapply current_iProp_frame_own.
+      { eapply current_iProp_updatable; et.
+        eapply current_iProp_frame_own; et.
+        { eapply URA.updatable_wf; et. }
         eapply current_iProp_entail.
         { eapply PRE0. }
-        iIntros "[[H0 H1] H2] H3".
-        iSplitR "H2"; [|iExact "H2"].
-        iSplitR "H1"; [|iExact "H1"].
-        instantiate (1:= _ ** _).
-        iSplitL "H0"; [iExact "H0"|].
-        iExact "H3".
+        iIntros "[[H0 H1] H2] H3". iFrame. iCombine "H0 H3" as "H". iAssumption.
       }
       { des. esplits; eauto.
-        i. eapply rclo9_clo_base. econs.
-        { instantiate (1:=res). eapply current_iProp_own_wf.
-          eapply current_iProp_entail.
-          { eapply ACC. }
-          iIntros "[[[H0 H1] H2] H3]". ss.
-        }
+        i. eapply rclo9_clo_base.
+          eapply current_iProp_entail in ACC; cycle 1.
+        { iIntros "[[[H0 H1] H2] H3]". iCombine "H1 H0 H2 H3" as "H". iExact "H". }
+        eapply current_iProp_frame_own_rev in ACC. des.
+        econs; et.
         { eapply SIM; eauto.
-          eapply current_iProp_frame_own_rev.
-          eapply current_iProp_entail.
-          { eapply ACC. }
-          iIntros "[[[H0 H1] H2] H3]".
-          iSplitL "H1"; [iExact "H1"|].
-          iSplitR "H3"; [|iExact "H3"].
-          iSplitR "H2"; [|iExact "H2"].
-          iExact "H0".
+                    eapply current_iProp_entail.
+          { eapply ACC1. }
+          iIntros "[H0 [H1 H2]]".
+          iFrame.
         }
       }
     }
     { econs 5; eauto. i. eapply rclo9_clo_base. econs; eauto. }
     { econs 6; eauto. }
     { econs 7; eauto. }
-    { econs 8; eauto. des. esplits; eauto. }
-    { econs 9; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { econs 10; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
-    { econs 11; eauto. des. esplits; eauto. }
-    { econs 12; eauto. }
-    { econs 13; eauto. }
-    { econs 14; eauto. eapply rclo9_clo_base. econs; eauto. }
+    { econs 8; eauto. }
+    { econs 9; eauto. }
+    { econs 10; eauto. des. esplits; eauto. }
+    { econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 12; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 13; eauto. des. esplits; eauto. }
+    { econs 14; eauto. }
+    { econs 15; eauto. }
+    { econs 16; eauto. eapply rclo9_clo_base. econs; eauto. }
   Qed.
 
   Variant hframeC (r: forall R_src R_tgt
                              (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-                             (ctx: Σ),
+                             (fmr: Σ),
                       option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
           {R_src R_tgt}
           (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
-          (ctx: Σ)
+          (fmr: Σ)
     : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
   | hframeC_intro
       P0 P1
       f_src f_tgt fuel
       st_src st_tgt
-      (PRE: current_iProp ctx (P0 ** P1))
-      (SIM: forall ctx (PRE: current_iProp ctx P1),
-          r _ _ (fun st_src st_tgt ret_src ret_tgt => P0 -* #=> Q st_src st_tgt ret_src ret_tgt) ctx fuel f_src f_tgt st_src st_tgt)
+      (PRE: current_iProp fmr (P0 ** P1))
+      (SIM: forall fmr (PRE: current_iProp fmr P1),
+          r _ _ (fun st_src st_tgt ret_src ret_tgt => P0 -* #=> Q st_src st_tgt ret_src ret_tgt) fmr fuel f_src f_tgt st_src st_tgt)
     :
-      hframeC r Q ctx fuel f_src f_tgt st_src st_tgt
+      hframeC r Q fmr fuel f_src f_tgt st_src st_tgt
   .
 
   Lemma hframeC_spec: hframeC <10= gupaco9 (_hsim) (cpn9 _hsim).
@@ -1488,18 +1528,73 @@ Section SIM.
     autounfold with iprop in IPROP.
     autorewrite with iprop in IPROP. des. clarify.
     guclo hframeC_aux_spec. econs.
-    { instantiate (1:=a). eapply URA.wf_mon. instantiate (1:=b). r_wf GWF. }
+    { ss. }
+    { rewrite URA.add_comm. eauto. }
     { guclo hmonoC_spec. econs.
-      { gbase. eapply SIM. econs; [|eauto]. r_wf GWF.
+      { gbase. eapply SIM. econs; eauto.
+        - eapply URA.updatable_wf; et. etrans; et. eapply URA.extends_updatable. exists a; r_solve.
+        - refl.
       }
       { i. ss. iIntros "H0". iModIntro. iIntros "H1".
         iApply bupd_trans. iApply "H0".
         iStopProof. uipropall.
-        i. red in H. des. clarify. esplits; [|eauto].
-        eapply URA.wf_mon. instantiate (1:=ctx0). r_wf H0.
+        i. red in H. des. clarify. esplits; [eassumption|eauto].
+        i. eapply URA.wf_extends. { exists ctx. r_solve. } r_wf H.
       }
     }
   Qed.
+
+  Variant hupdC (r: forall R_src R_tgt
+                            (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
+                            (fmr: Σ),
+                     option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop)
+          {R_src R_tgt}
+          (Q: Any.t -> Any.t -> R_src -> R_tgt -> iProp)
+          (fmr: Σ)
+    : option Ord.t -> bool -> bool -> Any.t * itree hEs R_src -> Any.t * itree Es R_tgt -> Prop :=
+  | hupdC_intro
+      f_src f_tgt fuel
+      st_src st_tgt
+      fmr1
+      (WF: URA.wf fmr)
+      (UPD: URA.updatable fmr fmr1)
+      (SIM: r _ _ Q fmr1 fuel f_src f_tgt st_src st_tgt)
+    :
+      hupdC r Q fmr fuel f_src f_tgt st_src st_tgt
+  .
+
+  Lemma hupdC_mon:
+    monotone9 hupdC.
+  Proof. ii. inv IN; econs; et. Qed.
+  Hint Resolve hupdC_mon: paco.
+
+  Lemma hupdC_spec: hupdC <10= gupaco9 (_hsim) (cpn9 _hsim).
+  Proof.
+    eapply wrespect9_uclo; eauto with paco.
+    econs; eauto with paco. i. inv PR. eapply GF in SIM.
+    induction SIM using _hsim_ind2; i; clarify; ired_both.
+    { econs 1; eauto. eapply current_iProp_updatable; et. }
+    { econs 2; eauto. { eapply current_iProp_updatable; et. }
+      i. eapply rclo9_clo_base. econs; eauto; try refl. apply ACC.
+    }
+    { econs 3; eauto. }
+    { econs 4; eauto. { eapply current_iProp_updatable; et. } des. esplits; eauto. i. hexploit SIM; eauto.
+      i. eapply rclo9_clo_base. econs; eauto; try refl. apply ACC.
+    }
+    { econs 5; eauto. i. eapply rclo9_clo_base. econs; eauto. }
+    { econs 6; eauto. }
+    { econs 7; eauto. }
+    { econs 8; eauto. }
+    { econs 9; eauto. }
+    { econs 10; eauto. des. esplits; eauto. }
+    { econs 11; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 12; eauto. i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    { econs 13; eauto. des. esplits; eauto. }
+    { econs 14; eauto. }
+    { econs 15; eauto. }
+    { econs 16; eauto. eapply rclo9_clo_base. econs; eauto. }
+  Qed.
+
 End SIM.
 #[export] Hint Resolve _hsim_mon: paco.
 #[export] Hint Resolve cpn9_wcompat: paco.
