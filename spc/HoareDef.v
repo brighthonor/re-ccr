@@ -198,6 +198,10 @@ End PROOF.
 (* Definition map_fst A0 A1 B (f: A0 -> A1): (A0 * B) -> (A1 * B) := fun '(a, b) => (f a, b). *)
 (* Definition map_snd A B0 B1 (f: B0 -> B1): (A * B0) -> (A * B1) := fun '(a, b) => (a, f b). *)
 
+Section CANCEL.
+
+Context {Σ: GRA.t}.
+
 Variant hCallE: Type -> Type :=
 | hCall (tbr: bool) (fn: gname) (varg_src: Any_src): hCallE Any_src
 (*** tbr == to be removed ***)
@@ -206,10 +210,14 @@ Variant hCallE: Type -> Type :=
 Variant hAPCE: Type -> Type :=
 | hAPC: hAPCE unit
 .
+Variant hAAE: Type -> Type :=
+| ASSUME (P: iProp): hAAE unit
+| ASSERT (P: iProp): hAAE unit
+.
 
-Notation Es' := (hCallE +' sE +' eventE).
+Notation Es' := (hCallE +' hAAE +' sE +' eventE).
 
-Definition hEs := (hAPCE +' Es).
+Definition hEs := (hAPCE +' hAAE +' Es).
 
 Definition hcall {X Y} (fn: gname) (varg: X): itree (hCallE +' sE +' eventE) Y :=
   vret <- trigger (hCall false fn varg↑);; vret <- vret↓ǃ;; Ret vret.
@@ -262,14 +270,12 @@ Global Opaque _APC.
 
 
 
-Section CANCEL.
 
-  Context `{Σ: GRA.t}.
 
 
   Record fspecbody: Type := mk_specbody {
     fsb_fspec:> fspec;
-    fsb_body: Any.t -> itree (hAPCE +' Es) Any.t;
+    fsb_body: Any.t -> itree hEs Any.t;
   }
   .
 
@@ -306,8 +312,15 @@ Section CANCEL.
   Definition handle_hAPCE_src: hAPCE ~> itree Es :=
     fun _ '(hAPC) => Ret tt.
 
+  Definition handle_hAAE_src: hAAE ~> itree Es :=
+    fun _ e => 
+      match e with
+      | ASSUME _ => Ret tt
+      | ASSERT _ => Ret tt
+      end.
+
   Definition interp_hEs_src: itree hEs ~> itree Es :=
-    interp (case_ handle_hAPCE_src trivial_Handler)
+    interp (case_ handle_hAPCE_src (case_ handle_hAAE_src trivial_Handler))
   .
 
   Definition body_to_src {X} (body: X -> itree hEs Any.t): X -> itree Es Any.t :=
@@ -321,18 +334,21 @@ Section CANCEL.
 
 
   Definition handle_hAPCE_tgt: hAPCE ~> itree Es' :=
-    fun _ '(hAPC) => APC.
+        fun _ '(hAPC) => APC.
 
   Definition handle_callE_hEs: callE ~> itree Es' :=
     fun _ '(Call fn arg) => trigger (hCall false fn arg).
 
-  Definition interp_hEs_tgt: itree (hAPCE +' Es) ~> itree Es' :=
+  Definition interp_hEs_tgt: itree (hAPCE +' hAAE +' Es) ~> itree Es' :=
     interp (case_ (bif:=sum1) (handle_hAPCE_tgt)
-                  (case_ (bif:=sum1) (handle_callE_hEs)
-                         trivial_Handler)).
+                  (case_ (bif:=sum1) trivial_Handler
+                          (case_ (bif:=sum1) (handle_callE_hEs)
+                                  trivial_Handler))).
+
+(* TODO: following 'mid' definitions are auxilary functions for proving cancelation thm *)
 
 
-  Definition handle_hCallE_mid2: hCallE ~> itree Es :=
+  (* Definition handle_hCallE_mid2: hCallE ~> itree Es :=
     fun _ '(hCall tbr fn varg_src) =>
       match tbr with
       | true => tau;; trigger (Choose _)
@@ -380,12 +396,31 @@ Section CANCEL.
                                    (match ord_cur with
                                     | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
                                     | _ => body (varg_src)
-                                    end)).
+                                    end)). *)
+
+  Definition handle_hAAE_tgt: hAAE ~> stateT (Σ) (itree Es) :=
+    fun _ e 'fr =>
+      match e with
+      | ASSUME P => 
+        add <- trigger (Take Σ);;
+        mr <- mget;; 
+        assume (URA.wf (add ⋅ fr ⋅ mr));;;
+        assume(P add);;; 
+        Ret (add ⋅ fr, tt)
+      | ASSERT P =>
+        '(del, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
+        mr <- mget;;
+        guarantee(URA.updatable (fr ⋅ mr) (del ⋅ fr' ⋅ mr'));;;
+        guarantee(P del);;;
+        mput mr';;;
+        Ret (fr', tt)
+      end
+  .
 
   Definition handle_hCallE_tgt (ord_cur: ord): hCallE ~> stateT (Σ) (itree Es) :=
-    fun _ '(hCall tbr fn varg_src) 'ctx =>
+    fun _ '(hCall tbr fn varg_src) 'fr =>
       f <- (stb fn)ǃ;;
-      HoareCall tbr ord_cur f fn varg_src ctx
+      HoareCall tbr ord_cur f fn varg_src fr
   .
 
   Definition handle_sE_tgt: sE ~> itree Es :=
@@ -394,16 +429,17 @@ Section CANCEL.
          | SUpdate run => pupdate run
          end).
 
-  Definition interp_hCallE_tgt (ord_cur: ord): itree Es' ~> stateT Σ (itree Es) :=
+  Definition interp_Es'_tgt (ord_cur: ord): itree Es' ~> stateT Σ (itree Es) :=
     interp_state (case_ (bif:=sum1) (handle_hCallE_tgt ord_cur)
-                        (case_ (bif:=sum1)
-                               ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es))
-                               ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es))))
+                        (case_ (bif:=sum1) (handle_hAAE_tgt)
+                                (case_ (bif:=sum1)
+                                        ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es))
+                                        ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)))))
   .
 
   Definition body_to_tgt (ord_cur: ord)
-             {X} (body: X -> itree (hCallE +' sE +' eventE) Any_src): X -> stateT Σ (itree Es) Any_src :=
-    (@interp_hCallE_tgt ord_cur _) ∘ body.
+             {X} (body: X -> itree (hCallE +' hAAE +' sE +' eventE) Any_src): X -> stateT Σ (itree Es) Any_src :=
+    (@interp_Es'_tgt ord_cur _) ∘ body.
 
 
   Definition HoareFun
@@ -421,7 +457,7 @@ Section CANCEL.
     assume(URA.wf (rarg ⋅ mr));;;
     let ord_cur := D x in
     assume(P x varg_src varg_tgt rarg);;; (*** precondition ***)
-    '(fr0, vret_src) <- interp_hCallE_tgt
+    '(fr0, vret_src) <- interp_Es'_tgt
                           ord_cur
                           (interp_hEs_tgt
                              (match ord_cur with
@@ -489,7 +525,7 @@ If this feature is needed; we can extend it then. At the moment, I will only all
     :
       HoareFun D P Q body varg_tgt =
       '(ctx, (x, varg_src)) <- HoareFunArg P varg_tgt;;
-      interp_hCallE_tgt (D x)
+      interp_Es'_tgt (D x)
                         (interp_hEs_tgt
                            (match D x with
                             | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
@@ -551,8 +587,8 @@ Section SMODSEM.
   .
 
   Definition to_src (ms: t): ModSem.t := transl (fun_to_src ∘ fsb_body) initial_st ms.
-  Definition to_mid (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid stb ∘ fsb_body) initial_st ms.
-  Definition to_mid2 (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid2 ∘ fsb_body) initial_st ms.
+  (* Definition to_mid (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid stb ∘ fsb_body) initial_st ms.
+  Definition to_mid2 (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid2 ∘ fsb_body) initial_st ms. *)
   Definition to_tgt (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_tgt stb) (fun ms => Any.pair ms.(initial_st) ms.(initial_mr)↑) ms.
 
   Definition main (mainpre: Any.t -> iProp) (mainbody: Any.t -> itree hEs Any.t): t := {|
@@ -585,8 +621,8 @@ Section SMOD.
   .
 
   Definition to_src (md: t): Mod.t := transl (fun _ => fun_to_src ∘ fsb_body) SModSem.initial_st md.
-  Definition to_mid (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid stb ∘ fsb_body) SModSem.initial_st md.
-  Definition to_mid2 (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid2 ∘ fsb_body) SModSem.initial_st md.
+  (* Definition to_mid (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid stb ∘ fsb_body) SModSem.initial_st md.
+  Definition to_mid2 (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid2 ∘ fsb_body) SModSem.initial_st md. *)
   Definition to_tgt (stb: Sk.t -> gname -> option fspec) (md: t): Mod.t :=
     transl (fun sk => fun_to_tgt (stb sk)) (fun ms => Any.pair ms.(SModSem.initial_st) ms.(SModSem.initial_mr)↑) md.
 
@@ -625,9 +661,9 @@ Section SMOD.
   Lemma to_src_comm: forall sk smd,
       (SModSem.to_src) (get_modsem smd sk) = (to_src smd).(Mod.get_modsem) sk.
   Proof. refl. Qed.
-  Lemma to_mid_comm: forall sk stb smd,
+  (* Lemma to_mid_comm: forall sk stb smd,
       (SModSem.to_mid stb) (get_modsem smd sk) = (to_mid stb smd).(Mod.get_modsem) sk.
-  Proof. refl. Qed.
+  Proof. refl. Qed. *)
   Lemma to_tgt_comm: forall sk stb smd,
       (SModSem.to_tgt (stb sk)) (get_modsem smd sk) = (to_tgt stb smd).(Mod.get_modsem) sk.
   Proof. refl. Qed.
@@ -921,100 +957,100 @@ Context `{Σ: GRA.t}.
 (* itree reduction *)
 Lemma interp_tgt_bind
       (R S: Type)
-      (s : itree (hCallE +' sE +' eventE) R) (k : R -> itree (hCallE +' sE +' eventE) S)
+      (s : itree (hCallE +' hAAE +' sE +' eventE) R) (k : R -> itree (hCallE +' hAAE +' sE +' eventE) S)
       stb o ctx
   :
-    (interp_hCallE_tgt stb o (s >>= k)) ctx
+    (interp_Es'_tgt stb o (s >>= k)) ctx
     =
-    st <- interp_hCallE_tgt stb o s ctx;; interp_hCallE_tgt stb o (k st.2) st.1.
+    st <- interp_Es'_tgt stb o s ctx;; interp_Es'_tgt stb o (k st.2) st.1.
 Proof.
-  unfold interp_hCallE_tgt in *. eapply interp_state_bind.
+  unfold interp_Es'_tgt in *. eapply interp_state_bind.
 Qed.
 
 Lemma interp_tgt_tau stb o ctx
       (U: Type)
       (t : itree _ U)
   :
-    (interp_hCallE_tgt stb o (Tau t) ctx)
+    (interp_Es'_tgt stb o (Tau t) ctx)
     =
-    (Tau (interp_hCallE_tgt stb o t ctx)).
+    (Tau (interp_Es'_tgt stb o t ctx)).
 Proof.
-  unfold interp_hCallE_tgt in *. eapply interp_state_tau.
+  unfold interp_Es'_tgt in *. eapply interp_state_tau.
 Qed.
 
 Lemma interp_tgt_ret stb o ctx
       (U: Type)
       (t: U)
   :
-    (interp_hCallE_tgt stb o (Ret t) ctx)
+    (interp_Es'_tgt stb o (Ret t) ctx)
     =
     Ret (ctx, t).
 Proof.
-  unfold interp_hCallE_tgt in *. eapply interp_state_ret.
+  unfold interp_Es'_tgt in *. eapply interp_state_ret.
 Qed.
 
 Lemma interp_tgt_triggerp stb o ctx
       (R: Type)
       (i: sE R)
   :
-    (interp_hCallE_tgt stb o (trigger i) ctx)
+    (interp_Es'_tgt stb o (trigger i) ctx)
     =
     (handle_sE_tgt i >>= (fun r => tau;; Ret (ctx, r))).
 Proof.
-  unfold interp_hCallE_tgt. rewrite interp_state_trigger. cbn. grind.
+  unfold interp_Es'_tgt. rewrite interp_state_trigger. cbn. grind.
 Qed.
 
 Lemma interp_tgt_triggere stb o ctx
       (R: Type)
       (i: eventE R)
   :
-    (interp_hCallE_tgt stb o (trigger i) ctx)
+    (interp_Es'_tgt stb o (trigger i) ctx)
     =
     (trigger i >>= (fun r => tau;; Ret (ctx, r))).
 Proof.
-  unfold interp_hCallE_tgt. rewrite interp_state_trigger. cbn. grind.
+  unfold interp_Es'_tgt. rewrite interp_state_trigger. cbn. grind.
 Qed.
 
 Lemma interp_tgt_hcall stb o ctx
       (R: Type)
       (i: hCallE R)
   :
-    (interp_hCallE_tgt stb o (trigger i) ctx)
+    (interp_Es'_tgt stb o (trigger i) ctx)
     =
     ((handle_hCallE_tgt stb o i ctx) >>= (fun r => tau;; Ret r)).
 Proof.
-  unfold interp_hCallE_tgt in *. rewrite interp_state_trigger. cbn. auto.
+  unfold interp_Es'_tgt in *. rewrite interp_state_trigger. cbn. auto.
 Qed.
 
 Lemma interp_tgt_triggerUB stb o ctx
       (R: Type)
   :
-    (interp_hCallE_tgt stb o (triggerUB) ctx)
+    (interp_Es'_tgt stb o (triggerUB) ctx)
     =
     triggerUB (A:=Σ*R).
 Proof.
-  unfold interp_hCallE_tgt, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
+  unfold interp_Es'_tgt, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
 Qed.
 
 Lemma interp_tgt_triggerNB stb o ctx
       (R: Type)
   :
-    (interp_hCallE_tgt stb o (triggerNB) ctx)
+    (interp_Es'_tgt stb o (triggerNB) ctx)
     =
     triggerNB (A:=Σ*R).
 Proof.
-  unfold interp_hCallE_tgt, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
+  unfold interp_Es'_tgt, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
 Qed.
 
 Lemma interp_tgt_unwrapU stb o ctx
       (R: Type)
       (i: option R)
   :
-    (interp_hCallE_tgt stb o (@unwrapU (hCallE +' sE +' eventE) _ _ i) ctx)
+    (interp_Es'_tgt stb o (@unwrapU (hCallE +' hAAE +' sE +' eventE) _ _ i) ctx)
     =
     r <- (unwrapU i);; Ret (ctx, r).
 Proof.
-  unfold interp_hCallE_tgt, unwrapU in *. des_ifs.
+  unfold interp_Es'_tgt, unwrapU in *. des_ifs.
   { etrans.
     { eapply interp_tgt_ret. }
     { grind. }
@@ -1029,11 +1065,11 @@ Lemma interp_tgt_unwrapN stb o ctx
       (R: Type)
       (i: option R)
   :
-    (interp_hCallE_tgt stb o (@unwrapN (hCallE +' sE +' eventE) _ _ i) ctx)
+    (interp_Es'_tgt stb o (@unwrapN (hCallE +' hAAE +' sE +' eventE) _ _ i) ctx)
     =
     r <- (unwrapN i);; Ret (ctx, r).
 Proof.
-  unfold interp_hCallE_tgt, unwrapN in *. des_ifs.
+  unfold interp_Es'_tgt, unwrapN in *. des_ifs.
   { etrans.
     { eapply interp_tgt_ret. }
     { grind. }
@@ -1047,7 +1083,7 @@ Qed.
 Lemma interp_tgt_assume stb o ctx
       P
   :
-    (interp_hCallE_tgt stb o (assume P) ctx)
+    (interp_Es'_tgt stb o (assume P) ctx)
     =
     (assume P;;; tau;; Ret (ctx, tt))
 .
@@ -1058,7 +1094,7 @@ Qed.
 Lemma interp_tgt_guarantee stb o ctx
       P
   :
-    (interp_hCallE_tgt stb o (guarantee P) ctx)
+    (interp_Es'_tgt stb o (guarantee P) ctx)
     =
     (guarantee P;;; tau;; Ret (ctx, tt)).
 Proof.
@@ -1069,13 +1105,13 @@ Lemma interp_tgt_ext stb o ctx
       R (itr0 itr1: itree _ R)
       (EQ: itr0 = itr1)
   :
-    (interp_hCallE_tgt stb o itr0 ctx)
+    (interp_Es'_tgt stb o itr0 ctx)
     =
-    (interp_hCallE_tgt stb o itr1 ctx)
+    (interp_Es'_tgt stb o itr1 ctx)
 .
 Proof. subst; et. Qed.
 
-Global Program Instance interp_hCallE_tgt_rdb: red_database (mk_box (@interp_hCallE_tgt)) :=
+Global Program Instance interp_Es'_tgt_rdb: red_database (mk_box (@interp_Es'_tgt)) :=
   mk_rdb
     1
     (mk_box interp_tgt_bind)
@@ -1103,7 +1139,7 @@ Section AUX.
 Context `{Σ: GRA.t}.
 Variable stb: gname -> option fspec.
 (* itree reduction *)
-Lemma interp_mid_bind
+(* Lemma interp_mid_bind
       (R S: Type)
       (s : itree (hCallE +' sE +' eventE) R) (k : R -> itree (hCallE +' sE +' eventE) S)
       o
@@ -1260,12 +1296,12 @@ Lemma interp_mid_ext o
     =
     (interp_hCallE_mid stb o itr1)
 .
-Proof. subst; et. Qed.
+Proof. subst; et. Qed. *)
 
 End AUX.
 
 
-Global Program Instance interp_hCallE_mid_rdb `{Σ: GRA.t}: red_database (mk_box (@interp_hCallE_mid)) :=
+(* Global Program Instance interp_hCallE_mid_rdb `{Σ: GRA.t}: red_database (mk_box (@interp_hCallE_mid)) :=
   mk_rdb
     0
     (mk_box interp_mid_bind)
@@ -1282,14 +1318,14 @@ Global Program Instance interp_hCallE_mid_rdb `{Σ: GRA.t}: red_database (mk_box
     (mk_box interp_mid_assume)
     (mk_box interp_mid_guarantee)
     (mk_box interp_mid_ext)
-.
+. *)
 
 Section AUX.
 
 Context `{Σ: GRA.t}.
 Variable stb: gname -> option fspec.
 (* itree reduction *)
-Lemma interp_mid2_bind
+(* Lemma interp_mid2_bind
       (R S: Type)
       (s : itree (hCallE +' sE +' eventE) R) (k : R -> itree (hCallE +' sE +' eventE) S)
   :
@@ -1445,12 +1481,12 @@ Lemma interp_mid2_ext
     =
     (interp_hCallE_mid2 itr1)
 .
-Proof. subst; et. Qed.
+Proof. subst; et. Qed. *)
 
 End AUX.
 
 
-Global Program Instance interp_hCallE_mid2_rdb `{Σ: GRA.t}: red_database (mk_box (@interp_hCallE_mid2)) :=
+(* Global Program Instance interp_hCallE_mid2_rdb `{Σ: GRA.t}: red_database (mk_box (@interp_hCallE_mid2)) :=
   mk_rdb
     0
     (mk_box interp_mid2_bind)
@@ -1467,7 +1503,7 @@ Global Program Instance interp_hCallE_mid2_rdb `{Σ: GRA.t}: red_database (mk_bo
     (mk_box interp_mid2_assume)
     (mk_box interp_mid2_guarantee)
     (mk_box interp_mid2_ext)
-.
+. *)
 
 
 
