@@ -141,7 +141,7 @@ Notation "'update_and_discard' fr0" :=
 .  
 
 
-Section PROOF.
+(* Section PROOF.
 
   Context {Σ: GRA.t}.
 
@@ -159,7 +159,8 @@ Section PROOF.
       
       (* ASSERT *)
       varg_tgt <- trigger (Choose Any_tgt);;
-      guarantee(fsp.(precond) x varg_src varg_tgt rarg);;; (*** precondition ***)
+      (*** precondition ***)
+      guarantee(fsp.(precond) x varg_src varg_tgt rarg);;; 
 
       let ord_next := fsp.(measure) x in
       guarantee(ord_lt ord_next ord_cur /\ (tbr = true -> is_pure ord_next) /\ (tbr = false -> ord_next = ord_top));;;
@@ -178,7 +179,7 @@ Section PROOF.
   .  
 
 
-End PROOF.
+End PROOF. *)
 
 
 
@@ -210,17 +211,52 @@ Variant hCallE: Type -> Type :=
 Variant hAPCE: Type -> Type :=
 | hAPC: hAPCE unit
 .
-Variant hAAE: Type -> Type :=
-| ASSUME (P: iProp): hAAE unit
-| ASSERT (P: iProp): hAAE unit
+
+Variant agE: Type -> Type :=
+| ASSUME (P: iProp): agE unit
+| GUARANTEE (P: iProp): agE unit
 .
 
-Notation Es' := (hCallE +' hAAE +' sE +' eventE).
+Notation Es' := (hCallE +' sE +' eventE).
 
-Definition hEs := (hAPCE +' hAAE +' Es).
+Definition hEs := (hAPCE +' Es).
+Definition agEs := (agE +' Es).
 
 Definition hcall {X Y} (fn: gname) (varg: X): itree (hCallE +' sE +' eventE) Y :=
   vret <- trigger (hCall false fn varg↑);; vret <- vret↓ǃ;; Ret vret.
+
+Definition ord_eval (tbr: bool) (o: ord):iProp :=
+  match tbr with
+  | true => ⌜is_pure o⌝%I
+  | false => ⌜o = ord_top⌝%I
+  end.
+
+  Definition HoareCall
+        (tbr: bool)
+        (ord_cur: ord)
+        (fsp: fspec): gname -> Any.t -> (itree agEs) Any.t :=
+  fun fn varg_src =>
+  
+    x <- trigger (Choose fsp.(meta));; 
+  
+    (*** precondition ***)
+    varg_tgt <- trigger (Choose Any_tgt);;
+    let ord_next := fsp.(measure) x in
+    trigger (GUARANTEE ((fsp.(precond) x varg_src varg_tgt) ** ⌜ord_lt ord_next ord_cur⌝%I ** (ord_eval tbr ord_next)));;;
+
+    (*** call ***)
+    vret_tgt <- trigger (Call fn varg_tgt);; 
+
+    (*** postcondition ***)
+    vret_src <- trigger (Take Any.t);;
+    trigger (ASSUME(fsp.(postcond) x vret_src vret_tgt));;;
+
+    Ret vret_src
+  .  
+
+
+
+
 
 Program Fixpoint _APC (at_most: Ord.t) {wf Ord.lt at_most}: itree Es' unit :=
   break <- trigger (Choose _);;
@@ -231,6 +267,7 @@ Program Fixpoint _APC (at_most: Ord.t) {wf Ord.lt at_most}: itree Es' unit :=
     trigger (Choose (n < at_most)%ord);;;
     '(fn, varg) <- trigger (Choose _);;
     trigger (hCall true fn varg);;;
+    (* trigger (Call fn varg);;; *)
     _APC n.
 Next Obligation.
   i. auto.
@@ -254,6 +291,7 @@ Lemma unfold_APC:
                     guarantee (n < at_most)%ord;;;
                     '(fn, varg) <- trigger (Choose _);;
                     trigger (hCall true fn varg);;;
+                    (* trigger (Call fn varg);;; *)
                     _APC n.
 Proof.
   i. unfold _APC. rewrite Fix_eq; eauto.
@@ -309,96 +347,138 @@ Global Opaque _APC.
 
   Variable stb: gname -> option fspec.
 
-  Definition handle_hAPCE_src: hAPCE ~> itree Es :=
+  (* Definition handle_hAPCE_Es: hAPCE ~> itree Es :=
     fun _ '(hAPC) => Ret tt.
 
-  Definition handle_hAAE_src: hAAE ~> itree Es :=
+  Definition handle_agE_Es: agE ~> itree Es :=
     fun _ e => 
       match e with
       | ASSUME _ => Ret tt
-      | ASSERT _ => Ret tt
+      | GUARANTEE _ => Ret tt
       end.
 
-  Definition interp_hEs_src: itree hEs ~> itree Es :=
-    interp (case_ handle_hAPCE_src (case_ handle_hAAE_src trivial_Handler))
+  Definition interp_hEs_Es: itree hEs ~> itree Es :=
+    interp (case_ handle_hAPCE_Es (trivial_Handler))
   .
 
   Definition body_to_src {X} (body: X -> itree hEs Any.t): X -> itree Es Any.t :=
-    (@interp_hEs_src _) ∘ body
+    (@interp_hEs_Es _) ∘ body
   .
 
   Definition fun_to_src (body: Any.t -> itree hEs Any.t): ( Any.t -> itree Es Any_src) :=
     (body_to_src body)
-  .
+  . *)
 
 
 
-  Definition handle_hAPCE_tgt: hAPCE ~> itree Es' :=
+  Definition handle_hAPCE_Es': hAPCE ~> itree Es' :=
         fun _ '(hAPC) => APC.
 
-  Definition handle_callE_hEs: callE ~> itree Es' :=
+  Definition handle_callE_Es': callE ~> itree Es' :=
     fun _ '(Call fn arg) => trigger (hCall false fn arg).
 
-  Definition interp_hEs_tgt: itree (hAPCE +' hAAE +' Es) ~> itree Es' :=
-    interp (case_ (bif:=sum1) (handle_hAPCE_tgt)
-                  (case_ (bif:=sum1) trivial_Handler
-                          (case_ (bif:=sum1) (handle_callE_hEs)
-                                  trivial_Handler))).
-
-(* TODO: following 'mid' definitions are auxilary functions for proving cancelation thm *)
+  Definition interp_hEs_Es': itree hEs ~> itree Es' :=
+    interp (case_ (bif:=sum1) (handle_hAPCE_Es')
+                          (case_ (bif:=sum1) (handle_callE_Es')
+                                  trivial_Handler)).
 
 
-  (* Definition handle_hCallE_mid2: hCallE ~> itree Es :=
+  Definition handle_hCallE_agEs (ord_cur: ord): hCallE ~> itree agEs :=
     fun _ '(hCall tbr fn varg_src) =>
-      match tbr with
-      | true => tau;; trigger (Choose _)
-      | false => trigger (Call fn varg_src)
-      end
+      fsp <- (stb fn)ǃ;;
+      HoareCall tbr ord_cur fsp fn varg_src
   .
 
-  Definition interp_hCallE_mid2: itree Es' ~> itree Es :=
-    interp (case_ (bif:=sum1) (handle_hCallE_mid2)
-                  trivial_Handler)
+  Definition interp_Es'_agEs (ord_cur: ord): itree Es' ~> itree agEs :=
+    interp (case_ (bif:=sum1) (handle_hCallE_agEs ord_cur)
+                                trivial_Handler)
   .
 
-  Definition body_to_mid2 {X} (body: X -> itree (hCallE +' sE +' eventE) Any.t): X -> itree Es Any.t :=
-    (@interp_hCallE_mid2 _) ∘ body
+  Definition HoareFunAG
+             {X: Type}
+             (D: X -> ord)
+             (P: X -> Any.t -> Any_tgt -> iProp)
+             (Q: X -> Any.t -> Any_tgt -> iProp)
+             (body: Any.t -> itree hEs Any.t): Any_tgt -> itree agEs Any_tgt := fun varg_tgt =>
+    x <- trigger (Take X);;
+
+    (* ASSUME *)
+    varg_src <- trigger (Take _);;
+    let ord_cur := D x in
+    trigger (ASSUME (P x varg_src varg_tgt));;; (*** precondition ***)
+
+
+    vret_src <- interp_Es'_agEs
+                          ord_cur
+                          (interp_hEs_Es'
+                             (match ord_cur with
+                              | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
+                              | _ => body (varg_src)
+                              end));;
+
+    (* ASSERT *)
+    vret_tgt <- trigger (Choose Any_tgt);;
+    trigger (GUARANTEE (Q x vret_src vret_tgt));;; (*** postcondition ***)
+
+
+    Ret vret_tgt
   .
 
-  Definition fun_to_mid2 (body: Any.t -> itree hEs Any.t): (Any_src -> itree Es Any_src) :=
-    body_to_mid2 ((@interp_hEs_tgt _) ∘ body)
+  Definition HoareFunAGArg
+             {X: Type}
+             (P: X -> Any.t -> Any_tgt -> iProp):
+    Any_tgt -> itree agEs (X * Any.t) := fun varg_tgt =>
+    x <- trigger (Take X);;
+    (*ASSUME*)
+    varg_src <- trigger (Take _);;
+    trigger (ASSUME (P x varg_src varg_tgt));;; (*** precondition ***)
+    Ret (x, varg_src)
+  .
+
+  Definition HoareFunAGRet
+             {X: Type}
+             (Q: X -> Any.t -> Any_tgt -> iProp):
+    X -> Any.t -> itree agEs Any_tgt := fun x vret_src =>
+    (*ASSERT*)
+    vret_tgt <- trigger (Choose Any_tgt);;
+    trigger (GUARANTEE (Q x vret_src vret_tgt));;; (*** postcondition ***)
+    Ret vret_tgt
+  .  
+  
+  Lemma HoareFunAG_parse
+        {X: Type}
+        (D: X -> ord)
+        (P: X -> Any.t -> Any_tgt -> iProp)
+        (Q: X -> Any.t -> Any_tgt -> iProp)
+        (body: Any.t -> itree hEs Any.t)
+        (varg_tgt: Any_tgt)
+    :
+      HoareFunAG D P Q body varg_tgt =
+      '((x, varg_src)) <- HoareFunAGArg P varg_tgt;;
+      interp_Es'_agEs (D x)
+                        (interp_hEs_Es'
+                           (match D x with
+                            | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
+                            | _ => body varg_src
+                            end)) >>= (HoareFunAGRet Q x).
+  Proof.
+    unfold HoareFunAG, HoareFunAGArg, HoareFunAGRet. grind.
+  Qed.
+
+  Definition fun_to_agEs (sb: fspecbody): (Any_tgt -> itree agEs Any_tgt) :=
+    let fs: fspec := sb.(fsb_fspec) in
+    (HoareFunAG (fs.(measure)) (fs.(precond)) (fs.(postcond)) (sb.(fsb_body)))
   .
 
 
-  Definition handle_hCallE_mid (ord_cur: ord): hCallE ~> itree Es :=
-    fun _ '(hCall tbr fn varg_src) =>
-      tau;;
-      f <- (stb fn)ǃ;; guarantee (tbr = true -> ~ (forall x, f.(measure) x = ord_top));;;
-      ord_next <- (if tbr then o0 <- trigger (Choose _);; Ret (ord_pure o0) else Ret ord_top);;
-      guarantee(ord_lt ord_next ord_cur);;;
-      let varg_mid: Any_mid := Any.pair ord_next↑ varg_src in
-      trigger (Call fn varg_mid)
-  .
+  Definition handle_sE_tgt: sE ~> itree Es :=
+      (fun _ e =>
+         match e with
+         | SUpdate run => pupdate run
+         end).
+  
 
-  Definition interp_hCallE_mid (ord_cur: ord): itree Es' ~> itree Es :=
-    interp (case_ (bif:=sum1) (handle_hCallE_mid ord_cur)
-                  ((fun T X => trigger X): _ ~> itree Es))
-  .
-
-  Definition body_to_mid (ord_cur: ord) {X} (body: X -> itree (hCallE +' sE +' eventE) Any.t): X -> itree Es Any.t :=
-    fun varg_mid => interp_hCallE_mid ord_cur (body varg_mid)
-  .
-
-  Definition fun_to_mid (body: Any.t -> itree hEs Any.t): (Any_mid -> itree Es Any_src) :=
-    fun ord_varg_src =>
-      '(ord_cur, varg_src) <- (Any.split ord_varg_src)ǃ;; ord_cur <- ord_cur↓ǃ;;
-      interp_hCallE_mid ord_cur (interp_hEs_tgt
-                                   (match ord_cur with
-                                    | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
-                                    | _ => body (varg_src)
-                                    end)). *)
-
-  Definition handle_hAAE_tgt: hAAE ~> stateT (Σ) (itree Es) :=
+  Definition handle_agE_tgt: agE ~> stateT (Σ) (itree Es) :=
     fun _ e 'fr =>
       match e with
       | ASSUME P => 
@@ -407,7 +487,7 @@ Global Opaque _APC.
         assume (URA.wf (add ⋅ fr ⋅ mr));;;
         assume(P add);;; 
         Ret (add ⋅ fr, tt)
-      | ASSERT P =>
+      | GUARANTEE P =>
         '(del, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
         mr <- mget;;
         guarantee(URA.updatable (fr ⋅ mr) (del ⋅ fr' ⋅ mr'));;;
@@ -417,29 +497,18 @@ Global Opaque _APC.
       end
   .
 
-  Definition handle_hCallE_tgt (ord_cur: ord): hCallE ~> stateT (Σ) (itree Es) :=
-    fun _ '(hCall tbr fn varg_src) 'fr =>
-      f <- (stb fn)ǃ;;
-      HoareCall tbr ord_cur f fn varg_src fr
-  .
+  Definition interp_agEs_tgt : itree agEs ~> stateT Σ (itree Es) :=
+    interp (case_ (bif:=sum1) (handle_agE_tgt)
+              (case_ (bif:=sum1) ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
+                (case_ (bif:=sum1) 
+                          ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
+                          ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)))))
+    .
 
-  Definition handle_sE_tgt: sE ~> itree Es :=
-      (fun _ e =>
-         match e with
-         | SUpdate run => pupdate run
-         end).
-
-  Definition interp_Es'_tgt (ord_cur: ord): itree Es' ~> stateT Σ (itree Es) :=
-    interp_state (case_ (bif:=sum1) (handle_hCallE_tgt ord_cur)
-                        (case_ (bif:=sum1) (handle_hAAE_tgt)
-                                (case_ (bif:=sum1)
-                                        ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es))
-                                        ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)))))
-  .
 
   Definition body_to_tgt (ord_cur: ord)
-             {X} (body: X -> itree (hCallE +' hAAE +' sE +' eventE) Any_src): X -> stateT Σ (itree Es) Any_src :=
-    (@interp_Es'_tgt ord_cur _) ∘ body.
+             {X} (body: X -> itree agEs Any_src): X -> stateT Σ (itree Es) Any_src :=
+    (@interp_agEs_tgt _) ∘ body.
 
 
   Definition HoareFun
@@ -552,6 +621,59 @@ If this feature is needed; we can extend it then. At the moment, I will only all
 
 
 
+
+(* TODO: following 'mid' definitions are auxilary functions for proving cancelation thm *)
+
+
+  (* Definition handle_hCallE_mid2: hCallE ~> itree Es :=
+    fun _ '(hCall tbr fn varg_src) =>
+      match tbr with
+      | true => tau;; trigger (Choose _)
+      | false => trigger (Call fn varg_src)
+      end
+  .
+
+  Definition interp_hCallE_mid2: itree Es' ~> itree Es :=
+    interp (case_ (bif:=sum1) (handle_hCallE_mid2)
+                  trivial_Handler)
+  .
+
+  Definition body_to_mid2 {X} (body: X -> itree (hCallE +' sE +' eventE) Any.t): X -> itree Es Any.t :=
+    (@interp_hCallE_mid2 _) ∘ body
+  .
+
+  Definition fun_to_mid2 (body: Any.t -> itree hEs Any.t): (Any_src -> itree Es Any_src) :=
+    body_to_mid2 ((@interp_hEs_tgt _) ∘ body)
+  .
+
+
+  Definition handle_hCallE_mid (ord_cur: ord): hCallE ~> itree Es :=
+    fun _ '(hCall tbr fn varg_src) =>
+      tau;;
+      f <- (stb fn)ǃ;; guarantee (tbr = true -> ~ (forall x, f.(measure) x = ord_top));;;
+      ord_next <- (if tbr then o0 <- trigger (Choose _);; Ret (ord_pure o0) else Ret ord_top);;
+      guarantee(ord_lt ord_next ord_cur);;;
+      let varg_mid: Any_mid := Any.pair ord_next↑ varg_src in
+      trigger (Call fn varg_mid)
+  .
+
+  Definition interp_hCallE_mid (ord_cur: ord): itree Es' ~> itree Es :=
+    interp (case_ (bif:=sum1) (handle_hCallE_mid ord_cur)
+                  ((fun T X => trigger X): _ ~> itree Es))
+  .
+
+  Definition body_to_mid (ord_cur: ord) {X} (body: X -> itree (hCallE +' sE +' eventE) Any.t): X -> itree Es Any.t :=
+    fun varg_mid => interp_hCallE_mid ord_cur (body varg_mid)
+  .
+
+  Definition fun_to_mid (body: Any.t -> itree hEs Any.t): (Any_mid -> itree Es Any_src) :=
+    fun ord_varg_src =>
+      '(ord_cur, varg_src) <- (Any.split ord_varg_src)ǃ;; ord_cur <- ord_cur↓ǃ;;
+      interp_hCallE_mid ord_cur (interp_hEs_tgt
+                                   (match ord_cur with
+                                    | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
+                                    | _ => body (varg_src)
+                                    end)). *)
 
 
 
