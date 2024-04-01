@@ -203,38 +203,38 @@ Section CANCEL.
 
 Context {Σ: GRA.t}.
 
+Variant hAPCE: Type -> Type :=
+| hAPC: hAPCE unit
+.
+
 Variant hCallE: Type -> Type :=
 | hCall (tbr: bool) (fn: gname) (varg_src: Any_src): hCallE Any_src
 (*** tbr == to be removed ***)
 .
 
-Variant hAPCE: Type -> Type :=
-| hAPC: hAPCE unit
+Variant hAGE: Type -> Type :=
+| Assume (P: iProp): hAGE unit
+| Guarantee (P: iProp): hAGE unit
 .
 
-Variant agE: Type -> Type :=
-| ASSUME (P: iProp): agE unit
-| GUARANTEE (P: iProp): agE unit
-.
-
-Notation Es' := (hCallE +' sE +' eventE).
 
 Definition hEs := (hAPCE +' Es).
-Definition agEs := (agE +' Es).
+(* Notation Es' := (hCallE +' sE +' eventE). *)
+Definition hAGEs := (hAGE +' Es).
 
-Definition hcall {X Y} (fn: gname) (varg: X): itree (hCallE +' sE +' eventE) Y :=
-  vret <- trigger (hCall false fn varg↑);; vret <- vret↓ǃ;; Ret vret.
+(* Definition hcall {X Y} (fn: gname) (varg: X): itree (hCallE +' sE +' eventE) Y :=
+  vret <- trigger (hCall false fn varg↑);; vret <- vret↓ǃ;; Ret vret. *)
 
-Definition ord_eval (tbr: bool) (o: ord):iProp :=
+Definition ord_eval (tbr: bool) (o: ord): Prop :=
   match tbr with
-  | true => ⌜is_pure o⌝%I
-  | false => ⌜o = ord_top⌝%I
+  | true => is_pure o
+  | false => o = ord_top
   end.
 
   Definition HoareCall
         (tbr: bool)
         (ord_cur: ord)
-        (fsp: fspec): gname -> Any.t -> (itree agEs) Any.t :=
+        (fsp: fspec): gname -> Any.t -> (itree hAGEs) Any.t :=
   fun fn varg_src =>
   
     x <- trigger (Choose fsp.(meta));; 
@@ -242,23 +242,23 @@ Definition ord_eval (tbr: bool) (o: ord):iProp :=
     (*** precondition ***)
     varg_tgt <- trigger (Choose Any_tgt);;
     let ord_next := fsp.(measure) x in
-    trigger (GUARANTEE ((fsp.(precond) x varg_src varg_tgt) ** ⌜ord_lt ord_next ord_cur⌝%I ** (ord_eval tbr ord_next)));;;
+    trigger (Guarantee ((fsp.(precond) x varg_src varg_tgt) ** ⌜ord_lt ord_next ord_cur⌝%I ** (⌜ord_eval tbr ord_next⌝%I)));;;
 
     (*** call ***)
     vret_tgt <- trigger (Call fn varg_tgt);; 
 
     (*** postcondition ***)
     vret_src <- trigger (Take Any.t);;
-    trigger (ASSUME(fsp.(postcond) x vret_src vret_tgt));;;
+    trigger (Assume (fsp.(postcond) x vret_src vret_tgt));;;
 
     Ret vret_src
   .  
 
+  Variable stb: gname -> option fspec.
 
 
-
-
-Program Fixpoint _APC (at_most: Ord.t) {wf Ord.lt at_most}: itree Es' unit :=
+Program Fixpoint _APC (at_most: Ord.t) {wf Ord.lt at_most} : ord -> itree hAGEs unit :=
+  fun ord_cur => 
   break <- trigger (Choose _);;
   if break: bool
   then Ret tt
@@ -266,9 +266,9 @@ Program Fixpoint _APC (at_most: Ord.t) {wf Ord.lt at_most}: itree Es' unit :=
     n <- trigger (Choose Ord.t);;
     trigger (Choose (n < at_most)%ord);;;
     '(fn, varg) <- trigger (Choose _);;
-    trigger (hCall true fn varg);;;
-    (* trigger (Call fn varg);;; *)
-    _APC n.
+    fsp <- (stb fn)ǃ;;
+    _ <- HoareCall true ord_cur fsp fn varg;;
+    (_APC n) _ ord_cur.
 Next Obligation.
   i. auto.
 Qed.
@@ -276,13 +276,13 @@ Next Obligation.
   eapply Ord.lt_well_founded.
 Qed.
 
-Definition APC: itree Es' unit :=
+Definition HoareAPC (ord_cur: ord): itree hAGEs unit :=
   at_most <- trigger (Choose _);;
-  _APC at_most
+  _APC at_most ord_cur
 .
 
 Lemma unfold_APC:
-  forall at_most, _APC at_most =
+  forall at_most ord_cur, _APC at_most ord_cur = 
                   break <- trigger (Choose _);;
                   if break: bool
                   then Ret tt
@@ -290,9 +290,9 @@ Lemma unfold_APC:
                     n <- trigger (Choose Ord.t);;
                     guarantee (n < at_most)%ord;;;
                     '(fn, varg) <- trigger (Choose _);;
-                    trigger (hCall true fn varg);;;
-                    (* trigger (Call fn varg);;; *)
-                    _APC n.
+                    fsp <- (stb fn)ǃ;;
+                    _ <- HoareCall true ord_cur fsp fn varg;;
+                    (_APC n) ord_cur.
 Proof.
   i. unfold _APC. rewrite Fix_eq; eauto.
   { repeat f_equal. extensionality break. destruct break; ss.
@@ -333,7 +333,7 @@ Global Opaque _APC.
              (fun x z a => (((snd ∘ DPQ) x a: iProp) ∧ ⌜z = a⌝)%I)
   .
 
-  Section INTERP.
+  (* Section INTERP. *)
   (* Variable stb: gname -> option fspec. *)
   (*** TODO: I wanted to use above definiton, but doing so makes defining ms_src hard ***)
   (*** We can fix this by making ModSemL.fnsems to a function, but doing so will change the type of
@@ -345,12 +345,12 @@ Global Opaque _APC.
  ***)
   (*** TODO: try above idea; if it fails, document it; and refactor below with alist ***)
 
-  Variable stb: gname -> option fspec.
+  (* Variable stb: gname -> option fspec. *)
 
   (* Definition handle_hAPCE_Es: hAPCE ~> itree Es :=
     fun _ '(hAPC) => Ret tt.
 
-  Definition handle_agE_Es: agE ~> itree Es :=
+  Definition handle_agE_Es: hAGE ~> itree Es :=
     fun _ e => 
       match e with
       | ASSUME _ => Ret tt
@@ -371,81 +371,88 @@ Global Opaque _APC.
 
 
 
-  Definition handle_hAPCE_Es': hAPCE ~> itree Es' :=
-        fun _ '(hAPC) => APC.
+  Definition handle_hAPCE_hAGEs (ord_cur: ord): hAPCE ~> itree hAGEs :=
+        fun _ '(hAPC) => HoareAPC ord_cur.
 
-  Definition handle_callE_Es': callE ~> itree Es' :=
-    fun _ '(Call fn arg) => trigger (hCall false fn arg).
+  Definition handle_callE_hAGEs ord_cur: callE ~> itree hAGEs :=
+    fun _ '(Call fn arg) => 
+          fsp <- (stb fn)ǃ;;
+          HoareCall false ord_cur fsp fn arg
+    .
 
-  Definition interp_hEs_Es': itree hEs ~> itree Es' :=
+  Definition interp_hEs_hAGEs ord_cur: itree hEs ~> itree hAGEs :=
+    interp (case_ (bif:=sum1) (handle_hAPCE_hAGEs ord_cur)
+                          (case_ (bif:=sum1) (handle_callE_hAGEs ord_cur)
+                                  trivial_Handler)).    
+
+  (* Definition interp_hEs_Es': itree hEs ~> itree Es' :=
     interp (case_ (bif:=sum1) (handle_hAPCE_Es')
                           (case_ (bif:=sum1) (handle_callE_Es')
-                                  trivial_Handler)).
+                                  trivial_Handler)). *)
 
 
-  Definition handle_hCallE_agEs (ord_cur: ord): hCallE ~> itree agEs :=
+  (* Definition handle_hCallE_agEs (ord_cur: ord): hCallE ~> itree hAGEs :=
     fun _ '(hCall tbr fn varg_src) =>
       fsp <- (stb fn)ǃ;;
       HoareCall tbr ord_cur fsp fn varg_src
-  .
+  . *)
 
-  Definition interp_Es'_agEs (ord_cur: ord): itree Es' ~> itree agEs :=
+  (* Definition interp_Es'_agEs (ord_cur: ord): itree Es' ~> itree hAGEs :=
     interp (case_ (bif:=sum1) (handle_hCallE_agEs ord_cur)
                                 trivial_Handler)
-  .
+  . *)
 
-  Definition HoareFunAG
+  Definition HoareFun
              {X: Type}
              (D: X -> ord)
              (P: X -> Any.t -> Any_tgt -> iProp)
              (Q: X -> Any.t -> Any_tgt -> iProp)
-             (body: Any.t -> itree hEs Any.t): Any_tgt -> itree agEs Any_tgt := fun varg_tgt =>
+             (body: Any.t -> itree hEs Any.t): Any_tgt -> itree hAGEs Any_tgt := fun varg_tgt =>
     x <- trigger (Take X);;
 
     (* ASSUME *)
     varg_src <- trigger (Take _);;
     let ord_cur := D x in
-    trigger (ASSUME (P x varg_src varg_tgt));;; (*** precondition ***)
+    trigger (Assume (P x varg_src varg_tgt));;; (*** precondition ***)
 
 
-    vret_src <- interp_Es'_agEs
+    vret_src <- interp_hEs_hAGEs
                           ord_cur
-                          (interp_hEs_Es'
                              (match ord_cur with
-                              | ord_pure n => _ <- trigger hAPC;; trigger (Choose _)
+                              | ord_pure _ => _ <- trigger hAPC;; trigger (Choose _)
                               | _ => body (varg_src)
-                              end));;
+                              end);;
 
     (* ASSERT *)
     vret_tgt <- trigger (Choose Any_tgt);;
-    trigger (GUARANTEE (Q x vret_src vret_tgt));;; (*** postcondition ***)
+    trigger (Guarantee (Q x vret_src vret_tgt));;; (*** postcondition ***)
 
 
     Ret vret_tgt
   .
 
-  Definition HoareFunAGArg
+  (* Definition HoareFunArg
              {X: Type}
              (P: X -> Any.t -> Any_tgt -> iProp):
-    Any_tgt -> itree agEs (X * Any.t) := fun varg_tgt =>
+    Any_tgt -> itree hAGEs (X * Any.t) := fun varg_tgt =>
     x <- trigger (Take X);;
     (*ASSUME*)
     varg_src <- trigger (Take _);;
-    trigger (ASSUME (P x varg_src varg_tgt));;; (*** precondition ***)
+    trigger (Assume (P x varg_src varg_tgt));;; (*** precondition ***)
     Ret (x, varg_src)
   .
 
-  Definition HoareFunAGRet
+  Definition HoareFunRet
              {X: Type}
              (Q: X -> Any.t -> Any_tgt -> iProp):
-    X -> Any.t -> itree agEs Any_tgt := fun x vret_src =>
+    X -> Any.t -> itree hAGEs Any_tgt := fun x vret_src =>
     (*ASSERT*)
     vret_tgt <- trigger (Choose Any_tgt);;
-    trigger (GUARANTEE (Q x vret_src vret_tgt));;; (*** postcondition ***)
+    trigger (Guarantee (Q x vret_src vret_tgt));;; (*** postcondition ***)
     Ret vret_tgt
-  .  
+  .   *)
   
-  Lemma HoareFunAG_parse
+  (* Lemma HoareFun_parse
         {X: Type}
         (D: X -> ord)
         (P: X -> Any.t -> Any_tgt -> iProp)
@@ -453,8 +460,8 @@ Global Opaque _APC.
         (body: Any.t -> itree hEs Any.t)
         (varg_tgt: Any_tgt)
     :
-      HoareFunAG D P Q body varg_tgt =
-      '((x, varg_src)) <- HoareFunAGArg P varg_tgt;;
+      HoareFun D P Q body varg_tgt =
+      '((x, varg_src)) <- HoareFunArg P varg_tgt;;
       interp_Es'_agEs (D x)
                         (interp_hEs_Es'
                            (match D x with
@@ -462,12 +469,12 @@ Global Opaque _APC.
                             | _ => body varg_src
                             end)) >>= (HoareFunAGRet Q x).
   Proof.
-    unfold HoareFunAG, HoareFunAGArg, HoareFunAGRet. grind.
-  Qed.
+    unfold HoareFun, HoareFunAGArg, HoareFunAGRet. grind.
+  Qed. *)
 
-  Definition fun_to_agEs (sb: fspecbody): (Any_tgt -> itree agEs Any_tgt) :=
+  Definition interp_sb_hp (sb: fspecbody): (Any_tgt -> itree hAGEs Any_tgt) :=
     let fs: fspec := sb.(fsb_fspec) in
-    (HoareFunAG (fs.(measure)) (fs.(precond)) (fs.(postcond)) (sb.(fsb_body)))
+    (HoareFun (fs.(measure)) (fs.(precond)) (fs.(postcond)) (sb.(fsb_body)))
   .
 
 
@@ -478,27 +485,28 @@ Global Opaque _APC.
          end).
   
 
-  Definition handle_agE_tgt: agE ~> stateT (Σ) (itree Es) :=
-    fun _ e 'fr =>
+  Definition handle_hAGE_tgt: hAGE ~> stateT (Σ) (itree Es) :=
+    fun _ e fr =>
       match e with
-      | ASSUME P => 
-        add <- trigger (Take Σ);;
+      | Assume P => 
+        r <- trigger (Take Σ);;
         mr <- mget;; 
-        assume (URA.wf (add ⋅ fr ⋅ mr));;;
-        assume(P add);;; 
-        Ret (add ⋅ fr, tt)
-      | GUARANTEE P =>
-        '(del, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
+        assume (URA.wf (r ⋅ fr ⋅ mr));;;
+        assume(P r);;; 
+        Ret (r ⋅ fr, tt)
+      | Guarantee P =>
+        '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
         mr <- mget;;
-        guarantee(URA.updatable (fr ⋅ mr) (del ⋅ fr' ⋅ mr'));;;
-        guarantee(P del);;;
+        guarantee(URA.updatable (fr ⋅ mr) (r ⋅ fr' ⋅ mr'));;;
+        guarantee(P r);;;
         mput mr';;;
         Ret (fr', tt)
       end
   .
 
-  Definition interp_agEs_tgt : itree agEs ~> stateT Σ (itree Es) :=
-    interp (case_ (bif:=sum1) (handle_agE_tgt)
+
+  Definition interp_hp_tgt : itree hAGEs ~> stateT Σ (itree Es) :=
+    interp (case_ (bif:=sum1) (handle_hAGE_tgt)
               (case_ (bif:=sum1) ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
                 (case_ (bif:=sum1) 
                           ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
@@ -506,12 +514,21 @@ Global Opaque _APC.
     .
 
 
-  Definition body_to_tgt (ord_cur: ord)
-             {X} (body: X -> itree agEs Any_src): X -> stateT Σ (itree Es) Any_src :=
+
+  Definition body_to_agEs (ord_cur: ord)
+             {X} (body: X -> itree hEs Any_src): X -> itree hAGEs Any_src :=
+    (@interp_Es'_agEs ord_cur _) ∘ (@interp_hEs_Es' _) ∘ body.
+
+
+  
+
+  Definition body_to_tgt
+             {X} (body: X -> itree hAGEs Any_src): X -> stateT Σ (itree Es) Any_src :=
     (@interp_agEs_tgt _) ∘ body.
 
 
-  Definition HoareFun
+
+  (* Definition HoareFun
              {X: Type}
              (D: X -> ord)
              (P: X -> Any.t -> Any_tgt -> iProp)
@@ -546,7 +563,7 @@ Global Opaque _APC.
   Definition fun_to_tgt (sb: fspecbody): (Any_tgt -> itree Es Any_tgt) :=
     let fs: fspec := sb.(fsb_fspec) in
     (HoareFun (fs.(measure)) (fs.(precond)) (fs.(postcond)) (sb.(fsb_body)))
-  .
+  . *)
 
 (*** NOTE:
 body can execute eventE events.
@@ -558,7 +575,7 @@ NOTE: we can allow normal "callE" in the body too, but we need to ensure that it
 If this feature is needed; we can extend it then. At the moment, I will only allow hCallE.
 ***)
 
-
+(* 
   Definition HoareFunArg
              {X: Type}
              (P: X -> Any.t -> Any_tgt -> iProp):
@@ -603,9 +620,9 @@ If this feature is needed; we can extend it then. At the moment, I will only all
   Proof.
     unfold HoareFun, HoareFunArg, HoareFunRet. grind.
   Qed.
-
+*)
   End INTERP.
-
+ 
 
 
   Variable md_tgt: Mod.t.
