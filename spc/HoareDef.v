@@ -515,7 +515,7 @@ Global Opaque _APC.
 
 
 
-  Definition body_to_agEs (ord_cur: ord)
+  (* Definition body_to_agEs (ord_cur: ord)
              {X} (body: X -> itree hEs Any_src): X -> itree hAGEs Any_src :=
     (@interp_Es'_agEs ord_cur _) ∘ (@interp_hEs_Es' _) ∘ body.
 
@@ -524,7 +524,7 @@ Global Opaque _APC.
 
   Definition body_to_tgt
              {X} (body: X -> itree hAGEs Any_src): X -> stateT Σ (itree Es) Any_src :=
-    (@interp_agEs_tgt _) ∘ body.
+    (@interp_agEs_tgt _) ∘ body. *)
 
 
 
@@ -621,11 +621,11 @@ If this feature is needed; we can extend it then. At the moment, I will only all
     unfold HoareFun, HoareFunArg, HoareFunRet. grind.
   Qed.
 *)
-  End INTERP.
+  (* End INTERP. *)
  
 
 
-  Variable md_tgt: Mod.t.
+  (* Variable md_tgt: Mod.t.
   Let ms_tgt: ModSem.t := (Mod.get_modsem md_tgt md_tgt.(Mod.sk)).
 
   Variable sbtb: alist gname fspecbody.
@@ -634,7 +634,7 @@ If this feature is needed; we can extend it then. At the moment, I will only all
 
 
 
-
+ *)
 
 
 
@@ -705,9 +705,15 @@ End PSEUDOTYPING.
 
 
 
+(* TODO: Modify the Definition of  Spec Module *)
+(* TODO: Modify the Definition of  Spec Module *)
+(* TODO: Modify the Definition of  Spec Module *)
+(* TODO: Modify the Definition of  Spec Module *)
+(* TODO: Modify the Definition of  Spec Module *)
+(* TODO: Modify the Definition of  Spec Module *)
 
 
-Module SModSem.
+(* Module SModSem.
 Section SMODSEM.
 
   Context `{Σ: GRA.t}.
@@ -2144,4 +2150,4 @@ Module IPCNotations.
       (at level 62, t1 at next level, p pattern, right associativity) : itree_scope.
 End IPCNotations.
 
-Export IPCNotations.
+Export IPCNotations. *)
