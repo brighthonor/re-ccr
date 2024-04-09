@@ -136,9 +136,9 @@ Section ADD.
 
   Definition emb_id : forall T, Es T -> Es T := fun T es => es.
 
-  (* Definition emb_l := emb_ run_l.
+  Definition emb_l := emb_ run_l.
 
-  Definition emb_r := emb_ run_r. *)
+  Definition emb_r := emb_ run_r.
 
   Definition trans_l '(fn, f): gname * (Any.t -> itree _ Any.t) :=
     (fn, (fun args => translate (emb_ run_l) (f args))).

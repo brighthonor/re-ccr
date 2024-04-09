@@ -84,14 +84,11 @@ Section COMM.
         * apply sim_itree_call; clarify.
           -- exists a0, b0; et.
           -- i. unfold comm_st in WF. des. ss. clarify.
-             gstep. econs; et.
-            gfinal. left. eapply CIH.
+             econs. gfinal. left. eapply CIH.
         * apply sim_itree_call; clarify.
           -- eexists a0, b0; et.
           -- i. unfold comm_st in WF. des. ss. clarify.
-            gstep. econs; et. 
-             gfinal. left. eapply CIH.
-
+             econs. gfinal. left. eapply CIH.
       + (* sE *)
         gstep. destruct s, EMB.
         * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
@@ -105,31 +102,29 @@ Section COMM.
       + (* eventE *)
         gstep. destruct e, EMB.
         (* Choose *)
-        * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+        * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
           eapply sim_itree_progress; et.
           gfinal. left. eapply CIH.
-        * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+        * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
           eapply sim_itree_progress; et.
           gfinal. left. eapply CIH.
         (* Take *)
-        * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+        * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
           eapply sim_itree_progress; et.
           gfinal. left. eapply CIH. 
-        * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+        * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
           eapply sim_itree_progress; et.
           gfinal. left. eapply CIH. 
         (* Syscall *)
         * apply sim_itree_syscall. i.
-          eapply sim_itree_flag_down.
-          gfinal. left. eapply CIH. 
+          econs. gfinal. left. eapply CIH. 
         * apply sim_itree_syscall. i.
-          eapply sim_itree_flag_down.
-          gfinal. left. eapply CIH.
+          econs. gfinal. left. eapply CIH.
   Qed. 
 
 
   (* Move to somewhere else *)
-  Lemma fst_trans_l : forall x, fst (trans_l x) = fst x.
+  (* Lemma fst_trans_l : forall x, fst (trans_l x) = fst x.
   Proof. i. destruct x. ss. Qed.
 
   Lemma fst_trans_r : forall x, fst (trans_r x) = fst x.
@@ -169,7 +164,7 @@ Section COMM.
     (fun x : string * (Any.t -> itree Es Any.t) => fst (trans_r (trans_r x))) = (fun x : string * (Any.t -> itree Es Any.t) => fst x).
   Proof.
     extensionality x. rewrite ! fst_trans_r. et.
-  Qed.
+  Qed. *)
 
 
   Context {CONF: EMSConfig}.
@@ -297,18 +292,15 @@ Proof.
       * apply sim_itree_call; clarify.
         -- exists a0, b0, c0; et.
         -- i. destruct WF, H, H, H. ss. clarify.
-        gstep. econs; et. 
-         gfinal. left. eapply CIH.
+        econs. gfinal. left. eapply CIH.
       * apply sim_itree_call; clarify.
         -- eexists a0, b0, c0; et.
         -- i. unfold assoc_st in WF. des. ss. clarify.
-        gstep. econs; et. 
-           gfinal. left. eapply CIH.
+           econs. gfinal. left. eapply CIH.
       * apply sim_itree_call; clarify.
         -- eexists a0, b0, c0; et.
         -- i. unfold assoc_st in WF. des. ss. clarify.
-        gstep. econs; et. 
-           gfinal. left. eapply CIH. 
+           econs. gfinal. left. eapply CIH. 
     + (* sE *)
       gstep. destruct s, EMB.
       * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
@@ -326,35 +318,32 @@ Proof.
     + (* eventE *)
       gstep. destruct e, EMB.
       (* Choose *)
-      * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+      * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH.
-      * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+      * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH.
-      * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+      * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH.
       (* Take *)
-      * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+      * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH. 
-      * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+      * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH. 
-      * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+      * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH.
       (* Syscall *)
       * apply sim_itree_syscall. i.
-        eapply sim_itree_flag_down.
-        gfinal. left. eapply CIH. 
+        econs. gfinal. left. eapply CIH. 
       * apply sim_itree_syscall. i.
-        eapply sim_itree_flag_down.
-        gfinal. left. eapply CIH.
+        econs. gfinal. left. eapply CIH.
       * apply sim_itree_syscall. i.
-        eapply sim_itree_flag_down.
-        gfinal. left. eapply CIH.
+        econs. gfinal. left. eapply CIH.
 Qed. 
 
 Lemma add_assoc_rev_aux
@@ -367,7 +356,6 @@ Lemma add_assoc_rev_aux
 .
 Proof.
 destruct ASSOC, STATE. des. ss.
-(* unfold assoc_st. *)
 ginit. 
 generalize it as itr. 
 clarify.
@@ -396,18 +384,15 @@ destruct (observe itr).
     * apply sim_itree_call; clarify.
       -- exists a0, b0, c0; et.
       -- i. destruct WF, H, H, H. ss. clarify.
-      gstep. econs; et. 
-       gfinal. left. eapply CIH.
+         econs. gfinal. left. eapply CIH.
     * apply sim_itree_call; clarify.
       -- eexists a0, b0, c0; et.
       -- i. unfold assoc_rev_st in WF. des. ss. clarify.
-      gstep. econs; et. 
-         gfinal. left. eapply CIH.
+         econs. gfinal. left. eapply CIH.
     * apply sim_itree_call; clarify.
       -- eexists a0, b0, c0; et.
       -- i. unfold assoc_rev_st in WF. des. ss. clarify.
-      gstep. econs; et. 
-         gfinal. left. eapply CIH. 
+         econs. gfinal. left. eapply CIH. 
   + (* sE *)
     gstep. destruct s, EMB.
     * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
@@ -425,35 +410,32 @@ destruct (observe itr).
   + (* eventE *)
     gstep. destruct e, EMB.
     (* Choose *)
-    * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+    * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
       eapply sim_itree_progress; et.
       gfinal. left. eapply CIH.
-    * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+    * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src. 
       eapply sim_itree_progress; et.
       gfinal. left. eapply CIH.
-    * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+    * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src. 
       eapply sim_itree_progress; et.
       gfinal. left. eapply CIH.
     (* Take *)
-    * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+    * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
       eapply sim_itree_progress; et.
       gfinal. left. eapply CIH. 
-    * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+    * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
       eapply sim_itree_progress; et.
       gfinal. left. eapply CIH. 
-    * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+    * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
       eapply sim_itree_progress; et.
       gfinal. left. eapply CIH.
     (* Syscall *)
     * apply sim_itree_syscall. i.
-      eapply sim_itree_flag_down.
-      gfinal. left. eapply CIH. 
+      econs. gfinal. left. eapply CIH. 
     * apply sim_itree_syscall. i.
-      eapply sim_itree_flag_down.
-      gfinal. left. eapply CIH.
+      econs. gfinal. left. eapply CIH.
     * apply sim_itree_syscall. i.
-      eapply sim_itree_flag_down.
-      gfinal. left. eapply CIH.
+      econs. gfinal. left. eapply CIH.
 Qed. 
 
 Context {CONF: EMSConfig}.
@@ -630,37 +612,32 @@ Proof.
       apply sim_itree_call; clarify.
       -- exists a; et.
       -- i. destruct WF, H. ss. clarify.
-        gstep. econs; et. 
-         gfinal. left. eapply CIH.
+         econs. gfinal. left. eapply CIH.
     + (* sE *)
       gstep. destruct s, EMB.
       apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
       eapply sim_itree_progress; et.
       unfold run_l, run_r. rewrite ! Any.pair_split.
       gfinal. left. destruct (run a). eapply CIH.
-      
     + (* eventE *)
       gstep. destruct e, EMB.
-      (* Choose *)
-      * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+      * (* Choose *)
+        apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src. 
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH.
-      (* Take *)
-        * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+      * (* Take *)
+        apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH. 
-      (* Syscall *)
-        * apply sim_itree_syscall. i.
-        eapply sim_itree_flag_down.
-        gfinal. left. eapply CIH. 
-
+      * (* Syscall *)
+        apply sim_itree_syscall. i.
+        econs. gfinal. left. eapply CIH. 
 Qed.
 
 Lemma add_empty_rev_aux
         fl fr itl itr stl str (w: unit)
         (EMPTY: empty_ems itr itl)
         (STATE: empty_rev_st (stl, str))
-
   :
       sim_itree (fun _ => empty_rev_st) top2 fl fr false false w (stl, itl) (str, itr)
 .
@@ -693,30 +670,26 @@ Proof.
       apply sim_itree_call; clarify.
       -- exists a; et.
       -- i. destruct WF, H. ss. clarify.
-        gstep. econs; et. 
-         gfinal. left. eapply CIH.
+         econs. gfinal. left. eapply CIH.
     + (* sE *)
       gstep. destruct s, EMB.
       apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
       eapply sim_itree_progress; et.
       unfold run_l, run_r. rewrite ! Any.pair_split.
       gfinal. left. destruct (run a). eapply CIH.
-      
     + (* eventE *)
       gstep. destruct e, EMB.
-      (* Choose *)
-      * apply sim_itree_choose_tgt. i. apply sim_itree_choose_src. exists x0.
+      * (* Choose *)
+        apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH.
-      (* Take *)
-        * apply sim_itree_take_src. i. apply sim_itree_take_tgt. exists x0.
+      * (* Take *)
+        apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
         eapply sim_itree_progress; et.
         gfinal. left. eapply CIH. 
-      (* Syscall *)
-        * apply sim_itree_syscall. i.
-        eapply sim_itree_flag_down.
-        gfinal. left. eapply CIH. 
-
+      * (* Syscall *)
+        apply sim_itree_syscall. i.
+        econs. gfinal. left. eapply CIH. 
 Qed.
 
 
@@ -807,8 +780,8 @@ Proof.
     unfold ModSem.add_fnsems in *.
     rewrite ! List.map_app in *.
     rewrite ! List.map_map in *.
-    rewrite ModSemFacts.fun_fst_trans_l in *.
-    rewrite ModSemFacts.fun_fst_trans_r in *.
+    rewrite fun_fst_trans_l in *.
+    rewrite fun_fst_trans_r in *.
     eapply nodup_comm. et.
   }
   { rewrite Sk.add_comm; et. }
@@ -831,12 +804,12 @@ Proof.
   rewrite <- Sk.add_assoc.
   inv H2. inv H3. econs.
   repeat (ss; unfold ModSem.add_fnsems in *; rewrite ! List.map_app in *; rewrite ! List.map_map in *).
-  rewrite ModSemFacts.fun_fst_trans_l in *.
-  rewrite ModSemFacts.fun_fst_trans_r in *.
-  rewrite ModSemFacts.fun_fst_trans_l_l in *.
-  rewrite ModSemFacts.fun_fst_trans_l_r in *.
-  rewrite ModSemFacts.fun_fst_trans_r_l in *.
-  rewrite ModSemFacts.fun_fst_trans_r_r in *.
+  rewrite fun_fst_trans_l in *.
+  rewrite fun_fst_trans_r in *.
+  rewrite fun_fst_trans_l_l in *.
+  rewrite fun_fst_trans_l_r in *.
+  rewrite fun_fst_trans_r_l in *.
+  rewrite fun_fst_trans_r_r in *.
   rewrite <- app_assoc. apply wf_fnsems.
 Qed.
 
@@ -857,12 +830,12 @@ Proof.
   rewrite Sk.add_assoc.
   inv H2. inv H3. econs.
   repeat (ss; unfold ModSem.add_fnsems in *; rewrite ! List.map_app in *; rewrite ! List.map_map in *).
-  rewrite ModSemFacts.fun_fst_trans_l in *.
-  rewrite ModSemFacts.fun_fst_trans_r in *.
-  rewrite ModSemFacts.fun_fst_trans_l_l in *.
-  rewrite ModSemFacts.fun_fst_trans_l_r in *.
-  rewrite ModSemFacts.fun_fst_trans_r_l in *.
-  rewrite ModSemFacts.fun_fst_trans_r_r in *.
+  rewrite fun_fst_trans_l in *.
+  rewrite fun_fst_trans_r in *.
+  rewrite fun_fst_trans_l_l in *.
+  rewrite fun_fst_trans_l_r in *.
+  rewrite fun_fst_trans_r_l in *.
+  rewrite fun_fst_trans_r_r in *.
   rewrite app_assoc. apply wf_fnsems.
 Qed.
 
@@ -886,7 +859,7 @@ Proof.
     unfold ModSem.add, ModSem.add_fnsems. ss.
     rewrite List.map_app. rewrite List.map_map.
     ss. rewrite app_nil_r.
-    rewrite ModSemFacts.fun_fst_trans_l.
+    rewrite fun_fst_trans_l.
     ss.
 
   - unfold ModSem.compile, ModSem.empty, enclose.
@@ -923,7 +896,7 @@ Proof.
        unfold ModSem.add_fnsems in wf_fnsems. ss.
        rewrite List.map_app in wf_fnsems.
        rewrite List.map_map in wf_fnsems.
-       rewrite ModSemFacts.fun_fst_trans_l in wf_fnsems. ss.
+       rewrite fun_fst_trans_l in wf_fnsems. ss.
        eapply nodup_app_l in wf_fnsems. ss. }
   - instantiate (1:= wf md). i.
     unfold wf. esplits; et. ss.
@@ -932,7 +905,7 @@ Proof.
     unfold ModSem.add, ModSem.add_fnsems in *. ss.
     rewrite List.map_app, List.map_map in wf_fnsems.
     ss. rewrite app_nil_r in wf_fnsems.
-    rewrite ModSemFacts.fun_fst_trans_l in wf_fnsems.
+    rewrite fun_fst_trans_l in wf_fnsems.
     ss.
 
   - unfold ModSem.compile, ModSem.empty, enclose. ss.
@@ -967,18 +940,6 @@ Lemma add_list_cons
           (add_list (x::xs) = (add x (add_list xs)))
 .
 Proof. ss. destruct xs; ss. Qed.
-
-(* Definition add_list_snoc
-          x xs
-        :
-          << SNOC: Beh.of_program (compile (add_list (snoc xs x))) <1= 
-                   Beh.of_program (compile (add (add_list xs) x)) >>
-.
-Proof. Admitted. *)
-
-  (* ginduction xs; ii; ss.
-  { cbn. rewrite add_empty_l, add_empty_r. et. }
-  { cbn. rewrite <- add_assoc'.  r in IHxs. r. f_equal.}  *)
 
   Lemma add_list_sk (mdl: list t)
   :
