@@ -440,9 +440,9 @@ Global Opaque _APC.
     varg_src <- trigger (Take _);;
     trigger (Assume (P x varg_src varg_tgt));;; (*** precondition ***)
     Ret (x, varg_src)
-  .
+  . *)
 
-  Definition HoareFunRet
+  (* Definition HoareFunRet
              {X: Type}
              (Q: X -> Any.t -> Any_tgt -> iProp):
     X -> Any.t -> itree hAGEs Any_tgt := fun x vret_src =>
@@ -506,7 +506,7 @@ Global Opaque _APC.
 
 
   Definition interp_hp_tgt : itree hAGEs ~> stateT Σ (itree Es) :=
-    interp (case_ (bif:=sum1) (handle_hAGE_tgt)
+    interp_state (case_ (bif:=sum1) (handle_hAGE_tgt)
               (case_ (bif:=sum1) ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
                 (case_ (bif:=sum1) 
                           ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
@@ -700,6 +700,201 @@ If this feature is needed; we can extend it then. At the moment, I will only all
 End CANCEL.
 
 End PSEUDOTYPING.
+
+
+
+Section AUX.
+
+Context `{Σ: GRA.t}.
+(* itree reduction *)
+Lemma interp_hp_bind
+      (R S: Type)
+      (s : itree hAGEs R) (k : R -> itree hAGEs S)
+      fmr
+  :
+    (interp_hp_tgt (s >>= k) fmr)
+    =
+    st <- interp_hp_tgt s fmr;; interp_hp_tgt (k st.2) st.1.
+Proof.
+  unfold interp_hp_tgt in *. eapply interp_state_bind.
+Qed.
+
+Lemma interp_hp_tau
+      (U: Type)
+      (t : itree _ U)
+      fmr
+  :
+    (interp_hp_tgt (Tau t) fmr)
+    =
+    (Tau (interp_hp_tgt t fmr)).
+Proof.
+  unfold interp_hp_tgt in *. eapply interp_state_tau.
+Qed.
+
+Lemma interp_hp_ret
+      (U: Type)
+      (t: U)
+      fmr
+  :
+    (interp_hp_tgt (Ret t) fmr)
+    =
+    Ret (fmr, t).
+Proof.
+  unfold interp_hp_tgt in *. eapply interp_state_ret.
+Qed.
+
+Lemma interp_hp_call
+      (R: Type)
+      (i: callE R)
+      fmr
+  :
+    (interp_hp_tgt (trigger i) fmr)
+    =
+    (trigger i >>= (fun r => tau;; Ret (fmr, r))).
+Proof.
+  unfold interp_hp_tgt in *. grind.
+Qed.
+
+Lemma interp_hp_triggerp
+      (R: Type)
+      (i: sE R)
+      fmr
+  :
+    (interp_hp_tgt (trigger i) fmr)
+    =
+    (handle_sE_tgt i >>= (fun r => tau;; Ret (fmr, r))).
+Proof.
+  unfold interp_hp_tgt. rewrite interp_state_trigger. cbn. grind.
+Qed.
+
+Lemma interp_hp_triggere
+      (R: Type)
+      (i: eventE R)
+      fmr
+  :
+    (interp_hp_tgt (trigger i) fmr)
+    =
+    (trigger i >>= (fun r => tau;; Ret (fmr, r))).
+Proof.
+  unfold interp_hp_tgt. rewrite interp_state_trigger. cbn. grind.
+Qed.
+
+Lemma interp_hp_triggerUB
+      (R: Type)
+      fmr
+  :
+    (interp_hp_tgt (triggerUB) fmr)
+    =
+    triggerUB (A:=Σ*R).
+Proof.
+  unfold interp_hp_tgt, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
+Qed.
+
+Lemma interp_hp_triggerNB
+      (R: Type)
+      fmr
+  :
+    (interp_hp_tgt (triggerNB) fmr)
+    =
+    triggerNB (A:=Σ*R).
+Proof.
+  unfold interp_hp_tgt, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
+Qed.
+
+Lemma interp_hp_unwrapU 
+      (R: Type)
+      (i: option R)
+      fmr
+  :
+    (interp_hp_tgt (@unwrapU hAGEs _ _ i) fmr)
+    =
+    r <- (unwrapU i);; Ret (fmr, r).
+Proof.
+  unfold interp_hp_tgt, unwrapU in *. des_ifs.
+  { etrans.
+    { eapply interp_hp_ret. }
+    { grind. }
+  }
+  { etrans.
+    { eapply interp_hp_triggerUB. }
+    { unfold triggerUB. grind. }
+  }
+Qed.
+
+Lemma interp_hp_unwrapN
+      (R: Type)
+      (i: option R)
+      fmr
+  :
+    (interp_hp_tgt (@unwrapN hAGEs _ _ i) fmr)
+    =
+    r <- (unwrapN i);; Ret (fmr, r).
+Proof.
+  unfold interp_hp_tgt, unwrapN in *. des_ifs.
+  { etrans.
+    { eapply interp_hp_ret. }
+    { grind. }
+  }
+  { etrans.
+    { eapply interp_hp_triggerNB. }
+    { unfold triggerNB. grind. }
+  }
+Qed.
+
+Lemma interp_hp_assume
+      P
+      fmr
+  :
+    (interp_hp_tgt (assume P) fmr)
+    =
+    (assume P;;; tau;; Ret (fmr, tt))
+.
+Proof.
+  unfold assume. rewrite interp_hp_bind. rewrite interp_hp_triggere. grind. eapply interp_hp_ret.
+Qed.
+
+Lemma interp_hp_guarantee
+      P
+      fmr
+  :
+    (interp_hp_tgt (guarantee P) fmr)
+    =
+    (guarantee P;;; tau;; Ret (fmr, tt)).
+Proof.
+  unfold guarantee. rewrite interp_hp_bind. rewrite interp_hp_triggere. grind. eapply interp_hp_ret.
+Qed.
+
+Lemma interp_hp_ext
+      R (itr0 itr1: itree _ R)
+      (EQ: itr0 = itr1)
+      fmr
+  :
+    (interp_hp_tgt itr0 fmr)
+    =
+    (interp_hp_tgt itr1 fmr)
+.
+Proof. subst; et. Qed.
+
+Global Program Instance interp_hp_tgt_rdb: red_database (mk_box (@interp_hp_tgt)) :=
+  mk_rdb
+    1
+    (mk_box interp_hp_bind)
+    (mk_box interp_hp_tau)
+    (mk_box interp_hp_ret)
+    (mk_box interp_hp_call)
+    (mk_box interp_hp_triggere)
+    (mk_box interp_hp_triggerp)
+    (mk_box interp_hp_triggerp)
+    (mk_box interp_hp_triggerUB)
+    (mk_box interp_hp_triggerNB)
+    (mk_box interp_hp_unwrapU)
+    (mk_box interp_hp_unwrapN)
+    (mk_box interp_hp_assume)
+    (mk_box interp_hp_guarantee)
+    (mk_box interp_hp_ext)
+.
+
+End AUX.
 
 
 

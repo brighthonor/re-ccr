@@ -136,25 +136,15 @@ Section ADD.
 
   Definition emb_id : forall T, Es T -> Es T := fun T es => es.
 
-  Definition emb_l : forall T, Es T -> Es T :=
-    fun T es => 
-    match es with
-    | inr1 (inl1 (SUpdate run)) => inr1 (inl1 (SUpdate (run_l run)))
-    | _ => es
-    end.   
+  (* Definition emb_l := emb_ run_l.
 
-  Definition emb_r : forall T, Es T -> Es T :=
-    fun T es => 
-    match es with
-    | inr1 (inl1 (SUpdate run)) => inr1 (inl1 (SUpdate (run_r run)))
-    | _ => es
-    end.       
+  Definition emb_r := emb_ run_r. *)
 
   Definition trans_l '(fn, f): gname * (Any.t -> itree _ Any.t) :=
-    (fn, (fun args => translate emb_l (f args))).
+    (fn, (fun args => translate (emb_ run_l) (f args))).
 
   Definition trans_r '(fn, f) : gname * (Any.t -> itree _ Any.t) :=
-    (fn, (fun args => translate emb_r (f args))).
+    (fn, (fun args => translate (emb_ run_r) (f args))).
 
   Definition add_fnsems : alist gname (Any.t -> itree _ Any.t) :=
     (List.map trans_l M1.(fnsems)) ++ (List.map trans_r M2.(fnsems)).
@@ -164,7 +154,6 @@ Section ADD.
     init_st := Any.pair (init_st M1) (init_st M2);
     fnsems := add_fnsems;
   |}.
-    
 
 End ADD.
 

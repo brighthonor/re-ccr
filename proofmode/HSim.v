@@ -14,7 +14,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import Red IRed.
 Require Import ProofMode Invariant.
-Require Import HTactics.
+(* Require Import HTactics. *)
 
 Set Implicit Arguments.
 

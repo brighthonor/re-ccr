@@ -214,7 +214,7 @@ Section HLEMMAS.
          end)%I
   .
 
-  Lemma hcall_clo_ord_weaken'
+  (* Lemma hcall_clo_ord_weaken'
         (fsp1: fspec) 
         (x: shelve__ fsp1.(meta))
 
@@ -648,7 +648,7 @@ Section HLEMMAS.
       replace i1 with i0; et
     end.
     f_equal. grind.
-  Qed.
+  Qed. *)
 
   (* Lemma trivial_init_clo
         A wf (le: A -> A -> Prop) r rg w arg mrp_src mp_tgt itr_tgt  stb body RR
@@ -873,7 +873,7 @@ Section TEST.
 
 End TEST.
 
-
+(* 
 Ltac astep_full _fn _args _next _n1 :=
   eapply (@APC_step_clo _ _fn _args _next _n1);
   [(try by ((try stb_tac); refl))|
@@ -1058,4 +1058,4 @@ Ltac deflag :=
   | [ |- (gpaco8 _ _ _ _ _ _ _ _ _ _ _ _) ] =>
     eapply sim_itree_flag_down
   | _ => fail
-  end.
+  end. *)
