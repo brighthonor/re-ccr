@@ -484,37 +484,47 @@ Global Opaque _APC.
          | SUpdate run => pupdate run
          end).
   
-
-  Definition handle_hAGE_tgt: hAGE ~> stateT (Σ) (itree Es) :=
-    fun _ e fr =>
-      match e with
-      | Assume P => 
+  Definition handle_Assume P: stateT (Σ) (itree Es) unit :=
+    fun fr =>
         r <- trigger (Take Σ);;
         mr <- mget;; 
         assume (URA.wf (r ⋅ fr ⋅ mr));;;
         assume(P r);;; 
         Ret (r ⋅ fr, tt)
-      | Guarantee P =>
-        '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
-        mr <- mget;;
-        guarantee(URA.updatable (fr ⋅ mr) (r ⋅ fr' ⋅ mr'));;;
-        guarantee(P r);;;
-        mput mr';;;
-        Ret (fr', tt)
+  .
+  Definition handle_Guarantee P: stateT (Σ) (itree Es) unit :=
+    fun fr =>
+      '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
+      mr <- mget;;
+      guarantee(URA.updatable (fr ⋅ mr) (r ⋅ fr' ⋅ mr'));;;
+      guarantee(P r);;;
+      mput mr';;;
+      Ret (fr', tt)
+  .
+
+  Definition handle_hAGE_tgt: hAGE ~> stateT (Σ) (itree Es) :=
+    fun _ e fr =>
+      match e with
+      | Assume P => handle_Assume P fr
+      | Guarantee P => handle_Guarantee P fr
       end
   .
 
 
   Definition interp_hp_tgt : itree hAGEs ~> stateT Σ (itree Es) :=
-    interp_state (case_ (bif:=sum1) (handle_hAGE_tgt)
-              (case_ (bif:=sum1) ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
-                (case_ (bif:=sum1) 
-                          ((fun T X s => x <- handle_sE_tgt X;; Ret (s, x)): _ ~> stateT Σ (itree Es)) 
-                          ((fun T X s => x <- trigger X;; Ret (s, x)): _ ~> stateT Σ (itree Es)))))
+      interp_state 
+        (case_ (bif:=sum1) (handle_hAGE_tgt)
+        (case_ (bif:=sum1) ((fun T X fr => x <- trigger X;; '(fr', _) <- (handle_Guarantee (True%I:iProp) fr);; Ret (fr', x)): _ ~> stateT Σ (itree Es)) 
+        (case_ (bif:=sum1) ((fun T X fr => x <- handle_sE_tgt X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)) 
+                           ((fun T X fr => x <- trigger X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)))))
     .
 
-
-
+  Definition interp_hp_tgt_fun : itree hAGEs ~> stateT Σ (itree Es):=
+    (fun T itr fr => 
+        interp_hp_tgt itr fr
+        >>= (fun '(fr, x) => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr) ;; Ret (fr', x)))
+    .
+    (*  *)
   (* Definition body_to_agEs (ord_cur: ord)
              {X} (body: X -> itree hEs Any_src): X -> itree hAGEs Any_src :=
     (@interp_Es'_agEs ord_cur _) ∘ (@interp_hEs_Es' _) ∘ body.
@@ -746,11 +756,11 @@ Qed.
 Lemma interp_hp_call
       (R: Type)
       (i: callE R)
-      fmr
+      fr
   :
-    (interp_hp_tgt (trigger i) fmr)
+    (interp_hp_tgt (trigger i) fr)
     =
-    (trigger i >>= (fun r => tau;; Ret (fmr, r))).
+    (trigger i >>= (fun r => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr);; tau;; Ret (fr', r))).
 Proof.
   unfold interp_hp_tgt in *. grind.
 Qed.

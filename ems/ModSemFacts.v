@@ -1210,11 +1210,5 @@ Qed.
    Lemma refines_strong_refines {CONF: EMSConfig}: refines_strong <2= refines.
    Proof. ii. eapply PR; et. Qed.
 
-
-
-
-
-
-
 End REFINE.
 
