@@ -135,7 +135,7 @@ End PROOF.
 Notation "'update_and_discard' fr0" :=
   ('(rarg, fr1, mr1) <- trigger (Choose (_ * _ * _));;
    mr0 <- mget;;
-   guarantee(URA.updatable (fr0 ⋅ mr0) (rarg ⋅ fr1 ⋅ mr1));;;
+   guarantee(Own (fr0 ⋅ mr0) ⊢ #=> Own (rarg ⋅ fr1 ⋅ mr1));;;
    mput mr1;;;
    Ret (fr1, rarg)) (at level 60)
 .  
@@ -489,15 +489,15 @@ Global Opaque _APC.
         r <- trigger (Take Σ);;
         mr <- mget;; 
         assume (URA.wf (r ⋅ fr ⋅ mr));;;
-        assume(P r);;; 
+        assume(Own r ⊢ P);;; 
         Ret (r ⋅ fr, tt)
   .
   Definition handle_Guarantee P: stateT (Σ) (itree Es) unit :=
     fun fr =>
       '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
       mr <- mget;;
-      guarantee(URA.updatable (fr ⋅ mr) (r ⋅ fr' ⋅ mr'));;;
-      guarantee(P r);;;
+      guarantee(Own (fr ⋅ mr) ⊢ #=> Own (r ⋅ fr' ⋅ mr'));;;
+      guarantee(Own r ⊢ P);;;
       mput mr';;;
       Ret (fr', tt)
   .
