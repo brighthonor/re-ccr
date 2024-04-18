@@ -403,7 +403,7 @@ Section SIM.
 		- eapply URA.wf_extends in H; et. econs. instantiate (1:= a). r_solve.
 	Qed.
 
-	Lemma own_update a b
+	Lemma own_ctx a b
 			(OWN: Own a ⊢ #=> Own b)
 		:
 			forall ctx, Own (a ⋅ ctx) ⊢ #=> Own (b ⋅ ctx)
@@ -414,7 +414,7 @@ Section SIM.
 		iSplitL "H"; et.
 	Qed.
 
-	Lemma own_updatable (r r': Σ)
+	Lemma updatable_own (r r': Σ)
 			(UPD: URA.updatable r r')
 		:
 			Own r ⊢ #=> Own r'
@@ -422,9 +422,39 @@ Section SIM.
 	Proof.
 		unfold URA.updatable in *. uipropall.
 		i. exists r'.
-		esplits; et. { admit. }
+		esplits; et. { r_solve. }
 		i. apply UPD. revert ctx H0.
 		eapply URA.extends_updatable. et.
+	Qed.
+
+	Lemma iProp_sepconj_aux P Q r 
+			(SAT: Own r ⊢ #=> (P ** Q))
+			(WF: URA.wf r)
+		:
+			exists rp rq, (URA.updatable r (rp ⋅ rq)) /\ 
+										(Own rp ⊢ P) /\ 
+										(Own rq ⊢ Q)
+	.
+	Proof.
+		uipropall.
+		hexploit SAT; et. { r_solve. }
+		i. des.
+		esplits; et; uipropall.
+		{
+			instantiate (1:= b). instantiate (1:=a).
+			unfold URA.updatable. 
+			rewrite H in H0. et.
+		}
+		{
+			i. destruct P. ss.
+			hexploit H3. i.
+			eapply URA.wf_extends in H3; et.
+		}
+		{
+			i. destruct Q. ss.
+			hexploit H3. i.
+			eapply URA.wf_extends in H3; et.
+		}
 	Qed.
 
 	Lemma iProp_sepconj P Q r 
@@ -432,43 +462,14 @@ Section SIM.
 			(WF: URA.wf r)
 		:
 			exists rp rq, (Own r ⊢ #=> Own (rp ⋅ rq)) /\ 
-			(* exists rp rq, (URA.updatable r (rp ⋅ rq)) /\  *)
 										(Own rp ⊢ P) /\ 
 										(Own rq ⊢ Q)
 	.
 	Proof.
-		uipropall.
-		hexploit SAT; et. { admit. }
-		i. des.
-		esplits; uipropall.
-		{
-			instantiate (1:= b). instantiate (1:= a).
-			unfold URA.updatable. 
-			rewrite H in H0. et.
-		}
-		{
-			i. destruct P. ss.
-			assert (URA.wf a). { admit. }
-			specialize (iProp_mono a r0 WF0 H3 H1). et. 	
-		}
-		{
-			i. 
-			i. destruct Q. ss.
-			assert (URA.wf b). { admit. }
-			specialize (iProp_mono b r0 WF0 H3 H2). et. 
-		}
-
-		
-	Admitted.
-		(* autounfold with iprop in SAT. *)
-		(* uipropall.
-		hexploit SAT; et. r_solve. 
-		i. des.
-		esplits.
-		{  }
-	{ uipropall. i. hexploit SAT; et.
-			i. 
-		} *)
+		eapply iProp_sepconj_aux in SAT; et. des.
+		eapply updatable_own in SAT.
+		esplits; et. 	
+	Qed.	
 
 	Lemma current_iProp_sepconj' P Q r 
 			(SAT: current_iProp r (P ** Q))
@@ -698,7 +699,7 @@ Qed.
 				clear -H FMR0.
 				assert (URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt)). { admit. }
 				assert (URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ε)). { admit. }
-				eapply own_update with (ctx := (fr_tgt ⋅ mr_tgt)) in H.
+				eapply own_ctx with (ctx := (fr_tgt ⋅ mr_tgt)) in H.
 				uipropall.
 				eapply H in H0. 2: { admit. }
 				des.
@@ -743,7 +744,11 @@ Qed.
 			}
 			steps. force_l; et.
 			steps.
-			hexploit K; et. i. des.
+			hexploit K; et.
+			{
+				iIntros "H". iPoseProof (H1 with "H") as "H". et.	
+			}
+			i. des.
 			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IH; et.
 			{
