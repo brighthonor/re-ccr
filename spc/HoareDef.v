@@ -496,6 +496,7 @@ Global Opaque _APC.
     fun fr =>
       '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
       mr <- mget;;
+      (* URA.wf (fr ⋅ mr) ????? *)
       guarantee(Own (fr ⋅ mr) ⊢ #=> Own (r ⋅ fr' ⋅ mr'));;;
       guarantee(Own r ⊢ P);;;
       mput mr';;;
@@ -514,7 +515,7 @@ Global Opaque _APC.
   Definition interp_hp_tgt : itree hAGEs ~> stateT Σ (itree Es) :=
       interp_state 
         (case_ (bif:=sum1) (handle_hAGE_tgt)
-        (case_ (bif:=sum1) ((fun T X fr => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr);; x <- trigger X;;  Ret (fr', x)): _ ~> stateT Σ (itree Es)) 
+        (case_ (bif:=sum1) ((fun T X fr => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr);; x <- trigger X;; Ret (fr', x)): _ ~> stateT Σ (itree Es)) 
         (case_ (bif:=sum1) ((fun T X fr => x <- handle_sE_tgt X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)) 
                            ((fun T X fr => x <- trigger X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)))))
     .
