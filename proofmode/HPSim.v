@@ -565,21 +565,6 @@ Section SIM.
 	Definition interp_hp_fun (hp: Any.t -> itree hAGEs Any.t): Any.t -> itree Es Any.t :=
 		fun arg => interp_hp_tgt_fun (hp arg) ε >>= (fun '(_, x) => Ret x).
 
-  Variant mk_inv  
-          (I: Any.t -> Any.t -> iProp)
-    : Σ -> Any.t * Any.t -> Prop :=
-  | mk_inv_intro
-      (ctx mr_src mr_tgt: Σ) st_src st_tgt
-      (INV: exists mr,
-						<<WF: URA.wf (ctx ⋅ mr_src)>> /\
-						<<MRS: Own mr_src ⊢ #=> Own (mr ⋅ mr_tgt)>> /\
-						<<MR: Own mr ⊢ #=> (I st_src st_tgt)>>)
-    :
-      mk_inv I ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
-  .
-
-
-
 	(* Variable st: Any.t.
 	Variable frr: Σ.
 	Variable itr: Σ -> itree Es (Σ * Any.t).
@@ -592,8 +577,8 @@ Section SIM.
 
 	(* Variable world: Type. *)
 
-	Section INLINEC.
 
+	Section INLINEC.
 	(* Check (@_sim_itree Σ wf le fl_src' fl_tgt'). *)
 
 	Variant inlineSrcC (r: forall S_src S_tgt (SS: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop):
@@ -601,17 +586,20 @@ Section SIM.
 	| inlineSrcC_intro
 			(f_src f_tgt: bool) w
  		 	SS
-			(st_src st_tgt: Any.t)
+			(mr: Σ)
+			(st: Any.t)
 			(f: Any.t -> itree hAGEs Any.t) varg
-			(itr: itree Es Any.t)
-			(ktr: (Σ * Any.t) -> itree Es Any.t)
-			
+			(stitr_tgt: Any.t * itree Es Any.t)
+			ktrH (ktr: (Σ * Any.t) -> itree Es Any.t)
+			(KTR: ktr = (fun x => ` x0 : Σ * Any.t <- interp_hp_tgt_fun (ktrH x.2) x.1;; Ret x0.2))
 
-			(SIM: r _ _ SS f_src f_tgt w (st_src, (interp_hp_tgt (f varg) ε >>= ktr)) (st_tgt, itr))
+			(SIM: r _ _ SS f_src f_tgt w (Any.pair st mr↑, (interp_hp_tgt (f varg) ε >>= ktr)) stitr_tgt)
 	:
-		inlineSrcC r Any.t Any.t SS f_src f_tgt w (st_src, interp_hp_fun f varg >>= (fun r0 => tau;; Ret (ε, r0)) >>= ktr) (st_tgt, itr)
+		inlineSrcC r Any.t Any.t SS f_src f_tgt w (Any.pair st mr↑, interp_hp_fun f varg >>= (fun r0 => tau;; Ret (ε, r0)) >>= ktr) stitr_tgt
 	.
 
+
+	(* ` x0 : Σ * Any.t <- interp_hp_tgt_fun (k_src x.2) x.1;; Ret x0.2 *)
 
 	(* ` r0 : Any.t <- interp_hp_fun f varg;; ` x : Σ * Any.t <- (tau;; Ret (ε, r0));; ` x0 : Σ * Any.t <- interp_hp_tgt_fun (k_src x.2) x.1;; Ret x0.2 *)
 	(* Variable fr: Σ.
@@ -624,9 +612,89 @@ Section SIM.
 	Check lbindC. *)
 	
 
-	Lemma inlineSrcC_spec: forall wf le fl_src fl_tgt, 
+  Lemma inlineSrcC_mon 
+        r1 r2
+        (LEr: r1 <8= r2)
+    :
+      inlineSrcC r1 <8= inlineSrcC r2
+  .
+  Proof. ii. destruct PR; econs; et. Qed.
+
+  Lemma inlineSrcC_compatible: forall wf le fl_src fl_tgt, 
+			compatible8 (@_sim_itree Σ wf le fl_src fl_tgt) inlineSrcC.
+	Proof.
+	Admitted.	
+		(* econs; i; eauto using inlineSrcC_mon.
+		depdes PR.
+		unfold interp_hp_fun, interp_hp_tgt_fun.
+		remember (interp_hp_tgt (f varg) ε)	as itr0. clear Heqitr0 f varg.
+		remember (Any.pair st (Any.upcast mr), ` x : _ <- itr0;; ktr x) as stitr.
+		move SIM before r. revert_until SIM. induction SIM; i.
+
+		- ides itr0; depdes H0; revert x; grind. 
+			2: { rewrite bind_vis in x. clarify. }
+			unfold handle_Guarantee, guarantee, mget, mput. grind. 
+			eapply sim_itree_choose_src. instantiate (1:= (ε, ε, mr ⋅ c)). grind. 
+			eapply sim_itree_supdate_src. grind.
+			rewrite Any.pair_split. grind.
+			rewrite Any.upcast_downcast. grind.
+			eapply sim_itree_choose_src. { r_solve. iIntros "[H H0]". iSplitL "H0"; et. }
+			eapply sim_itree_choose_src; et.
+			eapply sim_itree_supdate_src. grind.
+			rewrite Any.pair_split. grind.
+			eapply sim_itree_supdate_src. grind.
+			eapply sim_itree_tau_src. ss.
+			admit.
+			
+		- ides itr0; cycle 1.
+			{ (* tau *) revert H1; grind. rewrite bind_trigger in H1. clarify. }
+			{ (* vis *)
+				(* grind. rewrite bind_vis. *)
+				rewrite bind_vis in H1.
+				rewrite bind_trigger in H1. admit.
+			}
+			admit.
+		- admit.
+		- admit.
+		- eapply sim_itree_inline_tgt; et.
+		- ides itr0; revert H0; grind; cycle 2.
+			{ rewrite bind_vis in H0. clarify. }
+			{ 
+				unfold handle_Guarantee, mget, mput, guarantee. grind.
+				eapply sim_itree_choose_src. instantiate (1:= (ε, ε, mr ⋅ c)). grind.
+				eapply sim_itree_supdate_src. grind.
+				rewrite Any.pair_split. grind.
+				rewrite Any.upcast_downcast. grind.
+				eapply sim_itree_choose_src. { r_solve. iIntros "[H H0]". iSplitL "H0"; et. }
+				eapply sim_itree_choose_src; et.
+				eapply sim_itree_supdate_src. grind.
+				rewrite Any.pair_split. grind.
+				eapply sim_itree_supdate_src. grind.
+				eapply sim_itree_tau_src. ss.
+				admit.
+			}
+			eapply sim_itree_tau_src.
+			
+		- eapply sim_itree_tau_tgt; et.
+		- admit.
+		- eapply sim_itree_choose_tgt; et.
+			
+
+	Qed. *)
+
+	(* Lemma inlineSrcC_spec: forall wf le fl_src fl_tgt, 
 		(inlineSrcC) <9= gupaco8 (@_sim_itree Σ wf le fl_src fl_tgt ) (cpn8 (@_sim_itree Σ wf le fl_src fl_tgt)).
-  Proof. Admitted.
+  Proof.
+		clear fl_src fl_tgt.
+		intros wf le fl_src fl_tgt.
+		gcofix CIH.
+		i. depdes PR.
+		 (* Unset Printing Notations. rename x0 into r. *)
+		unfold interp_hp_fun, interp_hp_tgt_fun.
+		remember (interp_hp_tgt (f varg) ε)	as itr0. clear Heqitr0 f varg.
+		 r.
+		(* econs. *)
+	Admitted. *)
 
 	End INLINEC.
 
@@ -642,6 +710,20 @@ Section SIM.
 Proof.
 	unfold interp_hp_tgt_fun. rewrite interp_hp_bind. grind.
 Qed.
+
+
+Variant mk_inv  
+(I: Any.t -> Any.t -> iProp)
+: Σ -> Any.t * Any.t -> Prop :=
+| mk_inv_intro
+(ctx mr_src mr_tgt: Σ) st_src st_tgt
+(INV: exists mr,
+	<<WF: URA.wf (ctx ⋅ mr_src)>> /\
+	<<MRS: Own mr_src ⊢ #=> Own (mr ⋅ mr_tgt)>> /\
+	<<MR: Own mr ⊢ #=> (I st_src st_tgt)>>)
+:
+mk_inv I ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
+.
 
 
 	Lemma hpsim_adequacy:
@@ -665,7 +747,7 @@ Proof.
 	revert_until I.
 	ginit. gcofix CIH. i.
 	remember (st_src, itr_src). remember (st_tgt, itr_tgt).
-	move SIM before CIH. revert_until SIM.	
+	move SIM before FLT. revert_until SIM.	
 
 	induction SIM using hpsim_ind; i; clarify. 
 	4:{
@@ -682,9 +764,12 @@ Proof.
 			instantiate (1:= interp_hp_fun f).
 			rewrite alist_find_map. rewrite FUN. et.
 		}
-		rewrite <- bind_bind.
-		guclo inlineSrcC_spec. econs.
-		specialize (IHSIM eq_refl eq_refl st_src0 st_tgt0 ((f varg) >>= k_src) itr_tgt ctx (fr_src ⋅ mr_src) mr_tgt ε fr_tgt).
+		rewrite <- bind_bind. 
+		unfold interp_hp_tgt_fun.
+		gclo. eapply compatible'8_companion; eauto with paco.
+		{ eapply compat8_compatible'. apply inlineSrcC_compatible. }	
+		econs. { grind. }
+		specialize (IHSIM st_src0 st_tgt0 ((f varg) >>= k_src) itr_tgt ctx (fr_src ⋅ mr_src) mr_tgt ε fr_tgt).
 		rewrite interp_hp_fun_bind in IHSIM.
 		rewrite bind_bind in IHSIM.
 		(* unfold interp_hp_tgt_fun in IHSIM. *)
@@ -724,31 +809,37 @@ Proof.
 
 	- unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee.
 		hexploit INV. i.
-		eapply iProp_sepconj in H; et. 2: { admit. }
+		eapply iProp_sepconj in H; et. 
+		(* 2: { admit. } *)
 		des.
 		rename rq into fr. rename rp into mr.
 		steps.
 		unfold handle_Guarantee, mget, mput. steps_safe.
 		force_l.
-		instantiate (1:= (c0, fr ⋅ c1, mr ⋅ c)).
+		instantiate (1:= (c0, ε, fr ⋅ c1 ⋅ mr ⋅ c)).
 		steps_safe.
 		unfold guarantee. force_l.
-		{ 
-			iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H".
+		{ admit. }
+			(* iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H".
 			rewrite <- URA.add_assoc.
 			iDestruct "H" as "[H H0]". 
 			iPoseProof (H with "H") as "H".
 			replace (c0 ⋅ (fr ⋅ c1) ⋅ (mr ⋅ c)) with (mr ⋅ fr ⋅ (c0 ⋅ c1 ⋅ c)). 2: { r_solve. }
 			iPoseProof (_GUARANTEE with "H0") as "H0".
-			iSplitL "H"; et.
-		}
+			iSplitL "H"; et. *)
 		steps_safe. force_l.
 		{ et. }
-		steps_safe.
-		{ econs. esplits; et. admit. }
-		inv WF. des.
+		steps_safe. eapply safe_sim_sim; econs; esplits; i.
+		{ 
+			econs. esplits; et.
+			{ instantiate (1:= ctx). admit. }
+			{ admit. }
+			(* { iIntros "H". iPoseProof (H0 with "H") as "H". et. } *)
+		}
+		inv WF0. des.
 		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee in K.
-		hexploit K. 
+		steps.
+		hexploit K; swap 1 2. 
 		{ 
 			instantiate (1:= st_tgt). instantiate (1:= st_src).
 			iIntros "[H1 H2]".
@@ -756,16 +847,12 @@ Proof.
 			iPoseProof (MR with "H2") as "H2".
 			iSplitL "H2"; et.
 		}
+		{ admit. }
 		i. des.
-		gstep. econs. gfinal. left. 
 		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-		eapply CIH; et.
-		{ eapply hpsim_bot_flag_up. et. }
-		{ 
-			iIntros "[H H0]".
-			iPoseProof (MRS with "H0") as "H0".
-			replace (fr ⋅ mr0 ⋅ c1 ⋅ mr_tgt0) with (fr ⋅ c1 ⋅ (mr0 ⋅ mr_tgt0)). 2: { r_solve. }  
-			iSplitL "H"; et.
+		eapply IH; et.
+		{
+			
 		}
 	- steps. hexploit K; et. i. des.
 		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
