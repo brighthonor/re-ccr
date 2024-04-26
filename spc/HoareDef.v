@@ -512,7 +512,7 @@ Global Opaque _APC.
   .
 
 
-  Definition interp_hp_tgt : itree hAGEs ~> stateT Σ (itree Es) :=
+  Definition interp_hp : itree hAGEs ~> stateT Σ (itree Es) :=
       interp_state 
         (case_ (bif:=sum1) (handle_hAGE_tgt)
         (case_ (bif:=sum1) ((fun T X fr => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr);; x <- trigger X;; Ret (fr', x)): _ ~> stateT Σ (itree Es)) 
@@ -520,11 +520,22 @@ Global Opaque _APC.
                            ((fun T X fr => x <- trigger X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)))))
     .
 
-  Definition interp_hp_tgt_fun : itree hAGEs ~> stateT Σ (itree Es):=
-    (fun T itr fr => 
-        interp_hp_tgt itr fr
-        >>= (fun '(fr, x) => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr) ;; Ret (fr', x)))
-    .
+  (* Definition interp_hp_fun : itree hAGEs ~> stateT Σ (itree Es):= *)
+  (*   (fun T itr fr =>  *)
+  (*       interp_hp itr fr *)
+  (*       >>= (fun '(fr, x) => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr) ;; Ret (fr', x))) *)
+  (* . *)
+
+  Definition hp_fun_tail := (fun '(fr, x) => handle_Guarantee (True%I:iProp) fr ;;; Ret (x: Any.t)).
+    
+  Definition interp_hp_fun (hp: Any.t -> itree hAGEs Any.t): Any.t -> itree Es Any.t :=
+    fun arg => interp_hp (hp arg) ε >>= hp_fun_tail.
+      
+  (* (* Which fr to put in interp_hp & What to return *) *)
+  (* Definition interp_hp_fun (hp: Any.t -> itree hAGEs Any.t): Any.t -> itree Es Any.t := *)
+  (*   fun arg => interp_hp_fun (hp arg) ε >>= (fun '(_, x) => Ret x). *)
+
+    
     (*  *)
   (* Definition body_to_agEs (ord_cur: ord)
              {X} (body: X -> itree hEs Any_src): X -> itree hAGEs Any_src :=
@@ -723,11 +734,11 @@ Lemma interp_hp_bind
       (s : itree hAGEs R) (k : R -> itree hAGEs S)
       fmr
   :
-    (interp_hp_tgt (s >>= k) fmr)
+    (interp_hp (s >>= k) fmr)
     =
-    st <- interp_hp_tgt s fmr;; interp_hp_tgt (k st.2) st.1.
+    st <- interp_hp s fmr;; interp_hp (k st.2) st.1.
 Proof.
-  unfold interp_hp_tgt in *. eapply interp_state_bind.
+  unfold interp_hp in *. eapply interp_state_bind.
 Qed.
 
 Lemma interp_hp_tau
@@ -735,11 +746,11 @@ Lemma interp_hp_tau
       (t : itree _ U)
       fmr
   :
-    (interp_hp_tgt (Tau t) fmr)
+    (interp_hp (Tau t) fmr)
     =
-    (Tau (interp_hp_tgt t fmr)).
+    (Tau (interp_hp t fmr)).
 Proof.
-  unfold interp_hp_tgt in *. eapply interp_state_tau.
+  unfold interp_hp in *. eapply interp_state_tau.
 Qed.
 
 Lemma interp_hp_ret
@@ -747,11 +758,11 @@ Lemma interp_hp_ret
       (t: U)
       fmr
   :
-    (interp_hp_tgt (Ret t) fmr)
+    (interp_hp (Ret t) fmr)
     =
     Ret (fmr, t).
 Proof.
-  unfold interp_hp_tgt in *. eapply interp_state_ret.
+  unfold interp_hp in *. eapply interp_state_ret.
 Qed.
 
 Lemma interp_hp_call
@@ -759,11 +770,11 @@ Lemma interp_hp_call
       (i: callE R)
       fr
   :
-    (interp_hp_tgt (trigger i) fr)
+    (interp_hp (trigger i) fr)
     =
     ('(fr', _) <- (handle_Guarantee (True%I:iProp) fr);; trigger i >>= (fun r =>  tau;; Ret (fr', r))).
 Proof.
-  unfold interp_hp_tgt in *. grind.
+  unfold interp_hp in *. grind.
 Qed.
 
 Lemma interp_hp_triggerp
@@ -771,11 +782,11 @@ Lemma interp_hp_triggerp
       (i: sE R)
       fmr
   :
-    (interp_hp_tgt (trigger i) fmr)
+    (interp_hp (trigger i) fmr)
     =
     (handle_sE_tgt i >>= (fun r => tau;; Ret (fmr, r))).
 Proof.
-  unfold interp_hp_tgt. rewrite interp_state_trigger. cbn. grind.
+  unfold interp_hp. rewrite interp_state_trigger. cbn. grind.
 Qed.
 
 Lemma interp_hp_triggere
@@ -783,33 +794,33 @@ Lemma interp_hp_triggere
       (i: eventE R)
       fmr
   :
-    (interp_hp_tgt (trigger i) fmr)
+    (interp_hp (trigger i) fmr)
     =
     (trigger i >>= (fun r => tau;; Ret (fmr, r))).
 Proof.
-  unfold interp_hp_tgt. rewrite interp_state_trigger. cbn. grind.
+  unfold interp_hp. rewrite interp_state_trigger. cbn. grind.
 Qed.
 
 Lemma interp_hp_triggerUB
       (R: Type)
       fmr
   :
-    (interp_hp_tgt (triggerUB) fmr)
+    (interp_hp (triggerUB) fmr)
     =
     triggerUB (A:=Σ*R).
 Proof.
-  unfold interp_hp_tgt, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
+  unfold interp_hp, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
 Qed.
 
 Lemma interp_hp_triggerNB
       (R: Type)
       fmr
   :
-    (interp_hp_tgt (triggerNB) fmr)
+    (interp_hp (triggerNB) fmr)
     =
     triggerNB (A:=Σ*R).
 Proof.
-  unfold interp_hp_tgt, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
+  unfold interp_hp, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
 Qed.
 
 Lemma interp_hp_unwrapU 
@@ -817,11 +828,11 @@ Lemma interp_hp_unwrapU
       (i: option R)
       fmr
   :
-    (interp_hp_tgt (@unwrapU hAGEs _ _ i) fmr)
+    (interp_hp (@unwrapU hAGEs _ _ i) fmr)
     =
     r <- (unwrapU i);; Ret (fmr, r).
 Proof.
-  unfold interp_hp_tgt, unwrapU in *. des_ifs.
+  unfold interp_hp, unwrapU in *. des_ifs.
   { etrans.
     { eapply interp_hp_ret. }
     { grind. }
@@ -837,11 +848,11 @@ Lemma interp_hp_unwrapN
       (i: option R)
       fmr
   :
-    (interp_hp_tgt (@unwrapN hAGEs _ _ i) fmr)
+    (interp_hp (@unwrapN hAGEs _ _ i) fmr)
     =
     r <- (unwrapN i);; Ret (fmr, r).
 Proof.
-  unfold interp_hp_tgt, unwrapN in *. des_ifs.
+  unfold interp_hp, unwrapN in *. des_ifs.
   { etrans.
     { eapply interp_hp_ret. }
     { grind. }
@@ -856,7 +867,7 @@ Lemma interp_hp_assume
       P
       fmr
   :
-    (interp_hp_tgt (assume P) fmr)
+    (interp_hp (assume P) fmr)
     =
     (assume P;;; tau;; Ret (fmr, tt))
 .
@@ -868,7 +879,7 @@ Lemma interp_hp_guarantee
       P
       fmr
   :
-    (interp_hp_tgt (guarantee P) fmr)
+    (interp_hp (guarantee P) fmr)
     =
     (guarantee P;;; tau;; Ret (fmr, tt)).
 Proof.
@@ -880,13 +891,13 @@ Lemma interp_hp_ext
       (EQ: itr0 = itr1)
       fmr
   :
-    (interp_hp_tgt itr0 fmr)
+    (interp_hp itr0 fmr)
     =
-    (interp_hp_tgt itr1 fmr)
+    (interp_hp itr1 fmr)
 .
 Proof. subst; et. Qed.
 
-Global Program Instance interp_hp_tgt_rdb: red_database (mk_box (@interp_hp_tgt)) :=
+Global Program Instance interp_hp_rdb: red_database (mk_box (@interp_hp)) :=
   mk_rdb
     1
     (mk_box interp_hp_bind)

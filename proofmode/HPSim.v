@@ -534,103 +534,111 @@ Section SIM.
     eapply current_iProp_entail; eauto.
   Qed.
 
-	(* Move to HoareDef. *)
-	Lemma interp_hp_Assume
-      iP
-      fr
+  (* Move to HoareDef. *)
+  Lemma interp_hp_Assume iP fr
   :
-    (interp_hp_tgt (trigger (Assume iP)) fr)
-    =
-		(* interp_state (handle_hAGE_tgt) (trigger (Assume iP)) fr *)
-    ('(fr, _) <- (handle_Assume iP fr);; tau;; Ret (fr, tt))
-	.
-	Proof.
-		unfold interp_hp_tgt, trigger. rewrite ! interp_state_vis. grind. rewrite u. et.
-	Qed.
+  (interp_hp (trigger (Assume iP)) fr)
+  =
+  (* interp_state (handle_hAGE_tgt) (trigger (Assume iP)) fr *)
+  ('(fr, _) <- (handle_Assume iP fr);; tau;; Ret (fr, tt))
+  .
+  Proof.
+    unfold interp_hp, trigger. rewrite ! interp_state_vis. grind. rewrite u. et.
+  Qed.
 
-	Lemma interp_hp_Guarantee
-      iP
-      fr
+  Lemma interp_hp_Guarantee iP fr
   :
-    (interp_hp_tgt (trigger (Guarantee iP)) fr)
-    =
-		(* interp_state (handle_hAGE_tgt) (trigger (Assume iP)) fr *)
-    ('(fr', _) <- (handle_Guarantee iP fr);; tau;; Ret (fr', tt))
-	.
-	Proof.
-		unfold interp_hp_tgt, trigger. rewrite ! interp_state_vis. grind. rewrite u. et.
-	Qed.
+  (interp_hp (trigger (Guarantee iP)) fr)
+  =
+  (* interp_state (handle_hAGE_tgt) (trigger (Assume iP)) fr *)
+  ('(fr', _) <- (handle_Guarantee iP fr);; tau;; Ret (fr', tt))
+  .
+  Proof.
+    unfold interp_hp, trigger. rewrite ! interp_state_vis. grind. rewrite u. et.
+  Qed.
 
-	(* Which fr to put in interp_hp_tgt & What to return *)
-	Definition interp_hp_fun (hp: Any.t -> itree hAGEs Any.t): Any.t -> itree Es Any.t :=
-		fun arg => interp_hp_tgt_fun (hp arg) ε >>= (fun '(_, x) => Ret x).
+  (* Variable st: Any.t.
+     Variable frr: Σ.
+     Variable itr: Σ -> itree Es (Σ * Any.t).
+     Check  (tau;; Ret (ε:Σ, st)).
+     Check (itr frr >>= interp_ret) >>= (fun '(_, st) => (tau;; Ret ((ε: Σ), st))). *)
+  
+  (* move to HoareDef *)
+  (* Definition interp_ret {S} : (Σ * S) -> itree Es (Σ * S) :=  *)
+  (*   (fun '(fr, x) => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr) ;; Ret (fr', x)). *)
 
-	(* Variable st: Any.t.
-	Variable frr: Σ.
-	Variable itr: Σ -> itree Es (Σ * Any.t).
-	Check  (tau;; Ret (ε:Σ, st)).
-	Check (itr frr >>= interp_ret) >>= (fun '(_, st) => (tau;; Ret ((ε: Σ), st))). *)
-	
-	(* move to HoareDef *)
-	Definition interp_ret {S} : (Σ * S) -> itree Es (Σ * S) := 
-		(fun '(fr, x) => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr) ;; Ret (fr', x)).
-
-	(* Variable world: Type. *)
+  (* Variable world: Type. *)
 
 
-	Section INLINEC.
-	(* Check (@_sim_itree Σ wf le fl_src' fl_tgt'). *)
+  Section INLINEC.
+    (* Check (@_sim_itree Σ wf le fl_src' fl_tgt'). *)
 
-	Variant inlineSrcC (r: forall S_src S_tgt (SS: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop):
-		forall S_src S_tgt (SS: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop :=
-	| inlineSrcC_intro
-			(f_src f_tgt: bool) w
- 		 	SS
-			(mr: Σ)
-			(st: Any.t)
-			(f: Any.t -> itree hAGEs Any.t) varg
-			(stitr_tgt: Any.t * itree Es Any.t)
-			ktrH (ktr: (Σ * Any.t) -> itree Es Any.t)
-			(KTR: ktr = (fun x => ` x0 : Σ * Any.t <- interp_hp_tgt_fun (ktrH x.2) x.1;; Ret x0.2))
+    Inductive interp_hp_le: (Σ*Any.t -> itree Es Any.t) -> (Σ*Any.t -> itree Es Any.t) -> Prop :=
+    | interp_hp_le_base
+      :
+      interp_hp_le hp_fun_tail hp_fun_tail
+    | interp_hp_le_same
+        ktrH ktr1 ktr2
+        (KEQV: interp_hp_le ktr1 ktr2)
+      :
+      interp_hp_le (fun '(fr,x) => interp_hp (ktrH x) fr >>= ktr1) (fun '(fr,x) => interp_hp (ktrH x) fr >>= ktr2)
+    | interp_hp_le_inc
+        ktr1 ktr2
+        (KEQV: interp_hp_le ktr1 ktr2)
+      :
+      interp_hp_le ktr1 (fun frx => hp_fun_tail frx >>= (fun x => tau;; Ret (ε,x)) >>= ktr2)
+    .
 
-			(SIM: r _ _ SS f_src f_tgt w (Any.pair st mr↑, (interp_hp_tgt (f varg) ε >>= ktr)) stitr_tgt)
-	:
-		inlineSrcC r Any.t Any.t SS f_src f_tgt w (Any.pair st mr↑, interp_hp_fun f varg >>= (fun r0 => tau;; Ret (ε, r0)) >>= ktr) stitr_tgt
-	.
+    Variant inlineC
+      (r: forall S_src S_tgt (SS: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop):
+      forall S_src S_tgt (SS: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop :=
+    | inlineSrcC_intro SS f_src f_tgt w
+	st_src st_tgt (fr_src mr_src fr_src' mr_src' fr_tgt mr_tgt fr_tgt' mr_tgt': Σ)
+        ktr_src ktr_src' ktr_tgt ktr_tgt' x
+        (EQ_src: fr_src ⋅ mr_src = fr_src' ⋅ mr_src')
+        (EQ_tgt: fr_src ⋅ mr_src = fr_src' ⋅ mr_src')
+        (LE_src: interp_hp_le ktr_src ktr_src')
+        (LE_tgt: interp_hp_le ktr_tgt ktr_tgt')
+	(SIM: r Any.t Any.t SS f_src f_tgt w (Any.pair st_src mr_src↑, ktr_src (fr_src,x)) (Any.pair st_tgt mr_tgt↑, ktr_tgt (fr_tgt,x)))
+      :
+      inlineC r Any.t Any.t SS f_src f_tgt w (Any.pair st_src mr_src'↑, ktr_src' (fr_src',x)) (Any.pair st_tgt mr_tgt'↑, ktr_tgt' (fr_tgt',x))
+    .
+    Hint Constructors inlineC: core.
 
-
-	(* ` x0 : Σ * Any.t <- interp_hp_tgt_fun (k_src x.2) x.1;; Ret x0.2 *)
-
-	(* ` r0 : Any.t <- interp_hp_fun f varg;; ` x : Σ * Any.t <- (tau;; Ret (ε, r0));; ` x0 : Σ * Any.t <- interp_hp_tgt_fun (k_src x.2) x.1;; Ret x0.2 *)
-	(* Variable fr: Σ.
-	Variable itr: Σ -> itree Es (Σ * Any.t).
-	Variable ktr: (Σ * Any.t) -> itree Es (Σ * Any.t).
-	Check (((itr fr >>= (fun '(fr, x) => '(fr', _) <- (handle_Guarantee (True%I:iProp) fr) ;; Ret (fr', x)))) >>= (fun '(_, st) => (tau;; Ret (ε:Σ, st))) >>= ktr). *)
-
-	Hint Constructors inlineSrcC: core.
-	(* Check inlineSrcC.
-	Check lbindC. *)
-	
-
-  Lemma inlineSrcC_mon 
-        r1 r2
-        (LEr: r1 <8= r2)
+    Lemma inlineC_mon r1 r2
+      (LEr: r1 <8= r2)
     :
-      inlineSrcC r1 <8= inlineSrcC r2
+    inlineC r1 <8= inlineC r2
   .
   Proof. ii. destruct PR; econs; et. Qed.
 
-  Lemma inlineSrcC_compatible: forall wf le fl_src fl_tgt, 
-			compatible8 (@_sim_itree Σ wf le fl_src fl_tgt) inlineSrcC.
-	Proof.
-	Admitted.	
-		(* econs; i; eauto using inlineSrcC_mon.
-		depdes PR.
-		unfold interp_hp_fun, interp_hp_tgt_fun.
-		remember (interp_hp_tgt (f varg) ε)	as itr0. clear Heqitr0 f varg.
-		remember (Any.pair st (Any.upcast mr), ` x : _ <- itr0;; ktr x) as stitr.
-		move SIM before r. revert_until SIM. induction SIM; i.
+  Lemma inlineC_compatible: forall wf le fl_src fl_tgt, 
+      compatible8 (@_sim_itree Σ wf le fl_src fl_tgt) inlineC.
+  Proof.
+    econs; i; eauto using inlineC_mon.
+    depdes PR.
+    remember (Any.pair st_src mr_src↑, ktr_src (fr_src,x)) as sitr_src.
+    remember (Any.pair st_tgt mr_tgt↑, ktr_tgt (fr_tgt,x)) as sitr_tgt.
+    move SIM before r. revert_until SIM.
+    induction SIM; i; depdes Heqsitr_src; depdes Heqsitr_tgt.
+    - exfalso. clear EQ_src EQ_tgt x. revert fr_src x0 x1. induction LE_src; i; eauto.
+      + admit.
+      + admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - 
+      
+      
 
+      depdes Heqsitr_src. depdes LE_src.
+      + 
+
+      rewrite <-x0 in x1.
+      
 		- ides itr0; depdes H0; revert x; grind. 
 			2: { rewrite bind_vis in x. clarify. }
 			unfold handle_Guarantee, guarantee, mget, mput. grind. 
@@ -680,21 +688,8 @@ Section SIM.
 		- eapply sim_itree_choose_tgt; et.
 			
 
-	Qed. *)
+	Qed.
 
-	(* Lemma inlineSrcC_spec: forall wf le fl_src fl_tgt, 
-		(inlineSrcC) <9= gupaco8 (@_sim_itree Σ wf le fl_src fl_tgt ) (cpn8 (@_sim_itree Σ wf le fl_src fl_tgt)).
-  Proof.
-		clear fl_src fl_tgt.
-		intros wf le fl_src fl_tgt.
-		gcofix CIH.
-		i. depdes PR.
-		 (* Unset Printing Notations. rename x0 into r. *)
-		unfold interp_hp_fun, interp_hp_tgt_fun.
-		remember (interp_hp_tgt (f varg) ε)	as itr0. clear Heqitr0 f varg.
-		 r.
-		(* econs. *)
-	Admitted. *)
 
 	End INLINEC.
 
@@ -704,11 +699,11 @@ Section SIM.
       (s : itree hAGEs R) (k : R -> itree hAGEs S)
       fmr
   :
-    (interp_hp_tgt_fun (s >>= k) fmr)
+    (interp_hp_fun (s >>= k) fmr)
     =
-    st <- interp_hp_tgt s fmr;; interp_hp_tgt_fun (k st.2) st.1.
+    st <- interp_hp s fmr;; interp_hp_fun (k st.2) st.1.
 Proof.
-	unfold interp_hp_tgt_fun. rewrite interp_hp_bind. grind.
+	unfold interp_hp_fun. rewrite interp_hp_bind. grind.
 Qed.
 
 
@@ -739,8 +734,8 @@ mk_inv I ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
 
 
 		@sim_itree Σ (mk_inv I) (fun _ _ => True) fl_src0 fl_tgt0 f_src f_tgt ctx
-		(Any.pair st_src mr_src↑, (interp_hp_tgt_fun itr_src fr_src) >>= (fun r => Ret (snd r)))
-		(Any.pair st_tgt mr_tgt↑, (interp_hp_tgt_fun itr_tgt fr_tgt) >>= (fun r => Ret (snd r))).
+		(Any.pair st_src mr_src↑, (interp_hp_fun itr_src fr_src) >>= (fun r => Ret (snd r)))
+		(Any.pair st_tgt mr_tgt↑, (interp_hp_fun itr_tgt fr_tgt) >>= (fun r => Ret (snd r))).
 Proof.
 	i. 
 	(* remember (Any.pair st_src mr_src↑). remember (Any.pair st_tgt mr_tgt↑). *)
@@ -752,7 +747,7 @@ Proof.
 	induction SIM using hpsim_ind; i; clarify. 
 	4:{
 		rewrite interp_hp_fun_bind.
-		(* unfold interp_hp_tgt_fun. *)
+		(* unfold interp_hp_fun. *)
 
 		steps. unfold handle_Guarantee at 1. unfold mget, mput, guarantee. 
 		steps. force_l. instantiate (1:= (ε, ε, fr_src ⋅ mr_src)).
@@ -765,20 +760,20 @@ Proof.
 			rewrite alist_find_map. rewrite FUN. et.
 		}
 		rewrite <- bind_bind. 
-		unfold interp_hp_tgt_fun.
+		unfold interp_hp_fun.
 		gclo. eapply compatible'8_companion; eauto with paco.
 		{ eapply compat8_compatible'. apply inlineSrcC_compatible. }	
 		econs. { grind. }
 		specialize (IHSIM st_src0 st_tgt0 ((f varg) >>= k_src) itr_tgt ctx (fr_src ⋅ mr_src) mr_tgt ε fr_tgt).
 		rewrite interp_hp_fun_bind in IHSIM.
 		rewrite bind_bind in IHSIM.
-		(* unfold interp_hp_tgt_fun in IHSIM. *)
+		(* unfold interp_hp_fun in IHSIM. *)
 		eapply IHSIM; r_solve; et.
 	}
 
 
 
-	- unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee.
+	- unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
 		steps.
 		force_l. instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)). steps.
 		unfold guarantee. force_l.
@@ -807,7 +802,7 @@ Proof.
 			eapply URA.wf_mon; et.
 		}
 
-	- unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee.
+	- unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
 		hexploit INV. i.
 		eapply iProp_sepconj in H; et. 
 		(* 2: { admit. } *)
@@ -837,7 +832,7 @@ Proof.
 			(* { iIntros "H". iPoseProof (H0 with "H") as "H". et. } *)
 		}
 		inv WF0. des.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee in K.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee in K.
 		steps.
 		hexploit K; swap 1 2. 
 		{ 
@@ -849,34 +844,34 @@ Proof.
 		}
 		{ admit. }
 		i. des.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		eapply IH; et.
 		{
 			
 		}
 	- steps. hexploit K; et. i. des.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		eapply IH; et.
 	- admit. (* need to clarify the relation between fl_src ~ fl_src0 *)
 	- admit. 
-	- steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-	- steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-	- steps. force_l. steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+	- steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+	- steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+	- steps. force_l. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
 	- steps. hexploit K; et. i. des.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		eapply IH; et.
 	- steps. hexploit K; et. i. des.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		eapply IH; et.
-	- steps. force_r. steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+	- steps. force_r. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
 	- steps. rewrite ! Any.pair_split. rewrite RUN. s.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		exploit IHSIM; et.
 	- steps. rewrite ! Any.pair_split. rewrite RUN. s.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		exploit IHSIM; et.
 	- steps. rewrite interp_hp_Assume. unfold handle_Assume, mget, mput. steps.  
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		hexploit K; et.
 		{ 
 			instantiate (1:= x ⋅ fmr).
@@ -916,7 +911,7 @@ Proof.
 
 		steps. force_r; et. 
 		steps.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		hexploit K; et. 
 		{
 			iIntros "H". iPoseProof (H1 with "H") as "H". et.
@@ -955,14 +950,14 @@ Proof.
 			iIntros "H". iPoseProof (H1 with "H") as "H". et.	
 		}
 		i. des.
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 		eapply IH; et.
 		{
 			replace (fr_tgt ⋅ (fmr0 ⋅ mr_tgt)) with (fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve.
 			et.
 		}
 	- steps. rewrite interp_hp_Guarantee. unfold handle_Guarantee, mget, mput, guarantee. steps. 
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.			
+		unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.			
 		hexploit K; et.
 		{ 
 			instantiate (1:= (c0 ⋅ fmr)).
@@ -993,12 +988,12 @@ Admitted.
 
 	Inductive hpsim_adeq_rel : Σ -> (itree hAGEs Any.t)-> (itree Es (Σ * Any.t)) -> Σ -> (itree hAGEs Any.t)-> (itree Es (Σ * Any.t)) -> Prop :=
 	| hpsim_adeq_base (fr fr': Σ) st st' 
-		: hpsim_adeq_rel fr (Ret st) (@interp_hp_tgt_fun Σ Any.t (Ret st) fr)
-										 fr' (Ret st') (@interp_hp_tgt_fun Σ Any.t (Ret st') fr')
+		: hpsim_adeq_rel fr (Ret st) (@interp_hp_fun Σ Any.t (Ret st) fr)
+										 fr' (Ret st') (@interp_hp_fun Σ Any.t (Ret st') fr')
 
 	| hpsim_adeq_seq itrH0 itrH1 itrL0 itrL1 itrH0' itrH1' itrL0' itrL1' (fr fr': Σ)
-			(ITR0: itrL0 = @interp_hp_tgt_fun Σ Any.t itrH0)
-			(ITR0': itrL0' = @interp_hp_tgt_fun Σ Any.t itrH0')
+			(ITR0: itrL0 = @interp_hp_fun Σ Any.t itrH0)
+			(ITR0': itrL0' = @interp_hp_fun Σ Any.t itrH0')
 			(ADEQ: forall st st',
 							hpsim_adeq_rel ε (itrH1 st) (itrL1 st (ε:Σ)) 
 														 ε (itrH1' st') (itrL1' st' (ε:Σ)))
@@ -1027,7 +1022,7 @@ Admitted.
 		ginit. gcofix CIH. i.
 		move REL before CIH. revert_until REL. induction REL.
 		{ i. punfold SIM. inv SIM; (try rewrite ! bind_trigger in H3); (try rewrite ! bind_trigger in H5); clarify.
-			-	unfold interp_hp_tgt_fun, handle_Guarantee, mput, mget, guarantee. 
+			-	unfold interp_hp_fun, handle_Guarantee, mput, mget, guarantee. 
 				steps. force_l. instantiate (1:= (c0 ⋅ c1, ε, fmr ⋅ c)).
 				steps. force_l.
 				{  
@@ -1051,7 +1046,7 @@ Admitted.
 					eapply URA.wf_mon; et.
 				}
 			- pclearbot. punfold SIM0. inv SIM0; (try rewrite ! bind_trigger in H3); (try rewrite ! bind_trigger in H5); clarify.
-				unfold interp_hp_tgt_fun, handle_Guarantee, mput, mget, guarantee. steps.
+				unfold interp_hp_fun, handle_Guarantee, mput, mget, guarantee. steps.
 				force_l. instantiate (1:= (c0 ⋅ c1, ε, fmr ⋅ c)).
 				steps. force_l.
 				{  
@@ -1081,11 +1076,11 @@ Admitted.
 		remember (st_tgt, ` st0 : Any.t <- itrH0';; itrH1' st0) as sti_tgt.
 		move SIM before CIH. revert_until SIM.
 		induction SIM using hpsim_ind; i. 
-		(* ; clarify; unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput. *)
+		(* ; clarify; unfold interp_hp_fun, handle_Guarantee, mget, mput. *)
 		- 
 			steps.
 			ides itrH0; ides itrH0'; revert H1 H2; try rewrite bind_vis; grind.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
 			steps. force_l.
 			instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)).
 			steps. force_l.
@@ -1101,7 +1096,7 @@ Admitted.
 			}
 			
 			rewrite <- x1. rewrite <- x.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
 			steps. force_l.
 			instantiate (1 := (c3 ⋅ c4, ε, fmr ⋅ c2 )).
 			steps. force_l.
@@ -1131,7 +1126,7 @@ Admitted.
 				force_l. steps. admit. steps. eapply H; et.
 
 
-		unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput.
+		unfold interp_hp_fun, handle_Guarantee, mget, mput.
 			steps.
 
 			force_l. instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)). steps.
@@ -1201,7 +1196,7 @@ Admitted.
 				iIntros "H". iPoseProof (H0 with "H") as "H". et.
 			}
 			i. inv WF0. des.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput, guarantee in K.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee in K.
 			hexploit K; swap 1 2.
 			{ 
 				iIntros "[H1 H2]".
@@ -1216,7 +1211,7 @@ Admitted.
 			}
 			i. des.
 			steps. 
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IH; et.
 			{ 
 				iIntros "[H H0]".
@@ -1230,7 +1225,7 @@ Admitted.
 				admit.	
 			}
 		- steps. hexploit K; et. i. des.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IH; et.
 		- steps. unfold handle_Guarantee, mget, mput, guarantee. steps.
 			force_l.
@@ -1242,42 +1237,42 @@ Admitted.
 				instantiate (1:= interp_hp_fun f).
 				rewrite alist_find_map. rewrite FUN. et.
 			}
-			unfold interp_hp_fun, interp_hp_tgt_fun. steps.
+			unfold interp_hp_fun, interp_hp_fun. steps.
 			do 3 rewrite <- bind_bind in *.
-			(* set (` x : Σ * Any.t <- interp_hp_tgt (f varg) ε;; (let '(_, x0) := x in Ret x0)) as itr. *)
+			(* set (` x : Σ * Any.t <- interp_hp (f varg) ε;; (let '(_, x0) := x in Ret x0)) as itr. *)
 			(* assert () *)
-			set ((` x : Σ * Any.t <- (` x : Any.t <- (` x : Σ * Any.t <- interp_hp_tgt (f varg) ε;; (let '(_, x0) := x in Ret x0));; (tau;; Ret (fr_src, x)));;
-			interp_hp_tgt (k_src x.2) x.1)) as itr0.
-			set (interp_hp_tgt (` x : Any.t <- (f varg);; k_src x) fr_src) as itr1.
+			set ((` x : Σ * Any.t <- (` x : Any.t <- (` x : Σ * Any.t <- interp_hp (f varg) ε;; (let '(_, x0) := x in Ret x0));; (tau;; Ret (fr_src, x)));;
+			interp_hp (k_src x.2) x.1)) as itr0.
+			set (interp_hp (` x : Any.t <- (f varg);; k_src x) fr_src) as itr1.
 			assert (itr0 = itr1 ). {
 				unfold itr0, itr1. grind. rewrite interp_hp_bind.	
 			admit. }
 			rewrite H. unfold itr1.
-			(* assert (itr_src = interp_hp_tgt (` x : Any.t <- (f varg);; ` x : Σ * Any.t <- (k_src x)) fr_src).
+			(* assert (itr_src = interp_hp (` x : Any.t <- (f varg);; ` x : Σ * Any.t <- (k_src x)) fr_src).
 			{ unfold itr_src. grind. }
 			rewrite <- interp_hp_bind. *)
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IHSIM; et.
 	
 		- admit. 
-		- steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-		- steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-		- steps. force_l. steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+		- steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+		- steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+		- steps. force_l. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
 		- steps. hexploit K; et. i. des.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IH; et.
 		- steps. hexploit K; et. i. des.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IH; et.
-		- steps. force_r. steps. unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
+		- steps. force_r. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
 		- steps. rewrite ! Any.pair_split. rewrite RUN. s.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IHSIM; et.
 		- steps. rewrite ! Any.pair_split. rewrite RUN. s.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IHSIM; et.
 		- steps. rewrite interp_hp_Assume. unfold handle_Assume, mget, mput. steps.  
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			(* hexploit K. *)
 			hexploit (K (x ⋅ fmr)). et.
 			{ 
@@ -1320,7 +1315,7 @@ Admitted.
 			}
 			steps. force_r; et. 
 			steps.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			hexploit (K fmr0).
 			{
 				eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0; et. eapply own_wf in FMR0; et.
@@ -1372,7 +1367,7 @@ Admitted.
 				iIntros "H". iPoseProof (H1 with "H") as "H". et.	
 			}
 			i. des.
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
 			eapply IH; et.
 			{
 				replace (fr_tgt ⋅ (fmr0 ⋅ mr_tgt)) with (fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve.
@@ -1387,7 +1382,7 @@ Admitted.
 				eapply URA.wf_mon; et.
 			}
 		- steps. rewrite interp_hp_Guarantee. unfold handle_Guarantee, mget, mput, guarantee. steps. 
-			unfold interp_hp_tgt_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.			
+			unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.			
 			hexploit (K (c0 ⋅ fmr)). 
 			{
 				eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0. eapply own_wf in FMR0; et.
