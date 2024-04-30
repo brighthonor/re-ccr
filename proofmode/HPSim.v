@@ -222,17 +222,17 @@ Section SIM.
     eapply paco7_mon_bot in SIM; eauto. punfold SIM.
   Qed.
 
-  Variant hpsim_specC {with_dummy: bool}
+  Variant hpsim_stepC {with_dummy: bool}
   (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
   {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
-  | hpsim_specC_ret
+  | hpsim_stepC_ret
       p_src p_tgt st_src st_tgt fmr
       v_src v_tgt
       (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
       (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
-  | hpsim_specC_call
+      hpsim_stepC hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
+  | hpsim_stepC_call
       p_src p_tgt st_src st_tgt fmr
       fn varg k_src k_tgt FR
       (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
@@ -241,137 +241,137 @@ Section SIM.
           (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
           hpsim _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-  | hpsim_specC_syscall
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
+  | hpsim_stepC_syscall
       p_src p_tgt st_src st_tgt fmr
       fn varg rvs k_src k_tgt
       (K: forall vret, 
           hpsim _ RR true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
 
-  | hpsim_specC_inline_src
+  | hpsim_stepC_inline_src
       p_src p_tgt st_src st_tgt fmr
       fn f varg k_src i_tgt
       (FUN: alist_find fn fl_src = Some f)
       (K: hpsim _ RR true p_tgt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_inline_tgt
+  | hpsim_stepC_inline_tgt
       p_src p_tgt st_src st_tgt fmr
       fn f varg i_src k_tgt
       (FUN: alist_find fn fl_tgt = Some f)
       (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
 
-  | hpsim_specC_tau_src
+  | hpsim_stepC_tau_src
       p_src p_tgt st_src st_tgt fmr
       i_src i_tgt
       (K: hpsim _ RR true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_tau_tgt
+  | hpsim_stepC_tau_tgt
       p_src p_tgt st_src st_tgt fmr
       i_src i_tgt
       (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
 
-  | hpsim_specC_choose_src
+  | hpsim_stepC_choose_src
       p_src p_tgt st_src st_tgt fmr
       X x k_src i_tgt
       (K: hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
     :
-       hpsim_specC hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
+       hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_choose_tgt
+  | hpsim_stepC_choose_tgt
       p_src p_tgt st_src st_tgt fmr
       X i_src k_tgt
       (K: forall (x: X), hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
 
-  | hpsim_specC_take_src
+  | hpsim_stepC_take_src
       p_src p_tgt st_src st_tgt fmr
       X k_src i_tgt
       (K: forall (x: X), hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_take_tgt
+  | hpsim_stepC_take_tgt
       p_src p_tgt st_src st_tgt fmr
       X x i_src k_tgt
       (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
 
-  | hpsim_specC_supdate_src
+  | hpsim_stepC_supdate_src
       p_src p_tgt st_src st_tgt fmr
       X x st_src0 k_src i_tgt
       (run: Any.t -> Any.t * X)
       (RUN: run st_src = (st_src0, x))
       (K: hpsim _ RR true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_supdate_tgt
+  | hpsim_stepC_supdate_tgt
       p_src p_tgt st_src st_tgt fmr
       X x st_tgt0 i_src k_tgt
       (run: Any.t -> Any.t * X)
       (RUN: run st_tgt = (st_tgt0, x))
       (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
 
-  | hpsim_specC_assume_src
+  | hpsim_stepC_assume_src
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
           hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_assume_tgt
+  | hpsim_stepC_assume_tgt
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> (iP ** FMR))
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
           hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
 
-  | hpsim_specC_guarantee_src
+  | hpsim_stepC_guarantee_src
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> (iP ** FMR))
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
           hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
 
-  | hpsim_specC_guarantee_tgt
+  | hpsim_stepC_guarantee_tgt
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
           hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
-      hpsim_specC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
+      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
   .
   
-  Lemma hpsim_specC_mon with_dummy : monotone7 (@hpsim_specC with_dummy).
+  Lemma hpsim_stepC_mon with_dummy : monotone7 (@hpsim_stepC with_dummy).
   Proof.
     ii. inv IN; try (by des; econs; ss; et).
   Qed.
 
-  Hint Resolve hpsim_specC_mon: paco.
+  Hint Resolve hpsim_stepC_mon: paco.
 
-  Lemma hpsim_specC_spec with_dummy:
-    (@hpsim_specC with_dummy) <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
+  Lemma hpsim_stepC_spec with_dummy:
+    (@hpsim_stepC with_dummy) <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
   Proof.
     eapply wrespect7_uclo; eauto with paco.
     econs; eauto with paco; i.
@@ -525,7 +525,7 @@ Section SIM.
   Proof.
     i. eapply gpaco7_gpaco; [eauto with paco|].
     eapply gpaco7_mon; [|eauto|i; eapply gupaco7_mon; et].
-    inv PR; try (guclo hpsim_specC_spec; econs; et; i; gbase; et).
+    inv PR; try (guclo hpsim_stepC_spec; econs; et; i; gbase; et).
   Qed.
 
   Lemma hpsim_progress_flag with_dummy R RR r g st_src st_tgt fmr
