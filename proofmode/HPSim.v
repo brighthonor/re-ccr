@@ -22,18 +22,452 @@ Require Import ProofMode Invariant.
 
 Require Import HTactics.
 
-Section SIM.
+
+
+Lemma bind_ret_l_eta A {E R} (k: A -> itree E R):
+  (λ x : A, x0 <- Ret x;; k x0) = k.
+Proof. extensionality x. grind. Qed.
+
+Lemma imod_trans `{Σ: GRA.t} (P Q R: iProp) :
+  (P ⊢ #=> Q) -> (Q ⊢ #=> R) -> (P ⊢ #=> R).
+Proof.
+  i. iIntros "H". iPoseProof (H with "H") as "H". iMod "H".
+  iPoseProof (H0 with "H") as "H". eauto.
+Qed.
+
+Lemma imod_elim_trueL `{Σ: GRA.t} P Q :
+  (P ⊢ #=> Q) -> (P ⊢ #=> (True ** Q)).
+Proof.
+  i. iIntros "H". iSplitR; eauto. iStopProof. eauto.
+Qed.  
+
+Lemma imod_intro_trueL `{Σ: GRA.t} P Q :
+  (P ⊢ #=> (True ** Q)) -> (P ⊢ #=> Q).
+Proof.
+  i. iIntros "H". iPoseProof (H with "H") as "H".
+  iMod "H". iDestruct "H" as "[X Y]". eauto.
+Qed.  
+
+Lemma imod_elim_trueR `{Σ: GRA.t} P Q :
+  (P ⊢ #=> Q) -> (P ⊢ #=> (Q ** True)).
+Proof.
+  i. iIntros "H". iSplitL; eauto. iStopProof. eauto.
+Qed.  
+
+Lemma imod_intro_trueR `{Σ: GRA.t} P Q :
+  (P ⊢ #=> (Q ** True)) -> (P ⊢ #=> Q).
+Proof.
+  i. iIntros "H". iPoseProof (H with "H") as "H".
+  iMod "H". iDestruct "H" as "[X Y]". eauto.
+Qed.  
+
+Create HintDb imodL.
+Hint Resolve imod_trans imod_elim_trueL: imodL.
+
+Ltac imodIntroL :=
+  i; repeat match goal with [H: (_ ⊢ #=> (True ** _)) |- _ ] => apply imod_intro_trueL in H end; eauto with imodL.
+  
+Ltac grind_ret := try rewrite !bind_ret_l_eta in *; subst.
+
+Ltac itree_clarify H :=
+  revert H; grind; try unfold trigger in H; try rewrite !bind_vis in H; try depdes H; grind_ret. 
+
+Section SIM_STRICT.
+
+  Variant _sim_strict (sim_strict: forall R, relation (Any.t * R) -> relation (Any.t * itree Es R))
+    : forall R, relation (Any.t * R) -> relation (Any.t * itree Es R)
+  :=
+  | sim_strict_ret R RR st st' v v'
+      (RET: RR (st,v) (st',v'): Prop)
+    :
+    _sim_strict sim_strict R RR
+      (st, Ret v)
+      (st', Ret v')
+  | sim_strict_call R RR
+      st fn varg k k'
+      (K: forall st0 vret,
+          sim_strict R RR (st0, k vret) (st0, k' vret))
+    :
+    _sim_strict sim_strict R RR
+      (st, trigger (Call fn varg) >>= k)
+      (st, trigger (Call fn varg) >>= k')
+  | sim_strict_syscall R RR
+      st st' fn varg rvs k k'
+      (K: forall vret,
+          sim_strict R RR (st, k vret) (st', k' vret))
+    :
+    _sim_strict sim_strict R RR
+      (st, trigger (Syscall fn varg rvs) >>= k)
+      (st', trigger (Syscall fn varg rvs) >>= k')
+  | sim_strict_tau R RR
+      st st' i i'
+      (K: sim_strict R RR (st, i) (st', i'))
+    :
+    _sim_strict sim_strict R RR
+      (st, tau;; i)
+      (st', tau;; i')
+  | sim_strict_choose R RR
+      st st' X X' k k'
+      (K: forall x', exists x, sim_strict R RR (st, k x) (st', k' x'))
+    :
+    _sim_strict sim_strict R RR
+      (st, trigger (Choose X) >>= k)
+      (st', trigger (Choose X') >>= k')
+  | sim_strict_take R RR
+      st st' X X' k k'
+      (K: forall x, exists x', sim_strict R RR (st, k x) (st', k' x'))
+    :
+    _sim_strict sim_strict R RR
+      (st, trigger (Take X) >>= k)
+      (st', trigger (Take X') >>= k')
+  | sim_strict_supdate R RR
+      st st' X k X' k' (run: Any.t -> Any.t * X) (run': Any.t -> Any.t * X')
+      (K: sim_strict R RR
+            (fst (run st), k (snd (run st)))
+            (fst (run' st'), k' (snd (run' st'))))
+    :
+    _sim_strict sim_strict R RR
+      (st, trigger (SUpdate run) >>= k)
+      (st', trigger (SUpdate run') >>= k')
+  .
+
+  Definition sim_strict := paco4 _sim_strict bot4.
+
+  Lemma sim_strict_mon: monotone4 _sim_strict.
+  Proof.
+    ii. induction IN; try (econs; et; ii; exploit K; i; des; et).
+  Qed.
+
+  Hint Constructors _sim_strict.
+  Hint Unfold sim_strict.
+  Hint Resolve sim_strict_mon: paco.
+  Hint Resolve cpn4_wcompat: paco.
+
+  Lemma sim_strict_refl
+    R sti
+    :
+    sim_strict R eq sti sti.
+  Proof.
+    revert_until R. ginit. gcofix CIH; i.
+    destruct sti as [st i]. ides i; eauto with paco.
+    gstep. destruct e; [destruct c|destruct s; [destruct s|destruct e]];
+      rewrite <-(bind_ret_l_eta _ k); rewrite <-bind_vis;
+      econs; eauto with paco.
+  Qed.
+
+  Lemma sim_strict_le
+    R RR RR'
+    (LE: RR <2= RR')
+    :
+    sim_strict R RR <2= sim_strict R RR'.
+  Proof.
+    ginit. gcofix CIH. i. punfold PR.
+    inv PR; grind; depdes H0; try itree_clarify x;
+      gstep; econs; i; try edestruct K; pclearbot; eauto with paco.
+  Qed.
+
+  Variant sim_strict_bindC (r: forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)) :
+    forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)
+  :=
+  | sim_strict_bindC_intro R RR Q QQ st st' i i' k k'
+      (HD: r R RR (st,i) (st',i'))
+      (TL: forall st0 v0 st0' v0' (REL: RR (st0,v0) (st0',v0')),
+           r Q QQ (st0, k v0) (st0', k' v0'))
+    :
+    sim_strict_bindC r Q QQ (st, i >>= k) (st', i' >>= k')
+  .
+
+  Lemma sim_strict_bindC_mon
+        r1 r2
+        (LEr: r1 <4= r2)
+    :
+    sim_strict_bindC r1 <4= sim_strict_bindC r2
+  .
+  Proof. ii. destruct PR; econs; et. Qed.
+
+  Lemma sim_strict_bindC_wrespectful:
+    wrespectful4 _sim_strict sim_strict_bindC.
+  Proof.
+    econs; eauto using sim_strict_bindC_mon; i.
+    destruct PR. apply GF in HD. inv HD; grind; depdes H3 H0; grind;
+      try (by econs; i; econs 2; eauto; econs; eauto using rclo4).
+    - eapply sim_strict_mon; eauto using rclo4.
+    - econs. i. specialize (K x'). des.
+      eexists. econs 2; eauto. econs; eauto using rclo4.
+    - econs. i. specialize (K x). des.
+      eexists. econs 2; eauto. econs; eauto using rclo4.
+  Qed.
+
+  Lemma sim_strict_bindC_spec:
+    sim_strict_bindC <5= gupaco4 _sim_strict (cpn4 _sim_strict).
+  Proof.
+    intros. eapply wrespect4_uclo; eauto with paco.
+    apply sim_strict_bindC_wrespectful.
+  Qed.
+
+  Variant sim_strict_transC (r: forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)) :
+    forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)
+  :=
+  | sim_strict_transC_intro R RR0 RR1 RR st st' st'' i i' i''
+      (REL0: r R RR0 (st,i) (st',i'))
+      (REL1: r R RR1 (st',i') (st'',i''))
+      (LE: rcompose RR0 RR1 <2= RR)
+    :
+    sim_strict_transC r R RR (st, i) (st'', i'')
+  .
+
+  Lemma sim_strict_transC_mon
+        r1 r2
+        (LEr: r1 <4= r2)
+    :
+    sim_strict_transC r1 <4= sim_strict_transC r2
+  .
+  Proof. ii. destruct PR; econs; et. Qed.
+
+  Lemma sim_strict_transC_wrespectful:
+    wrespectful4 _sim_strict sim_strict_transC.
+  Proof.
+    econs; eauto using sim_strict_transC_mon; i.
+    destruct PR. apply GF in REL0. apply GF in REL1.
+    inv REL0; grind; depdes H3 H0; try itree_clarify x;
+      inv REL1; grind; depdes H3 H0; try itree_clarify x;
+        econs; i; eauto using sim_strict_transC, rclo4.
+    - destruct (K0 x'), (K x). eauto using sim_strict_transC, rclo4.
+    - destruct (K x), (K0 x0). eauto using sim_strict_transC, rclo4.
+  Qed.
+
+  Lemma sim_strict_transC_spec:
+    sim_strict_transC <5= gupaco4 _sim_strict (cpn4 _sim_strict).
+  Proof.
+    intros. eapply wrespect4_uclo; eauto with paco.
+    apply sim_strict_transC_wrespectful.
+  Qed.
+
+  Lemma sim_strict_inv_ret R RR sti st' v'
+      (EQV: sim_strict R RR sti (st', Ret v')):
+    exists st v, sti = (st, Ret v) /\ RR (st, v) (st', v').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; itree_clarify x.
+  Qed.
+
+  Lemma sim_strict_inv_ret' R RR st v sti'
+      (EQV: sim_strict R RR (st, Ret v) sti'):
+    exists st' v', sti' = (st', Ret v') /\ RR (st, v) (st', v').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; itree_clarify x.
+  Qed.
+  
+  Lemma sim_strict_inv_call R RR sti st fn varg k'
+      (EQV: sim_strict R RR sti (st, trigger (Call fn varg) >>= k')):
+    exists k,
+    sti = (st, trigger (Call fn varg) >>= k) /\
+    forall st0 vret, sim_strict R RR (st0, k vret) (st0, k' vret).
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0 H2; eauto; try itree_clarify x.
+    pclearbot. esplits; eauto.
+  Qed.
+
+  Lemma sim_strict_inv_call' R RR st fn varg k sti' 
+      (EQV: sim_strict R RR (st, trigger (Call fn varg) >>= k) sti'):
+    exists k',
+    sti' = (st, trigger (Call fn varg) >>= k') /\
+    forall st0 vret, sim_strict R RR (st0, k vret) (st0, k' vret).
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; try itree_clarify x.
+    pclearbot. esplits; eauto.
+  Qed.
+  
+  Lemma sim_strict_inv_syscall R RR sti st' fn varg rvs k'
+      (EQV: sim_strict R RR sti (st', trigger (Syscall fn varg rvs) >>= k')):
+    exists st k,
+    sti = (st, trigger (Syscall fn varg rvs) >>= k) /\
+    forall vret, sim_strict R RR (st, k vret) (st', k' vret).
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0 H2; eauto; itree_clarify x.
+    pclearbot. esplits; eauto.
+  Qed.
+
+  Lemma sim_strict_inv_syscall' R RR st fn varg rvs k sti'
+      (EQV: sim_strict R RR (st, trigger (Syscall fn varg rvs) >>= k) sti'):
+    exists st' k',
+    sti' = (st', trigger (Syscall fn varg rvs) >>= k') /\
+    forall vret, sim_strict R RR (st, k vret) (st', k' vret).
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; itree_clarify x.
+    pclearbot. esplits; eauto.
+  Qed.
+  
+  Lemma sim_strict_inv_tau R RR sti st' i'
+      (EQV: sim_strict R RR sti (st', tau;; i')):
+    exists st i,
+    sti = (st, tau;; i) /\
+    sim_strict R RR (st, i) (st', i').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; pclearbot; eauto; itree_clarify x.
+  Qed.
+
+  Lemma sim_strict_inv_tau' R RR st i sti' 
+      (EQV: sim_strict R RR (st, tau;; i) sti'):
+    exists st' i',
+    sti' = (st', tau;; i') /\
+    sim_strict R RR (st, i) (st', i').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; pclearbot; eauto; itree_clarify x.
+  Qed.
+  
+  Lemma sim_strict_inv_choose R RR sti st' X' k'
+      (EQV: sim_strict R RR sti (st', trigger (Choose X') >>= k')):
+    exists st X k,
+    sti = (st, trigger (Choose X) >>= k) /\
+    forall x', exists x, sim_strict R RR (st, k x) (st', k' x').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0 H2; eauto; itree_clarify x.
+    esplits; eauto.
+    i. specialize (K x'). des. pclearbot. eauto.
+  Qed.
+
+  Lemma sim_strict_inv_choose' R RR st X k sti' 
+      (EQV: sim_strict R RR (st, trigger (Choose X) >>= k) sti'):
+    exists st' X' k',
+    sti' = (st', trigger (Choose X') >>= k') /\
+    forall x', exists x, sim_strict R RR (st, k x) (st', k' x').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; itree_clarify x.
+    esplits; eauto.
+    i. specialize (K x'). des. pclearbot. eauto.
+  Qed.
+  
+  Lemma sim_strict_inv_take R RR sti st' X' k'
+      (EQV: sim_strict R RR sti (st', trigger (Take X') >>= k')):
+    exists st X k,
+    sti = (st, trigger (Take X) >>= k) /\
+    forall x, exists x', sim_strict R RR (st, k x) (st', k' x').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0 H2; eauto; itree_clarify x.
+    esplits; eauto.
+    i. specialize (K x). des. pclearbot. eauto.
+  Qed.
+
+  Lemma sim_strict_inv_take' R RR st X k sti'
+      (EQV: sim_strict R RR (st, trigger (Take X) >>= k) sti'):
+    exists st' X' k',
+    sti' = (st', trigger (Take X') >>= k') /\
+    forall x, exists x', sim_strict R RR (st, k x) (st', k' x').
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; itree_clarify x.
+    esplits; eauto.
+    i. specialize (K x). des. pclearbot. eauto.
+  Qed.
+  
+  Lemma sim_strict_inv_update R RR sti st' X' (run': Any.t -> Any.t * X') k'
+      (EQV: sim_strict R RR sti (st', trigger (SUpdate run') >>= k')):
+    exists X (run: Any.t -> Any.t * X) st k,
+    sti = (st, trigger (SUpdate run) >>= k) /\
+    sim_strict R RR ((run st).1, k (run st).2) ((run' st').1, k' (run' st').2).
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0 H2; eauto; itree_clarify x.
+    pclearbot. esplits; eauto.
+  Qed.
+
+  Lemma sim_strict_inv_update' R RR st X (run: Any.t -> Any.t * X) k sti'
+      (EQV: sim_strict R RR (st, trigger (SUpdate run) >>= k) sti'):
+    exists X' (run': Any.t -> Any.t * X') st' k',
+    sti' = (st', trigger (SUpdate run') >>= k') /\
+    sim_strict R RR ((run st).1, k (run st).2) ((run' st').1, k' (run' st').2).
+  Proof.
+    punfold EQV. inv EQV; grind; depdes H0; eauto; itree_clarify x.
+    pclearbot. esplits; eauto.
+  Qed.
+
+  (** **)
+
+  Variant sim_strictC W
+      (r: forall S_src S_tgt (RR: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> W -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop):
+      forall S_src S_tgt (RR: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> W -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop
+    :=
+  | sim_strictC_intro RR p_src p_tgt w sti_src sti_tgt sti_src' sti_tgt'
+      (SIM: r Any.t Any.t RR p_src p_tgt w sti_src' sti_tgt')
+      (EQVSRC: sim_strict Any.t eq sti_src sti_src')
+      (EQVTGT: sim_strict Any.t eq sti_tgt' sti_tgt)
+    : sim_strictC W r Any.t Any.t RR p_src p_tgt w sti_src sti_tgt
+  .
+
+  Lemma sim_strictC_mon W r1 r2
+    (LEr: r1 <8= r2)
+    :
+    sim_strictC W r1 <8= sim_strictC W r2.
+  Proof. ii. destruct PR. econs; et. Qed.
+
+  Lemma sim_strictC_compatible: forall W wf le fl_src fl_tgt, 
+      compatible8 (@_sim_itree W wf le fl_src fl_tgt) (sim_strictC W).
+  Proof.
+    econs; i; eauto using sim_strictC_mon. depdes PR.
+    move SIM before RR. revert_until SIM.
+    induction SIM; i; subst.
+    - apply sim_strict_inv_ret in EQVSRC. apply sim_strict_inv_ret' in EQVTGT.
+      des. subst. clarify. eauto using _sim_itree.
+    - apply sim_strict_inv_call in EQVSRC. apply sim_strict_inv_call' in EQVTGT.
+      des. subst. clarify. eauto using _sim_itree.
+    - apply sim_strict_inv_syscall in EQVSRC. apply sim_strict_inv_syscall' in EQVTGT.
+      des. subst. eauto using _sim_itree.
+    - apply sim_strict_inv_call in EQVSRC. des. subst.
+      destruct sti_tgt. econs; eauto. eapply IHSIM; eauto.
+      ginit. guclo sim_strict_bindC_spec. econs.
+      + gfinal. right. eapply sim_strict_refl.
+      + i. inv REL. gfinal. right. apply EQVSRC0.
+    - apply sim_strict_inv_call' in EQVTGT. des. subst.
+      destruct sti_src. econs; eauto. eapply IHSIM; eauto.
+      ginit. guclo sim_strict_bindC_spec. econs.
+      + gfinal. right. eapply sim_strict_refl.
+      + i. inv REL. gfinal. right. apply EQVTGT0.
+    - apply sim_strict_inv_tau in EQVSRC. des. subst.
+      destruct sti_tgt. econs; eauto.
+    - apply sim_strict_inv_tau' in EQVTGT. des. subst.
+      destruct sti_src. econs; eauto.
+    - apply sim_strict_inv_choose in EQVSRC. des. subst.
+      specialize (EQVSRC0 x). des. destruct sti_tgt. econs; eauto.
+    - apply sim_strict_inv_choose' in EQVTGT. des. subst.
+      destruct sti_src. econs; eauto. i. specialize (EQVTGT0 x). des; eauto.
+    - apply sim_strict_inv_take in EQVSRC. des. subst.
+      destruct sti_tgt. econs. i. specialize (EQVSRC0 x). des. eauto.
+    - apply sim_strict_inv_take' in EQVTGT. des. subst.
+      specialize (EQVTGT0 x). des. destruct sti_src. econs; eauto.
+    - apply sim_strict_inv_update in EQVSRC. des. subst.
+      destruct sti_tgt. econs; eauto.
+    - apply sim_strict_inv_update' in EQVTGT. des. subst.
+      destruct sti_src. econs; eauto.
+    - destruct sti_src, sti_tgt. econs; eauto. econs; eauto.
+  Qed.
+
+  Lemma sim_strictC_spec: forall W wf le fl_src fl_tgt,
+      sim_strictC W <9= gupaco8 (@_sim_itree W wf le fl_src fl_tgt) (cpn8 (@_sim_itree W wf le fl_src fl_tgt)).
+  Proof.
+    intros. gclo. econs; eauto using sim_strictC_compatible.
+    eapply sim_strictC_mon, PR; eauto with paco.
+  Qed.
+  
+End SIM_STRICT.
+
+  Hint Constructors _sim_strict.
+  Hint Unfold sim_strict.
+  Hint Resolve sim_strict_mon: paco.
+  Hint Resolve cpn4_wcompat: paco.
+
+
+
+Section HPSIM.
 
   Context `{Σ: GRA.t}.
 
   Variable fl_src: alist gname (Any.t -> itree hAGEs Any.t).
   Variable fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
   Variable I: Any.t -> Any.t -> iProp.
-  
+
   Inductive _hpsim {with_dummy: bool}
     (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
     {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
   | hpsim_ret
+      (HPSIM_RET: True)
       p_src p_tgt st_src st_tgt fmr
       v_src v_tgt
       (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
@@ -41,6 +475,7 @@ Section SIM.
     :
     _hpsim hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
   | hpsim_call
+      (HPSIM_CALL: True)
       p_src p_tgt st_src st_tgt fmr
       fn varg k_src k_tgt FR
       (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
@@ -51,6 +486,7 @@ Section SIM.
     :
     _hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
   | hpsim_syscall
+      (HPSIM_SYSCALL: True)
       p_src p_tgt st_src st_tgt fmr
       fn varg rvs k_src k_tgt
       (K: forall vret, 
@@ -59,6 +495,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
 
   | hpsim_inline_src
+      (HPSIM_INLINE_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       fn f varg k_src i_tgt
       (FUN: alist_find fn fl_src = Some f)
@@ -67,6 +504,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_inline_tgt
+      (HPSIM_INLINE_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       fn f varg i_src k_tgt
       (FUN: alist_find fn fl_tgt = Some f)
@@ -75,6 +513,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
 
   | hpsim_tau_src
+      (HPSIM_TAU_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       i_src i_tgt
       (K: _hpsim hpsim true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
@@ -82,6 +521,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
 
   | hpsim_tau_tgt
+      (HPSIM_TAU_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       i_src i_tgt
       (K: _hpsim hpsim p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
@@ -89,6 +529,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
 
   | hpsim_choose_src
+      (HPSIM_CHOOSE_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       X x k_src i_tgt
       (K: _hpsim hpsim true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
@@ -96,6 +537,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_choose_tgt
+      (HPSIM_CHOOSE_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       X i_src k_tgt
       (K: forall (x: X), _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
@@ -103,6 +545,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
 
   | hpsim_take_src
+      (HPSIM_TAKE_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       X k_src i_tgt
       (K: forall (x: X), _hpsim hpsim true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
@@ -110,6 +553,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_take_tgt
+      (HPSIM_TAKE_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       X x i_src k_tgt
       (K: _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
@@ -117,6 +561,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
 
   | hpsim_supdate_src
+      (HPSIM_SUPDATE_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       X x st_src0 k_src i_tgt
       (run: Any.t -> Any.t * X)
@@ -126,6 +571,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_supdate_tgt
+      (HPSIM_SUPDATE_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       X x st_tgt0 i_src k_tgt
       (run: Any.t -> Any.t * X)
@@ -135,6 +581,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
 
   | hpsim_assume_src
+      (HPSIM_ASSUME_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
@@ -144,6 +591,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_assume_tgt
+      (HPSIM_ASSUME_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> (iP ** FMR))
@@ -153,6 +601,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
 
   | hpsim_guarantee_src
+      (HPSIM_GUARANTEE_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> (iP ** FMR))
@@ -162,6 +611,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_guarantee_tgt
+      (HPSIM_GUARANTEE_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
@@ -171,6 +621,7 @@ Section SIM.
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
 
   | hpsim_progress
+      (HPSIM_PROGRESS: True)
       st_src st_tgt fmr
       i_src i_tgt
       (SIM: hpsim R RR false false (st_src, i_src) (st_tgt, i_tgt) fmr)
@@ -222,17 +673,45 @@ Section SIM.
     eapply paco7_mon_bot in SIM; eauto. punfold SIM.
   Qed.
 
-  Variant hpsim_stepC {with_dummy: bool}
+  Lemma case_itrH R (itrH: itree hAGEs R) :
+    (exists v, itrH = Ret v) \/
+    (exists itrH', itrH = tau;; itrH') \/
+    (exists P itrH', itrH = (trigger (Assume P);;; itrH')) \/
+    (exists P itrH', itrH = (trigger (Guarantee P);;; itrH')) \/
+    (exists R (c: callE R) ktrH', itrH = (trigger c >>= ktrH')) \/
+    (exists R (s: sE R) ktrH', itrH = (trigger s >>= ktrH')) \/
+    (exists R (e: eventE R) ktrH', itrH = (trigger e >>= ktrH')).
+  Proof.
+    ides itrH; eauto.
+    right; right.
+    destruct e; [destruct h|destruct e; [|destruct s]].
+    - left. exists P, (k()). unfold trigger. rewrite bind_vis.
+      repeat f_equal. extensionality x. destruct x. rewrite bind_ret_l. eauto.
+    - right; left. exists P, (k()). unfold trigger. rewrite bind_vis.
+      repeat f_equal. extensionality x. destruct x. rewrite bind_ret_l. eauto.
+    - do 2 right; left. exists X, c, k. unfold trigger. rewrite bind_vis.
+      repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
+    - do 3 right; left. exists X, s, k. unfold trigger. rewrite bind_vis.
+      repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
+    - do 4 right. exists X, e, k. unfold trigger. rewrite bind_vis.
+      repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
+  Qed.  
+
+
+
+  
+  
+  Variant hpsimC {with_dummy: bool}
   (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
   {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
-  | hpsim_stepC_ret
+  | hpsimC_ret
       p_src p_tgt st_src st_tgt fmr
       v_src v_tgt
       (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
       (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
     :
-      hpsim_stepC hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
-  | hpsim_stepC_call
+      hpsimC hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
+  | hpsimC_call
       p_src p_tgt st_src st_tgt fmr
       fn varg k_src k_tgt FR
       (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
@@ -241,293 +720,152 @@ Section SIM.
           (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
           hpsim _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-  | hpsim_stepC_syscall
+      hpsimC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
+  | hpsimC_syscall
       p_src p_tgt st_src st_tgt fmr
       fn varg rvs k_src k_tgt
       (K: forall vret, 
           hpsim _ RR true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
     :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
-
-  | hpsim_stepC_inline_src
-      p_src p_tgt st_src st_tgt fmr
-      fn f varg k_src i_tgt
-      (FUN: alist_find fn fl_src = Some f)
-      (K: hpsim _ RR true p_tgt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_inline_tgt
-      p_src p_tgt st_src st_tgt fmr
-      fn f varg i_src k_tgt
-      (FUN: alist_find fn fl_tgt = Some f)
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-
-  | hpsim_stepC_tau_src
-      p_src p_tgt st_src st_tgt fmr
-      i_src i_tgt
-      (K: hpsim _ RR true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_tau_tgt
-      p_src p_tgt st_src st_tgt fmr
-      i_src i_tgt
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
-
-  | hpsim_stepC_choose_src
-      p_src p_tgt st_src st_tgt fmr
-      X x k_src i_tgt
-      (K: hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
-    :
-       hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_choose_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X i_src k_tgt
-      (K: forall (x: X), hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
-
-  | hpsim_stepC_take_src
-      p_src p_tgt st_src st_tgt fmr
-      X k_src i_tgt
-      (K: forall (x: X), hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_take_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X x i_src k_tgt
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
-
-  | hpsim_stepC_supdate_src
-      p_src p_tgt st_src st_tgt fmr
-      X x st_src0 k_src i_tgt
-      (run: Any.t -> Any.t * X)
-      (RUN: run st_src = (st_src0, x))
-      (K: hpsim _ RR true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_supdate_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X x st_tgt0 i_src k_tgt
-      (run: Any.t -> Any.t * X)
-      (RUN: run st_tgt = (st_tgt0, x))
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
-
-  | hpsim_stepC_assume_src
-      p_src p_tgt st_src st_tgt fmr
-      iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_assume_tgt
-      p_src p_tgt st_src st_tgt fmr
-      iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
-
-  | hpsim_stepC_guarantee_src
-      p_src p_tgt st_src st_tgt fmr
-      iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_stepC_guarantee_tgt
-      p_src p_tgt st_src st_tgt fmr
-      iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
-    :
-      hpsim_stepC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
-  .
-  
-  Lemma hpsim_stepC_mon with_dummy : monotone7 (@hpsim_stepC with_dummy).
-  Proof.
-    ii. inv IN; try (by des; econs; ss; et).
-  Qed.
-
-  Hint Resolve hpsim_stepC_mon: paco.
-
-  Lemma hpsim_stepC_spec with_dummy:
-    (@hpsim_stepC with_dummy) <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
-  Proof.
-    eapply wrespect7_uclo; eauto with paco.
-    econs; eauto with paco; i.
-    inv PR; econs; et; try (i; eapply _hpsim_mon; et; i; eapply rclo7_base; et).
-  Qed.
-  
-  Variant hpsimC {with_dummy: bool}
-  (r g: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-  {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
-  | hpsimC_ret
-      p_src p_tgt st_src st_tgt fmr
-      v_src v_tgt
-      (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
-    :
-      hpsimC r g p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
-  | hpsimC_call
-      p_src p_tgt st_src st_tgt fmr
-      fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
-      (K: forall vret st_src0 st_tgt0 fmr0 
-          (WF: URA.wf fmr0)
-          (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
-          r _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
-    :
-      hpsimC r g p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-  | hpsimC_syscall
-      p_src p_tgt st_src st_tgt fmr
-      fn varg rvs k_src k_tgt
-      (K: forall vret, 
-          r _ RR true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
-    :
-      hpsimC r g p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
 
   | hpsimC_inline_src
       p_src p_tgt st_src st_tgt fmr
       fn f varg k_src i_tgt
       (FUN: alist_find fn fl_src = Some f)
-      (K: r _ RR true p_tgt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
+      (K: hpsim _ RR true p_tgt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_inline_tgt
       p_src p_tgt st_src st_tgt fmr
       fn f varg i_src k_tgt
       (FUN: alist_find fn fl_tgt = Some f)
-      (K: r _ RR p_src true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
+      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
 
   | hpsimC_tau_src
       p_src p_tgt st_src st_tgt fmr
       i_src i_tgt
-      (K: r _ RR true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (K: hpsim _ RR true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_tau_tgt
       p_src p_tgt st_src st_tgt fmr
       i_src i_tgt
-      (K: r _ RR p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
 
   | hpsimC_choose_src
       p_src p_tgt st_src st_tgt fmr
       X x k_src i_tgt
-      (K: r _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
+      (K: hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
     :
-       hpsimC r g p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
+       hpsimC hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_choose_tgt
       p_src p_tgt st_src st_tgt fmr
       X i_src k_tgt
-      (K: forall (x: X), r _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
+      (K: forall (x: X), hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
 
   | hpsimC_take_src
       p_src p_tgt st_src st_tgt fmr
       X k_src i_tgt
-      (K: forall (x: X), r _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
+      (K: forall (x: X), hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_take_tgt
       p_src p_tgt st_src st_tgt fmr
       X x i_src k_tgt
-      (K: r _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
+      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
 
   | hpsimC_supdate_src
       p_src p_tgt st_src st_tgt fmr
       X x st_src0 k_src i_tgt
       (run: Any.t -> Any.t * X)
       (RUN: run st_src = (st_src0, x))
-      (K: r _ RR true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
+      (K: hpsim _ RR true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_supdate_tgt
       p_src p_tgt st_src st_tgt fmr
       X x st_tgt0 i_src k_tgt
       (run: Any.t -> Any.t * X)
       (RUN: run st_tgt = (st_tgt0, x))
-      (K: r _ RR p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
+      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
 
   | hpsimC_assume_src
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          r _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
+          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
-      hpsimC r g p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_assume_tgt
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> (iP ** FMR))
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          r _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
+          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
 
   | hpsimC_guarantee_src
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> (iP ** FMR))
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          r _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
+          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
-      hpsimC r g p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
+      hpsimC hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsimC_guarantee_tgt
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
       (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          r _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
+          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
-      hpsimC r g p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
+    hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
+
+  | hpsimC_progress
+      st_src st_tgt fmr
+      i_src i_tgt
+      (SIM: hpsim R RR false false (st_src, i_src) (st_tgt, i_tgt) fmr)
+    :
+    hpsimC hpsim true true (st_src, i_src) (st_tgt, i_tgt) fmr
   .
+  Arguments _hpsim {with_dummy} hpsim {R} RR.
+                
+  Hint Constructors hpsimC: paco.
   
-  Lemma hpsimC_spec with_dummy r g:
-    (@hpsimC with_dummy) (gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g) (gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) g g)
-    <7=
-    gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g.
+  Lemma hpsimC_mon with_dummy : monotone7 (@hpsimC with_dummy).
   Proof.
-    i. eapply gpaco7_gpaco; [eauto with paco|].
-    eapply gpaco7_mon; [|eauto|i; eapply gupaco7_mon; et].
-    inv PR; try (guclo hpsim_stepC_spec; econs; et; i; gbase; et).
+    ii. inv IN; try (by des; econs; ss; et).
   Qed.
 
+  Lemma hpsimC_spec with_dummy:
+    (@hpsimC with_dummy) <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
+  Proof.
+    eapply wrespect7_uclo; eauto with paco.
+    econs; eauto using hpsimC_mon; i.
+    inv PR; econs; et; try (i; eapply _hpsim_mon; eauto using rclo7).
+    econs. eauto.
+  Qed.
+  
   Lemma hpsim_progress_flag with_dummy R RR r g st_src st_tgt fmr
         (SIM: gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) g g R RR false false st_src st_tgt fmr)
       :
@@ -624,7 +962,7 @@ Section SIM.
       eapply _hpsim_mon_progress; eauto; clarify.
     - econs; eauto. rewrite <-!bind_bind. eapply IHSIM; eauto.
     - econs; eauto. rewrite <-!bind_bind. eapply IHSIM; eauto.
-    - econs. eauto 10 using rclo7, hpsim_bindC.
+    - econs; eauto. eauto 10 using rclo7, hpsim_bindC.
   Qed.
 
   Lemma hpsim_bindC_spec:
@@ -634,40 +972,314 @@ Section SIM.
     apply hpsim_bindC_wrespectful.
   Qed.
 
-  Lemma hpsim_guarantee_true_src R RR ps pt st_src st_tgt v_src v_tgt fmr
-    (REL: Own fmr ⊢ #=> RR (st_src, v_src) (st_tgt, v_tgt))
-    :
-    @hpsim R RR ps pt (st_src, trigger (Guarantee True);;; Ret v_src) (st_tgt, Ret v_tgt) fmr.
+  Definition itreeH_dummy_ktree Q R (k k': Q -> itree hAGEs R) :=
+    k' = k \/ k' = (fun x => trigger (Guarantee True);;; k x).
+  Hint Unfold itreeH_dummy_ktree.
+  
+  Definition itreeH_dummy R (itr itr': itree hAGEs R) :=
+    exists Q i k k',
+      itr = (i >>= k) /\
+      itr' = (i >>= k') /\
+      itreeH_dummy_ktree Q R k k'.
+  Hint Unfold itreeH_dummy.
+
+  Lemma itreeH_dummy_refl R i:
+    itreeH_dummy R i i.
   Proof.
-    ginit. gstep. econs.
-    { instantiate (1:=Own fmr); eauto. }
-    i. econs. iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H".
-    iPoseProof (REL with "H") as "H". eauto.
+    replace i with (x <- Ret tt;; Ret tt;;; i); cycle 1.
+    { rewrite !bind_ret_l. eauto. }
+    r; esplits; last left; eauto; grind.
+  Qed.
+  Hint Resolve itreeH_dummy_refl.
+  
+  Lemma itreeH_dummy_dummy Q R i (k: Q -> _):
+    itreeH_dummy R (i >>= k) (x <- i ;; trigger (Guarantee True);;; k x).
+  Proof.
+    r; esplits; last right; eauto.
+  Qed.
+  Hint Resolve itreeH_dummy_dummy.
+
+  Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  :=
+  | hpsim_dummyC_src_intro R RR ps pt st_src i_src i_src' st_tgt i_tgt fmr fmr'
+      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (RELr: Own fmr' ⊢ #=> Own fmr)
+      (DUMMY: itreeH_dummy R i_src i_src')
+    :
+    hpsim_dummyC_src r R RR ps pt (st_src, i_src') (st_tgt, i_tgt) fmr'
+  .
+  
+  Lemma hpsim_dummyC_src_mon
+        r1 r2
+        (LEr: r1 <7= r2)
+    :
+    hpsim_dummyC_src r1 <7= hpsim_dummyC_src r2
+  .
+  Proof. i. destruct PR; econs; eauto. Qed.
+
+  Lemma hpsim_dummyC_src_compatible with_dummy:
+    compatible7 (@_hpsim with_dummy) hpsim_dummyC_src.
+  Proof.
+    econs; eauto using hpsim_dummyC_src_mon; i. depdes PR.
+    remember (st_src, i_src) as sti_src.
+    remember (st_tgt, i_tgt) as sti_tgt.
+    move SIM before RR. revert_until SIM.
+    induction SIM; i; depdes Heqsti_src Heqsti_tgt;
+      grind; eauto 7 with paco imodL; r in DUMMY; des.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      destruct DUMMY1; subst; rewrite <-x; econs; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto with imodL.
+        * eapply hpsim_guarantee_src; try econs; eauto with imodL.
+      + replace c with (Call fn varg).
+        econs; eauto with imodL.
+        i. destruct DUMMY1; subst; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_src; try econs; eauto with imodL.
+      + replace e with (Syscall fn varg rvs).
+        econs; eauto with imodL.
+        i. destruct DUMMY1; subst; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_src; try econs; eauto with imodL.
+      + replace c with (Call fn varg).
+        econs; eauto with imodL.
+        destruct DUMMY1; subst; destruct with_dummy; eauto.
+        * eapply IHSIM; eauto.
+          eexists _, (x<-f varg;; trigger (Guarantee True);;; ktrH' x), k, _.
+          esplits; eauto; grind.
+        * eapply IHSIM; eauto.
+          eexists _, (f varg >>= ktrH'), k, _.
+          esplits; eauto; grind.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x; eauto.
+        eapply hpsim_guarantee_src; eauto with imodL.
+      + econs; eauto with imodL.
+        destruct DUMMY1; subst; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_src; eauto with imodL.
+          econs; eauto with imodL.
+      + replace e with (Choose R0); econs; eauto.
+        i. destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_src; eauto with imodL.
+          econs; eauto with imodL.
+      + replace e with (Take R0); econs; eauto.
+        i. destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_src; eauto with imodL.
+          econs; eauto.
+      + replace s with (SUpdate run); econs; eauto.
+        i. destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; try instantiate (1:=FMR); eauto with imodL.
+        * eapply hpsim_guarantee_src; eauto with imodL.
+          econs; try instantiate (1:=FMR); eauto with imodL.
+      + econs; eauto. i. eapply H; eauto.
+        { eapply imod_trans; eauto.
+          iIntros "H". iDestruct "H" as "[X H]".
+          iSplitL "X"; eauto. iStopProof; eauto. }
+        destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
+        * econs; eauto with imodL.
+        * eapply hpsim_guarantee_src; eauto with imodL.
+          econs; eauto with imodL.
+      + econs; eauto with imodL.
+        i. eapply H; eauto. destruct DUMMY1; subst; eauto.
+    - subst. econs; eauto. destruct DUMMY1; subst; econs; eauto.
   Qed.
 
-  Lemma hpsim_guarantee_true_tgt R RR ps pt st_src st_tgt v_src v_tgt fmr
-    (REL: Own fmr ⊢ #=> RR (st_src, v_src) (st_tgt, v_tgt))
-    :
-    @hpsim R RR ps pt (st_src, Ret v_src) (st_tgt, trigger (Guarantee True);;; Ret v_tgt) fmr.
+  Lemma hpsim_dummyC_src_spec (with_dummy:bool) :
+    hpsim_dummyC_src <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
   Proof.
-    ginit. gstep. econs.
-    { instantiate (1:=Own fmr); eauto. }
-    i. econs. iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H".
-    iDestruct "H" as "[X Y]". iPoseProof (REL with "Y") as "Y". eauto.
+    intros. gclo. econs; eauto using hpsim_dummyC_src_compatible.
+    eapply hpsim_dummyC_src_mon, PR; eauto with paco.
   Qed.
 
+  Variant hpsim_dummyC_tgt (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  :=
+  | hpsim_dummyC_tgt_intro R RR ps pt st_src i_src st_tgt i_tgt i_tgt' fmr fmr'
+      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (RELr: Own fmr' ⊢ #=> Own fmr)
+      (DUMMY: itreeH_dummy R i_tgt i_tgt')
+    :
+    hpsim_dummyC_tgt r R RR ps pt (st_src, i_src) (st_tgt, i_tgt') fmr'
+  .
+  
+  Lemma hpsim_dummyC_tgt_mon
+        r1 r2
+        (LEr: r1 <7= r2)
+    :
+    hpsim_dummyC_tgt r1 <7= hpsim_dummyC_tgt r2
+  .
+  Proof. i. destruct PR; econs; eauto. Qed.
+
+  Lemma hpsim_dummyC_tgt_compatible with_dummy:
+    compatible7 (@_hpsim with_dummy) hpsim_dummyC_tgt.
+  Proof.
+    econs; eauto using hpsim_dummyC_tgt_mon; i. depdes PR.
+    remember (st_src, i_src) as sti_src.
+    remember (st_tgt, i_tgt) as sti_tgt.
+    move SIM before RR. revert_until SIM.
+    induction SIM; i; depdes Heqsti_src Heqsti_tgt;
+      grind; eauto 7 with paco imodL; r in DUMMY; des.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      destruct DUMMY1; subst; rewrite <-x; econs; eauto; imodIntroL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto with imodL.
+        * eapply hpsim_guarantee_tgt; try econs; eauto; imodIntroL.
+      + replace c with (Call fn varg).
+        econs; eauto with imodL.
+        i. destruct DUMMY1; subst; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_tgt; try econs; eauto; imodIntroL.
+      + replace e with (Syscall fn varg rvs).
+        econs; eauto with imodL.
+        i. destruct DUMMY1; subst; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_tgt; try econs; eauto; imodIntroL.
+      + replace c with (Call fn varg).
+        econs; eauto with imodL.
+        destruct DUMMY1; subst; destruct with_dummy; eauto.
+        * eapply IHSIM; eauto.
+          eexists _, (x<-f varg;; trigger (Guarantee True);;; ktrH' x), k, _.
+          esplits; eauto; grind.
+        * eapply IHSIM; eauto.
+          eexists _, (f varg >>= ktrH'), k, _.
+          esplits; eauto; grind.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x; eauto.
+        eapply hpsim_guarantee_tgt; eauto; imodIntroL.
+      + econs; eauto with imodL.
+        destruct DUMMY1; subst; eauto with imodL.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_tgt; eauto with imodL.
+          econs; eauto; imodIntroL.
+      + replace e with (Choose R0); econs; eauto.
+        i. destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_tgt; eauto with imodL.
+          econs; eauto; imodIntroL.
+      + replace e with (Take R0); econs; eauto.
+        i. destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto.
+        * eapply hpsim_guarantee_tgt; eauto with imodL.
+          econs; eauto; imodIntroL.
+      + replace s with (SUpdate run); econs; eauto.
+        i. destruct DUMMY1; subst; eauto.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; try instantiate (1:=FMR); eauto with imodL.
+        * eapply hpsim_guarantee_tgt; eauto with imodL.
+          econs; try instantiate (1:=FMR); eauto; imodIntroL.
+      + econs; eauto; imodIntroL. eapply H; eauto 10.
+    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
+        * econs; eauto. i. eapply H; eauto.
+          eapply imod_trans; eauto.
+          iIntros "H". iDestruct "H" as "[X H]".
+          iSplitL "X"; eauto. iStopProof; eauto.
+        * eapply hpsim_guarantee_tgt; eauto. econs; eauto.
+          i. eapply H; eauto.
+          iIntros "H". iPoseProof (NEW0 with "H") as "H". iMod "H".
+          iDestruct "H" as "[P [_ H]]". iSplitL "P"; eauto. iStopProof; eauto.
+      + econs; eauto with imodL.
+        i. eapply H; eauto.
+        { iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H".
+          iDestruct "H" as "[P H]". iSplitL "P"; eauto. iStopProof; eauto. }
+        destruct DUMMY1; subst; eauto.
+    - subst. econs; eauto. destruct DUMMY1; subst; econs; eauto.
+  Qed.
+
+  Lemma hpsim_dummyC_tgt_spec (with_dummy:bool) :
+    hpsim_dummyC_tgt <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
+  Proof.
+    intros. gclo. econs; eauto using hpsim_dummyC_tgt_compatible.
+    eapply hpsim_dummyC_tgt_mon, PR; eauto with paco.
+  Qed.
+  
   Lemma hpsim_le_gpaco with_dummy r r':
     @hpsim <7= gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r r'.
   Proof.
     gcofix CIH. i. punfold PR.
-    gstep. induction PR; eauto.
-  Admitted.
+    induction PR; pclearbot; eauto with paco;
+      guclo hpsimC_spec; eauto with paco.
+    - econs; eauto. destruct with_dummy; eauto.
+      guclo hpsim_dummyC_src_spec. econs; eauto.
+    - econs; eauto. destruct with_dummy; eauto.
+      guclo hpsim_dummyC_tgt_spec. econs; eauto.
+  Qed.
   Hint Resolve hpsim_le_gpaco: paco.
 
   Corollary hpsim_add_dummy:
     @hpsim <7= paco7 (@_hpsim true) bot7.
   Proof. ginit. eauto with paco. Qed.
                 
+  (*** Revised up to here ***)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   Lemma current_iProp_sepconj P Q r 
       (SAT: current_iProp r (P ** Q))
     :
@@ -808,488 +1420,9 @@ Section SIM.
     eapply current_iProp_entail; eauto.
   Qed.
 
-  Variant _sim_strict (sim_strict: forall R, relation (Any.t * R) -> relation (Any.t * itree Es R))
-    : forall R, relation (Any.t * R) -> relation (Any.t * itree Es R)
-  :=
-  | sim_strict_ret R RR st st' v v'
-      (RET: RR (st,v) (st',v'): Prop)
-    :
-    _sim_strict sim_strict R RR
-      (st, Ret v)
-      (st', Ret v')
-  | sim_strict_call R RR
-      st fn varg k k'
-      (K: forall st0 vret,
-          sim_strict R RR (st0, k vret) (st0, k' vret))
-    :
-    _sim_strict sim_strict R RR
-      (st, trigger (Call fn varg) >>= k)
-      (st, trigger (Call fn varg) >>= k')
-  | sim_strict_syscall R RR
-      st st' fn varg rvs k k'
-      (K: forall vret,
-          sim_strict R RR (st, k vret) (st', k' vret))
-    :
-    _sim_strict sim_strict R RR
-      (st, trigger (Syscall fn varg rvs) >>= k)
-      (st', trigger (Syscall fn varg rvs) >>= k')
-  | sim_strict_tau R RR
-      st st' i i'
-      (K: sim_strict R RR (st, i) (st', i'))
-    :
-    _sim_strict sim_strict R RR
-      (st, tau;; i)
-      (st', tau;; i')
-  | sim_strict_choose R RR
-      st st' X X' k k'
-      (K: forall x', exists x, sim_strict R RR (st, k x) (st', k' x'))
-    :
-    _sim_strict sim_strict R RR
-      (st, trigger (Choose X) >>= k)
-      (st', trigger (Choose X') >>= k')
-  | sim_strict_take R RR
-      st st' X X' k k'
-      (K: forall x, exists x', sim_strict R RR (st, k x) (st', k' x'))
-    :
-    _sim_strict sim_strict R RR
-      (st, trigger (Take X) >>= k)
-      (st', trigger (Take X') >>= k')
-  | sim_strict_supdate R RR
-      st st' X k X' k' (run: Any.t -> Any.t * X) (run': Any.t -> Any.t * X')
-      (K: sim_strict R RR
-            (fst (run st), k (snd (run st)))
-            (fst (run' st'), k' (snd (run' st'))))
-    :
-    _sim_strict sim_strict R RR
-      (st, trigger (SUpdate run) >>= k)
-      (st', trigger (SUpdate run') >>= k')
-  .
-
-  Definition sim_strict := paco4 _sim_strict bot4.
-
-  Lemma sim_strict_mon: monotone4 _sim_strict.
-  Proof.
-    ii. induction IN; try (econs; et; ii; exploit K; i; des; et).
-  Qed.
-
-  Hint Constructors _sim_strict.
-  Hint Unfold sim_strict.
-  Hint Resolve sim_strict_mon: paco.
-  Hint Resolve cpn4_wcompat: paco.
-
-  Lemma sim_strict_refl
-    R sti
-    :
-    sim_strict R eq sti sti.
-  Proof.
-    revert_until I. ginit. gcofix CIH; i.
-    destruct sti as [st i]. ides i; eauto with paco.
-    gstep. destruct e; [destruct c|destruct s; [destruct s|destruct e]].
-    - hexploit (sim_strict_call (gpaco4 _sim_strict (cpn4 _sim_strict) r r) R eq); i.
-      { instantiate (1:=k). eauto with paco. }
-      unfold trigger in H. rewrite !bind_vis in H.
-      erewrite f_equal2; eauto; repeat (eapply f_equal; eauto);
-        extensionality x; rewrite !bind_ret_l; eauto.
-    - hexploit (sim_strict_supdate (gpaco4 _sim_strict (cpn4 _sim_strict) r r) R eq); i.
-      { instantiate (4:=k). eauto with paco. }
-      unfold trigger in H. rewrite !bind_vis in H.
-      erewrite f_equal2; eauto; repeat (eapply f_equal; eauto);
-        extensionality x; rewrite !bind_ret_l; eauto.
-    - hexploit (sim_strict_choose (gpaco4 _sim_strict (cpn4 _sim_strict) r r) R eq); i.
-      { eexists. instantiate (4:=k). eauto with paco. }
-      unfold trigger in H. rewrite !bind_vis in H.
-      erewrite f_equal2; eauto; repeat (eapply f_equal; eauto);
-        extensionality x; rewrite !bind_ret_l; eauto.
-    - hexploit (sim_strict_take (gpaco4 _sim_strict (cpn4 _sim_strict) r r) R eq); i.
-      { eexists. instantiate (4:=k). eauto with paco. }
-      unfold trigger in H. rewrite !bind_vis in H.
-      erewrite f_equal2; eauto; repeat (eapply f_equal; eauto);
-        extensionality x; rewrite !bind_ret_l; eauto.
-    - hexploit (sim_strict_syscall (gpaco4 _sim_strict (cpn4 _sim_strict) r r) R eq); i.
-      { instantiate (3:=k). eauto with paco. }
-      unfold trigger in H. rewrite !bind_vis in H.
-      erewrite f_equal2; eauto; repeat (eapply f_equal; eauto);
-        extensionality x; rewrite !bind_ret_l; eauto.
-  Qed.
-
-  Lemma sim_strict_le
-    R RR RR'
-    (LE: RR <2= RR')
-    :
-    sim_strict R RR <2= sim_strict R RR'.
-  Proof.
-    ginit. gcofix CIH. i. punfold PR.
-    inv PR; grind; depdes H0; unfold trigger in *;
-      try (rewrite !bind_vis in x); gstep; econs; i;
-      try edestruct K; pclearbot; eauto with paco.
-  Qed.
-
-  Variant sim_strict_bindC (r: forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)) :
-    forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)
-  :=
-  | sim_strict_bindC_intro R RR Q QQ st st' i i' k k'
-      (HD: r R RR (st,i) (st',i'))
-      (TL: forall st0 v0 st0' v0' (REL: RR (st0,v0) (st0',v0')),
-           r Q QQ (st0, k v0) (st0', k' v0'))
-    :
-    sim_strict_bindC r Q QQ (st, i >>= k) (st', i' >>= k')
-  .
-
-  Lemma sim_strict_bindC_mon
-        r1 r2
-        (LEr: r1 <4= r2)
-    :
-    sim_strict_bindC r1 <4= sim_strict_bindC r2
-  .
-  Proof. ii. destruct PR; econs; et. Qed.
-
-  Lemma sim_strict_bindC_wrespectful:
-    wrespectful4 _sim_strict sim_strict_bindC.
-  Proof.
-    econs; eauto using sim_strict_bindC_mon; i.
-    destruct PR. apply GF in HD. inv HD; grind; depdes H3 H0; grind;
-      try (by econs; i; econs 2; eauto; econs; eauto using rclo4).
-    - eapply sim_strict_mon; eauto using rclo4.
-    - econs. i. specialize (K x'). des.
-      eexists. econs 2; eauto. econs; eauto using rclo4.
-    - econs. i. specialize (K x). des.
-      eexists. econs 2; eauto. econs; eauto using rclo4.
-  Qed.
-
-  Lemma sim_strict_bindC_spec:
-    sim_strict_bindC <5= gupaco4 _sim_strict (cpn4 _sim_strict).
-  Proof.
-    intros. eapply wrespect4_uclo; eauto with paco.
-    apply sim_strict_bindC_wrespectful.
-  Qed.
-
-  Variant sim_strict_transC (r: forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)) :
-    forall R, relation (Any.t*R) -> relation (Any.t * itree Es R)
-  :=
-  | sim_strict_transC_intro R RR0 RR1 RR st st' st'' i i' i''
-      (REL0: r R RR0 (st,i) (st',i'))
-      (REL1: r R RR1 (st',i') (st'',i''))
-      (LE: rcompose RR0 RR1 <2= RR)
-    :
-    sim_strict_transC r R RR (st, i) (st'', i'')
-  .
-
-  Lemma sim_strict_transC_mon
-        r1 r2
-        (LEr: r1 <4= r2)
-    :
-    sim_strict_transC r1 <4= sim_strict_transC r2
-  .
-  Proof. ii. destruct PR; econs; et. Qed.
-
-  Lemma sim_strict_transC_wrespectful:
-    wrespectful4 _sim_strict sim_strict_transC.
-  Proof.
-    econs; eauto using sim_strict_transC_mon; i.
-    destruct PR. apply GF in REL0. apply GF in REL1.
-    inv REL0; grind; depdes H3 H0; grind; unfold trigger in *; try (rewrite !bind_vis in x; depdes x);
-      inv REL1; grind; depdes H3 H0; grind; unfold trigger in *; try (rewrite !bind_vis in x; depdes x);
-      econs; i; eauto using sim_strict_transC, rclo4.
-    - replace k' with k0 in K; eauto using sim_strict_transC, rclo4.
-      extensionality v. eapply equal_f in x. rewrite !bind_ret_l in x. eauto.
-    - replace k' with k0 in K; eauto using sim_strict_transC, rclo4.
-      extensionality v. eapply equal_f in x. rewrite !bind_ret_l in x. eauto.
-    - replace k' with k0 in K; cycle 1.
-      { extensionality v. eapply equal_f in x. rewrite !bind_ret_l in x. eauto. }
-      destruct (K0 x'), (K x0). eauto using sim_strict_transC, rclo4.
-    - replace k' with k0 in K; cycle 1.
-      { extensionality v. eapply equal_f in x. rewrite !bind_ret_l in x. eauto. }
-      destruct (K x0), (K0 x1). eauto using sim_strict_transC, rclo4.
-    - replace k' with k0 in K; cycle 1; eauto using sim_strict_transC, rclo4.
-      extensionality v. eapply equal_f in x. rewrite !bind_ret_l in x. eauto.
-  Qed.
-
-  Lemma sim_strict_transC_spec:
-    sim_strict_transC <5= gupaco4 _sim_strict (cpn4 _sim_strict).
-  Proof.
-    intros. eapply wrespect4_uclo; eauto with paco.
-    apply sim_strict_transC_wrespectful.
-  Qed.
-
-  Lemma sim_strict_inv_ret R RR sti st' v'
-      (EQV: sim_strict R RR sti (st', Ret v')):
-    exists st v, sti = (st, Ret v) /\ RR (st, v) (st', v').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).      
-  Qed.
-
-  Lemma sim_strict_inv_ret' R RR st v sti'
-      (EQV: sim_strict R RR (st, Ret v) sti'):
-    exists st' v', sti' = (st', Ret v') /\ RR (st, v) (st', v').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-  Qed.
-  
-  Lemma sim_strict_inv_call R RR sti st fn varg k'
-      (EQV: sim_strict R RR sti (st, trigger (Call fn varg) >>= k')):
-    exists k,
-    sti = (st, trigger (Call fn varg) >>= k) /\
-    forall st0 vret, sim_strict R RR (st0, k vret) (st0, k' vret).
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0 H2; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    esplits; eauto. i.
-    specialize (K st0 vret). pclearbot.
-    replace k' with k'0; eauto.
-    extensionality v. depdes H0. eapply equal_f in x.
-    rewrite !bind_ret_l in x. eauto.
-  Qed.
-
-  Lemma sim_strict_inv_call' R RR st fn varg k sti' 
-      (EQV: sim_strict R RR (st, trigger (Call fn varg) >>= k) sti'):
-    exists k',
-    sti' = (st, trigger (Call fn varg) >>= k') /\
-    forall st0 vret, sim_strict R RR (st0, k vret) (st0, k' vret).
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    esplits; eauto. i.
-    specialize (K st0 vret). pclearbot.
-    replace k with k0; eauto.
-    extensionality v. depdes H0. eapply equal_f in x.
-    rewrite !bind_ret_l in x. eauto.
-  Qed.
-  
-  Lemma sim_strict_inv_syscall R RR sti st' fn varg rvs k'
-      (EQV: sim_strict R RR sti (st', trigger (Syscall fn varg rvs) >>= k')):
-    exists st k,
-    sti = (st, trigger (Syscall fn varg rvs) >>= k) /\
-    forall vret, sim_strict R RR (st, k vret) (st', k' vret).
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0 H2; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    esplits; eauto. i.
-    specialize (K vret). pclearbot.
-    replace k' with k'0; eauto.
-    extensionality v. depdes H0. eapply equal_f in x.
-    rewrite !bind_ret_l in x. eauto.
-  Qed.
-
-  Lemma sim_strict_inv_syscall' R RR st fn varg rvs k sti'
-      (EQV: sim_strict R RR (st, trigger (Syscall fn varg rvs) >>= k) sti'):
-    exists st' k',
-    sti' = (st', trigger (Syscall fn varg rvs) >>= k') /\
-    forall vret, sim_strict R RR (st, k vret) (st', k' vret).
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    esplits; eauto. i.
-    specialize (K vret). pclearbot.
-    replace k with k0; eauto.
-    extensionality v. depdes H0. eapply equal_f in x.
-    rewrite !bind_ret_l in x. eauto.
-  Qed.
-  
-  Lemma sim_strict_inv_tau R RR sti st' i'
-      (EQV: sim_strict R RR sti (st', tau;; i')):
-    exists st i,
-    sti = (st, tau;; i) /\
-    sim_strict R RR (st, i) (st', i').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    pclearbot. eauto.
-  Qed.
-
-  Lemma sim_strict_inv_tau' R RR st i sti' 
-      (EQV: sim_strict R RR (st, tau;; i) sti'):
-    exists st' i',
-    sti' = (st', tau;; i') /\
-    sim_strict R RR (st, i) (st', i').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    pclearbot. eauto.
-  Qed.
-  
-  Lemma sim_strict_inv_choose R RR sti st' X' k'
-      (EQV: sim_strict R RR sti (st', trigger (Choose X') >>= k')):
-    exists st X k,
-    sti = (st, trigger (Choose X) >>= k) /\
-    forall x', exists x, sim_strict R RR (st, k x) (st', k' x').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0 H2; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    replace k' with k'0; cycle 1.
-    { depdes H0. extensionality v. eapply equal_f in x.
-      rewrite !bind_ret_l in x. eauto. }
-    esplits; eauto.
-    i. specialize (K x'). des. pclearbot. eauto.
-  Qed.
-
-  Lemma sim_strict_inv_choose' R RR st X k sti' 
-      (EQV: sim_strict R RR (st, trigger (Choose X) >>= k) sti'):
-    exists st' X' k',
-    sti' = (st', trigger (Choose X') >>= k') /\
-    forall x', exists x, sim_strict R RR (st, k x) (st', k' x').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    replace k with k0; cycle 1.
-    { depdes H0. extensionality v. eapply equal_f in x.
-      rewrite !bind_ret_l in x. eauto. }
-    esplits; eauto.
-    i. specialize (K x'). des. pclearbot. eauto.
-  Qed.
-  
-  Lemma sim_strict_inv_take R RR sti st' X' k'
-      (EQV: sim_strict R RR sti (st', trigger (Take X') >>= k')):
-    exists st X k,
-    sti = (st, trigger (Take X) >>= k) /\
-    forall x, exists x', sim_strict R RR (st, k x) (st', k' x').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0 H2; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    replace k' with k'0; cycle 1.
-    { depdes H0. extensionality v. eapply equal_f in x.
-      rewrite !bind_ret_l in x. eauto. }
-    esplits; eauto.
-    i. specialize (K x). des. pclearbot. eauto.
-  Qed.
-
-  Lemma sim_strict_inv_take' R RR st X k sti'
-      (EQV: sim_strict R RR (st, trigger (Take X) >>= k) sti'):
-    exists st' X' k',
-    sti' = (st', trigger (Take X') >>= k') /\
-    forall x, exists x', sim_strict R RR (st, k x) (st', k' x').
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    replace k with k0; cycle 1.
-    { depdes H0. extensionality v. eapply equal_f in x.
-      rewrite !bind_ret_l in x. eauto. }
-    esplits; eauto.
-    i. specialize (K x). des. pclearbot. eauto.
-  Qed.
-  
-  Lemma sim_strict_inv_update R RR sti st' X' (run': Any.t -> Any.t * X') k'
-      (EQV: sim_strict R RR sti (st', trigger (SUpdate run') >>= k')):
-    exists X (run: Any.t -> Any.t * X) st k,
-    sti = (st, trigger (SUpdate run) >>= k) /\
-    sim_strict R RR ((run st).1, k (run st).2) ((run' st').1, k' (run' st').2).
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0 H2; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    replace k' with k'0; cycle 1.
-    { depdes H0. extensionality v. eapply equal_f in x.
-      rewrite !bind_ret_l in x. eauto. }
-    depdes H1. pclearbot. esplits; eauto.
-  Qed.
-
-  Lemma sim_strict_inv_update' R RR st X (run: Any.t -> Any.t * X) k sti'
-      (EQV: sim_strict R RR (st, trigger (SUpdate run) >>= k) sti'):
-    exists X' (run': Any.t -> Any.t * X') st' k',
-    sti' = (st', trigger (SUpdate run') >>= k') /\
-    sim_strict R RR ((run st).1, k (run st).2) ((run' st').1, k' (run' st').2).
-  Proof.
-    punfold EQV. inv EQV; grind; depdes H0; unfold trigger in *; eauto;
-      try (rewrite !bind_vis in x; clarify).
-    replace k with k0; cycle 1.
-    { depdes H0. extensionality v. eapply equal_f in x.
-      rewrite !bind_ret_l in x. eauto. }
-    depdes H1. pclearbot. esplits; eauto.
-  Qed.
-
-  (** **)
-
-  Variant sim_strictC
-      (r: forall S_src S_tgt (RR: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop):
-      forall S_src S_tgt (RR: Any.t -> Any.t -> S_src -> S_tgt -> Prop), bool -> bool -> Σ -> Any.t * itree Es S_src -> Any.t * itree Es S_tgt -> Prop
-    :=
-  | sim_strictC_intro RR p_src p_tgt w sti_src sti_tgt sti_src' sti_tgt'
-      (SIM: r Any.t Any.t RR p_src p_tgt w sti_src' sti_tgt')
-      (EQVSRC: sim_strict Any.t eq sti_src sti_src')
-      (EQVTGT: sim_strict Any.t eq sti_tgt' sti_tgt)
-    : sim_strictC r Any.t Any.t RR p_src p_tgt w sti_src sti_tgt
-  .
-
-  Lemma sim_strictC_mon r1 r2
-    (LEr: r1 <8= r2)
-    :
-    sim_strictC r1 <8= sim_strictC r2.
-  Proof. ii. destruct PR. econs; et. Qed.
-
-  Lemma sim_strictC_compatible: forall wf le fl_src fl_tgt, 
-      compatible8 (@_sim_itree Σ wf le fl_src fl_tgt) sim_strictC.
-  Proof.
-    econs; i; eauto using sim_strictC_mon. depdes PR.
-    move SIM before RR. revert_until SIM.
-    induction SIM; i; subst.
-    - apply sim_strict_inv_ret in EQVSRC. apply sim_strict_inv_ret' in EQVTGT.
-      des. subst. clarify. eauto using _sim_itree.
-    - apply sim_strict_inv_call in EQVSRC. apply sim_strict_inv_call' in EQVTGT.
-      des. subst. clarify. eauto using _sim_itree.
-    - apply sim_strict_inv_syscall in EQVSRC. apply sim_strict_inv_syscall' in EQVTGT.
-      des. subst. eauto using _sim_itree.
-    - apply sim_strict_inv_call in EQVSRC. des. subst.
-      destruct sti_tgt. econs; eauto. eapply IHSIM; eauto.
-      ginit. guclo sim_strict_bindC_spec. econs.
-      + gfinal. right. eapply sim_strict_refl.
-      + i. inv REL. gfinal. right. apply EQVSRC0.
-    - apply sim_strict_inv_call' in EQVTGT. des. subst.
-      destruct sti_src. econs; eauto. eapply IHSIM; eauto.
-      ginit. guclo sim_strict_bindC_spec. econs.
-      + gfinal. right. eapply sim_strict_refl.
-      + i. inv REL. gfinal. right. apply EQVTGT0.
-    - apply sim_strict_inv_tau in EQVSRC. des. subst.
-      destruct sti_tgt. econs; eauto.
-    - apply sim_strict_inv_tau' in EQVTGT. des. subst.
-      destruct sti_src. econs; eauto.
-    - apply sim_strict_inv_choose in EQVSRC. des. subst.
-      specialize (EQVSRC0 x). des. destruct sti_tgt. econs; eauto.
-    - apply sim_strict_inv_choose' in EQVTGT. des. subst.
-      destruct sti_src. econs; eauto. i. specialize (EQVTGT0 x). des; eauto.
-    - apply sim_strict_inv_take in EQVSRC. des. subst.
-      destruct sti_tgt. econs. i. specialize (EQVSRC0 x). des. eauto.
-    - apply sim_strict_inv_take' in EQVTGT. des. subst.
-      specialize (EQVTGT0 x). des. destruct sti_src. econs; eauto.
-    - apply sim_strict_inv_update in EQVSRC. des. subst.
-      destruct sti_tgt. econs; eauto.
-    - apply sim_strict_inv_update' in EQVTGT. des. subst.
-      destruct sti_src. econs; eauto.
-    - destruct sti_src, sti_tgt. econs; eauto. econs; eauto.
-  Qed.
-
-  Lemma sim_strictC_spec: forall wf le fl_src fl_tgt,
-      sim_strictC <9= gupaco8 (@_sim_itree Σ wf le fl_src fl_tgt) (cpn8 (@_sim_itree Σ wf le fl_src fl_tgt)).
-  Proof.
-    intros. gclo. econs; eauto using sim_strictC_compatible.
-    eapply sim_strictC_mon, PR; eauto with paco.
-  Qed.
 
   (** **)
   
-  Lemma case_itrH R (itrH: itree hAGEs R) :
-    (exists v, itrH = Ret v) \/
-    (exists itrH', itrH = tau;; itrH') \/
-    (exists P itrH', itrH = (trigger (Assume P);;; itrH')) \/
-    (exists P itrH', itrH = (trigger (Guarantee P);;; itrH')) \/
-    (exists R (c: callE R) ktrH', itrH = (trigger c >>= ktrH')) \/
-    (exists R (s: sE R) ktrH', itrH = (trigger s >>= ktrH')) \/
-    (exists R (e: eventE R) ktrH', itrH = (trigger e >>= ktrH')).
-  Proof.
-    ides itrH; eauto.
-    right; right.
-    destruct e; [destruct h|destruct e; [|destruct s]].
-    - left. exists P, (k()). unfold trigger. rewrite bind_vis.
-      repeat f_equal. extensionality x. destruct x. rewrite bind_ret_l. eauto.
-    - right; left. exists P, (k()). unfold trigger. rewrite bind_vis.
-      repeat f_equal. extensionality x. destruct x. rewrite bind_ret_l. eauto.
-    - right; right; left. exists X, c, k. unfold trigger. rewrite bind_vis.
-      repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
-    - right; right; right; left. exists X, s, k. unfold trigger. rewrite bind_vis.
-      repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
-    - right; right; right; right. exists X, e, k. unfold trigger. rewrite bind_vis.
-      repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
-  Qed.
-
   Definition hp_reconf_eq cr : relation (Any.t * Σ) :=
     fun '(str,fr) '(str',fr') =>
       <<RELr: Own fr ⊢ #=> Own (fr' ⋅ cr)>> /\      
@@ -1394,6 +1527,19 @@ Section SIM.
     repeat (grind; gstep; econs; i).
     split; eauto. split; eauto.
   Qed.
+
+  Lemma trigger_hAGE_simpl R (P: iProp) (e : hAGE R):
+    (trigger (e|)%sum : itree hAGEs R) = trigger e.
+  Proof. reflexivity. Qed.
+
+  Lemma trigger_callE_simpl R (P: iProp) (e : callE R):
+    (trigger (|e|)%sum : itree hAGEs R) = trigger e.
+  Proof. reflexivity. Qed.
+
+  Lemma trigger_sE_simpl R (P: iProp) (e : sE R):
+    (trigger (|e|)%sum : itree hAGEs R) = trigger e.
+  Proof. reflexivity. Qed.
+
   
   Lemma interp_hp_reconf
     R itrH str str' (fr fr' cr: Σ)
@@ -1405,11 +1551,42 @@ Section SIM.
   Proof.
     revert_until I. ginit. gcofix CIH; i.
     assert (CASE := case_itrH _ itrH). des; subst.
-    - rewrite !interp_hp_ret.
-      gstep. econs. rr. esplits; eauto.
-    - rewrite-> !interp_hp_tau.
-      grind; gstep; econs; i. eauto 10 with paco.
-    - rewrite-> !interp_hp_bind, !interp_hp_Assume.
+    { rewrite !interp_hp_ret.
+      gstep. econs. rr. esplits; eauto. }
+    { rewrite-> !interp_hp_tau.
+      grind; gstep; econs; i. eauto 10 with paco. }
+
+    destruct e; [destruct h|destruct e; [destruct c|destruct s]].
+      
+    - rewrite-> !interp_hp_bind.
+
+
+      
+      rewrite interp_hp_Assume.
+      
+
+      Search (Assume _).
+      
+Set Printing All.      
+
+  @eq (itree (@hAGE Σ) unit)
+    (@ITree.trigger (@hAGE Σ) unit
+       (@subevent (@hAGE Σ) (@hAGE Σ)
+          (@ReSum_id (forall _ : Type, Type) IFun Id_IFun (@hAGE Σ)) unit
+          (@Assume Σ P)))
+    (@ITree.trigger (@hAGE Σ) unit
+       (@subevent (@hAGE Σ) (@hAGE Σ)
+          (@ReSum_id (forall _ : Type, Type) IFun Id_IFun (@hAGE Σ)) unit
+          (@Assume Σ P)))
+    (@ITree.trigger (@hAGEs Σ) unit
+      (@subevent (@hAGEs Σ) (@hAGEs Σ)
+          (@ReSum_id (forall _ : Type, Type) IFun Id_IFun (@hAGEs Σ)) unit 
+          (@inl1 (@hAGE Σ) Es unit (@Assume Σ P))))
+      
+      assert(trigger (Assume P) = trigger (Assume P)).
+      { 
+      rewrite interp_hp_Assume.
+      
       unfold handle_Assume, assume, mget, mput.
       grind; gstep; econs; i. exists x.
       grind; gstep; econs; i.
@@ -1559,9 +1736,8 @@ Section SIM.
   Variant interp_inv: Σ -> Any.t * Any.t -> Prop :=
     | interp_inv_intro
         (ctx mr_src mr_tgt: Σ) st_src st_tgt mr
-        (WF: URA.wf (ctx ⋅ mr_src))
-        (* (MRS: Own (ctx ⋅ mr_src) ⊢ #=> Own (ctx ⋅ mr ⋅ mr_tgt)) *)
-        (MRS: Own mr_src ⊢ #=> Own (mr ⋅ mr_tgt))
+        (WF: URA.wf (mr_src))
+        (MRS: Own mr_src ⊢ #=> Own (ctx ⋅ mr ⋅ mr_tgt))
         (MR: Own mr ⊢ #=> I st_src st_tgt)
       :
       interp_inv ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
@@ -1575,8 +1751,8 @@ Section SIM.
       p_src p_tgt st_src st_tgt itr_src itr_tgt
       (ctx mr_src mr_tgt fr_src fr_tgt fmr: Σ)
       (SIM: hpsim_body p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
-      (WF: URA.wf (ctx ⋅ fr_src ⋅ mr_src))
-      (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (fmr ⋅ fr_tgt ⋅ mr_tgt)),
+      (WF: URA.wf (fr_src ⋅ mr_src))
+      (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)),
     @sim_itree Σ interp_inv (fun _ _ => True) fl_src0 fl_tgt0 p_src p_tgt ctx
       (Any.pair st_src mr_src↑, interp_hp_body itr_src fr_src)
       (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt fr_tgt).
@@ -2327,7 +2503,7 @@ Admitted.
     - gstep. econs. gfinal. left. eapply CIH; et. 
   Admitted.
 
-
+End HPSIM.
 
 
 
