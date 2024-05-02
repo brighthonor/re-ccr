@@ -329,6 +329,56 @@ Section CURRENT.
     eapply GRA.embed_wf; et.
     eapply URA.updatable_wf; et. etrans; et. eapply URA.extends_updatable. exists ctx; r_solve.
   Qed.
+
+  Lemma current_iProp_sepconj P Q r 
+      (SAT: current_iProp r (P ** Q))
+    :
+      exists rp rq, URA.updatable r (rp ⋅ rq) /\ current_iProp rp P /\ current_iProp rq Q
+  .
+  Proof.
+    destruct SAT. rr in IPROP. uipropall. des. clarify.
+    hexploit UPD. i. eapply URA.updatable_wf in H; et. des.
+    esplits; et; econs; et; r_solve.
+    - eapply URA.wf_mon in H. et.
+    - eapply URA.wf_extends in H; et. econs. instantiate (1:= a). r_solve.
+  Qed.
+
+  Lemma current_iProp_sepconj' P Q r 
+      (SAT: current_iProp r (P ** Q))
+    :
+      exists rp rq, URA.updatable r (rp ⋅ rq) /\ P rp /\ Q rq
+  .
+  Proof.
+    destruct SAT. rr in IPROP. uipropall. des. clarify.
+    hexploit UPD. i. eapply URA.updatable_wf in H; et. 
+  Qed.
+
+  Lemma current_iProp_sepconj_r P Q r 
+      (SAT: current_iProp r (P ** Q))
+    :
+      exists rp rq, URA.updatable r (rp ⋅ rq) /\ P rp /\ current_iProp rq Q
+  .
+  Proof.
+    destruct SAT. rr in IPROP. uipropall. des. clarify.
+    hexploit UPD. i. eapply URA.updatable_wf in H; et. 
+    esplits; et; econs; et; r_solve.
+    des. eapply URA.wf_extends; et. econs. instantiate (1:= a). r_solve.
+  Qed.
+
+  Lemma current_iProp_conj P Q x y
+      (IP: current_iProp x P)
+      (IQ: current_iProp y Q)
+      (WF: URA.wf (x ⋅ y))
+  :
+      current_iProp (x ⋅ y) (P ** Q)
+  .
+  Proof. 
+    inv IP. inv IQ.
+    econs; et.
+    { uipropall. esplits; et. }
+    eapply URA.updatable_add; et.
+  Qed.
+
 End CURRENT.
 
 
@@ -575,6 +625,16 @@ Section TACTICS.
       iIntros "[H0 [H1 _]]". iSplitL "H1"; iFrame. }
     ss. rewrite FIND0. rewrite FIND1. ss.
   Qed.
+
+  Lemma current_iPropL_convert fmr P
+        (CUR: current_iProp fmr P)
+    :
+      current_iPropL fmr [("H", P)].
+  Proof.
+    unfold current_iPropL. ss. unfold from_iPropL.
+    eapply current_iProp_entail; eauto.
+  Qed.
+
 End TACTICS.
 Arguments current_iPropL: simpl never.
 
@@ -1238,3 +1298,60 @@ Ltac iSplits :=
          | _ => iSplit
          end
 .
+
+
+Section IMOD.
+
+
+  Lemma bind_ret_l_eta A {E R} (k: A -> itree E R):
+    (λ x : A, x0 <- Ret x;; k x0) = k.
+  Proof. extensionality x. grind. Qed.
+
+  Lemma imod_trans `{Σ: GRA.t} (P Q R: iProp) :
+    (P ⊢ #=> Q) -> (Q ⊢ #=> R) -> (P ⊢ #=> R).
+  Proof.
+    i. iIntros "H". iPoseProof (H with "H") as "H". iMod "H".
+    iPoseProof (H0 with "H") as "H". eauto.
+  Qed.
+
+  Lemma imod_elim_trueL `{Σ: GRA.t} P Q :
+    (P ⊢ #=> Q) -> (P ⊢ #=> (True ** Q)).
+  Proof.
+    i. iIntros "H". iSplitR; eauto. iStopProof. eauto.
+  Qed.  
+
+  Lemma imod_intro_trueL `{Σ: GRA.t} P Q :
+    (P ⊢ #=> (True ** Q)) -> (P ⊢ #=> Q).
+  Proof.
+    i. iIntros "H". iPoseProof (H with "H") as "H".
+    iMod "H". iDestruct "H" as "[X Y]". eauto.
+  Qed.  
+
+  Lemma imod_elim_trueR `{Σ: GRA.t} P Q :
+    (P ⊢ #=> Q) -> (P ⊢ #=> (Q ** True)).
+  Proof.
+    i. iIntros "H". iSplitL; eauto. iStopProof. eauto.
+  Qed.  
+
+  Lemma imod_intro_trueR `{Σ: GRA.t} P Q :
+    (P ⊢ #=> (Q ** True)) -> (P ⊢ #=> Q).
+  Proof.
+    i. iIntros "H". iPoseProof (H with "H") as "H".
+    iMod "H". iDestruct "H" as "[X Y]". eauto.
+  Qed.  
+End IMOD.
+
+Create HintDb imodL.
+Hint Resolve imod_trans imod_elim_trueL: imodL.
+
+
+Ltac imodIntroL :=
+  i; repeat match goal with [H: (_ ⊢ #=> (True ** _)) |- _ ] => apply imod_intro_trueL in H end; eauto with imodL.
+  
+Ltac grind_ret := try rewrite !bind_ret_l_eta in *; subst.
+
+Ltac itree_clarify H :=
+  revert H; grind; try unfold trigger in H; try rewrite !bind_vis in H; try depdes H; grind_ret. 
+
+
+
