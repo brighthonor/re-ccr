@@ -1566,12 +1566,17 @@ Section SIM.
   Lemma own_mod (r: Σ) P (OWN: Own r ⊢ P): Own r ⊢ #=> P.
   Proof. iIntros "H". iModIntro. iPoseProof (OWN with "H") as "H"; et. Qed.
 
+  Lemma own_pure (P: Prop) (fmr: Σ) (WF: URA.wf fmr) (OWN: Own fmr ⊢ ⌜P⌝) : P.
+  Proof.
+    uipropall. hexploit OWN; [et|refl|].
+    i. rr in H. uipropall.
+  Qed.
 
   Variant interp_inv: Σ -> Any.t * Any.t -> Prop :=
     | interp_inv_intro
         (ctx mr_src mr_tgt: Σ) st_src st_tgt mr
-        (WF: URA.wf (ctx ⋅ mr_src))
-        (MRS: Own mr_src ⊢ #=> Own (mr ⋅ mr_tgt))
+        (WF: URA.wf mr_src)
+        (MRS: Own mr_src ⊢ #=> Own (ctx ⋅ mr ⋅ mr_tgt))
         (MR: Own mr ⊢ #=> I st_src st_tgt)
       :
       interp_inv ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
@@ -1585,8 +1590,8 @@ Section SIM.
       p_src p_tgt st_src st_tgt itr_src itr_tgt
       (ctx mr_src mr_tgt fr_src fr_tgt fmr: Σ)
       (SIM: hpsim_body p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
-      (WF: URA.wf (ctx ⋅ fr_src ⋅ mr_src))
-      (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (fmr ⋅ fr_tgt ⋅ mr_tgt)),
+      (WF: URA.wf (fr_src ⋅ mr_src))
+      (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)),
     @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 p_src p_tgt ctx
       (Any.pair st_src mr_src↑, interp_hp_body itr_src fr_src)
       (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt fr_tgt).
@@ -1597,36 +1602,44 @@ Section SIM.
     move SIM before FLT. revert_until SIM.
     punfold SIM. induction SIM; i; clarify.
     - unfold interp_hp_body, hp_fun_tail, handle_Guarantee, guarantee, mget, mput.
-      steps. force_l. instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)). steps.
+      steps. force_l. instantiate (1 := (c0, c1, ctx ⋅ fmr ⋅ c)). steps.
       force_l.
-      { 
-        rewrite FMR. 
-        iIntros "H". iMod "H".
-        rewrite <- URA.add_assoc. 
-        iDestruct "H" as "[H H0]".
-        iPoseProof (x with "H0") as "H0".
-        iMod "H0".
-        iModIntro. r_solve.
-        iDestruct "H0" as "[H0 H1]".
-        iSplitR "H1"; et.
-        iCombine "H0 H" as "H". et.
+      {
+        eapply own_trans; et. rewrite <- URA.add_assoc.
+        replace (c0 ⋅ c1 ⋅ (ctx ⋅ fmr ⋅ c)) with (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)); [|r_solve].
+        eapply own_ctx; et.  
       } 
-      steps. force_l. 
-      { iIntros "H". et. } 
+      steps. force_l; et. 
       steps. econs.
-      (* Own fmr ⊢ #=> v_src = v_ret? *)
-      admit.
+      unfold hpsim_end in RET.
+      esplits; et.
+      { 
+        econs; et.
+        {
+          eapply own_wf in FMR; et. rewrite <- URA.add_assoc in FMR. 
+          eapply own_ctx in x. eapply own_wf in x; et.
+          replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (ctx ⋅ fmr ⋅ c ⋅ (c0 ⋅ c1)) in x; r_solve.
+          eapply URA.wf_mon; et.
+        }
+        { iIntros "H". iPoseProof (RET with "H") as "H". iMod "H". iDestruct "H" as "[H H0]". et. }
+      }
+      {
+        eapply own_wf in FMR; et. do 2 eapply URA.wf_mon in FMR. eapply URA.wf_split in FMR. des. 
+        eapply iProp_sepconj in RET. des.
+        eapply own_wf in RET; et. eapply URA.wf_split in RET. des.
+        eapply own_pure in RET1; et.
+      }
     - unfold interp_hp_body. hexploit INV. i.
       eapply iProp_sepconj in H0; et. des. rename rq into fr. rename rp into mr.
       steps. unfold handle_Guarantee, guarantee, mget, mput. steps_safe.
-      force_l. instantiate (1:= (c0, fr ⋅ c1, mr ⋅ c)). steps_safe.
+      force_l. instantiate (1:= (c0, ε, ctx ⋅ fr ⋅ c1 ⋅ mr ⋅ c)). steps_safe.
       rename c1 into frt. rename c into mrt.
       force_l.
       { 
-        replace (c0 ⋅ (fr ⋅ frt) ⋅ (mr ⋅ mrt)) with ((mr ⋅ fr) ⋅ (c0 ⋅ frt ⋅ mrt)); [|r_solve].
-        eapply own_trans; et. rewrite <- (URA.add_assoc fmr fr_tgt mr_tgt).
-        iIntros "[H0 X]". iSplitL "H0".
-        { iPoseProof (H0 with "H0") as "H"; et. }
+        replace (c0 ⋅ ε ⋅ (ctx ⋅ fr ⋅ frt ⋅ mr ⋅ mrt)) with (ctx ⋅ (mr ⋅ fr) ⋅ (c0 ⋅ frt ⋅ mrt)); [|r_solve].
+        eapply own_trans; et. rewrite <- (URA.add_assoc (ctx ⋅ fmr) fr_tgt mr_tgt).
+        iIntros "[[H H0] X]". iSplitL "H H0".
+        { iSplitL "H"; et. iPoseProof (H0 with "H0") as "H"; et. }
         { iPoseProof (x with "X") as "H"; et. }
       }
       steps_safe. 
@@ -1634,19 +1647,19 @@ Section SIM.
       steps_safe. eapply safe_sim_sim; econs. esplits; i.
       { 
         instantiate (1:= ctx ⋅ fr ⋅ frt). econs; [ |et|eapply own_mod; et].
-        eapply own_ctx in FMR. rewrite URA.add_assoc in FMR. eapply own_wf in FMR; et.
-        rewrite <- URA.add_assoc in FMR. rewrite URA.add_assoc in FMR. 
-        eapply own_ctx in x. eapply own_wf in x; et.
+        eapply own_wf in FMR; et. 
+        eapply own_ctx in x. rewrite <- URA.add_assoc in FMR. eapply own_wf in x; et.
         replace (ctx ⋅ fmr ⋅ (c0 ⋅ frt ⋅ mrt)) with (c0 ⋅ ctx ⋅ frt ⋅ mrt ⋅ fmr) in x; r_solve.
         eapply own_ctx in H0. eapply own_wf in H0; et.
         rewrite <- !URA.add_assoc in H0. rewrite URA.add_comm in H0.
         eapply URA.wf_mon in H0.
         replace (ctx ⋅ (frt ⋅ (mrt ⋅ (mr ⋅ fr)))) with (ctx ⋅ fr ⋅ frt ⋅ mr ⋅ mrt) in H0; r_solve; et.          
-    }
+      }
       steps.
       inv WF0. eapply H with (fmr0 := fr ⋅ mr0); [| |et|et|r_solve; et|].
-      { eapply own_ctx in MRS. eapply own_wf in MRS; et.
-        replace (ctx ⋅ fr ⋅ frt ⋅ (mr0 ⋅ mr_tgt0)) with (fr ⋅ mr0 ⋅ (ctx ⋅ frt ⋅ mr_tgt0)) in MRS; r_solve.
+      {  
+        eapply own_wf in MRS; et.
+        replace (ctx ⋅ fr ⋅ frt ⋅ mr0 ⋅ mr_tgt0) with (fr ⋅ mr0 ⋅ (ctx ⋅ frt ⋅ mr_tgt0)) in MRS; r_solve.
         eapply URA.wf_mon; et.
       }
       {
@@ -1654,7 +1667,7 @@ Section SIM.
         iPoseProof (H2 with "H") as "FR". iPoseProof (MR with "H0") as "INV". iMod "INV".  
         iFrame. et.
       }
-      { eapply own_ctx in MRS. replace (fr ⋅ mr0 ⋅ frt ⋅ mr_tgt0) with (fr ⋅ frt ⋅ (mr0 ⋅ mr_tgt0)); et. r_solve. }
+      { r_solve. replace (ctx ⋅ fr ⋅ mr0 ⋅ frt ⋅ mr_tgt0) with (ctx ⋅ fr ⋅ frt ⋅ mr0 ⋅ mr_tgt0); et. r_solve. }
     - unfold interp_hp_body. steps. eapply H; et.
     - exploit IHSIM; eauto. i.
       rewrite-> interp_hp_body_bind, interp_hp_call.
@@ -1690,35 +1703,37 @@ Section SIM.
       steps. eapply H with (fmr0 := x ⋅ fmr); et.
       { 
         eapply own_ctx with (ctx := x) in FMR0. revert FMR0; r_solve; i.
-        eapply own_wf in FMR0; et. do 2 eapply URA.wf_mon. et.
+        eapply own_wf in FMR0; et. replace (x ⋅ ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (x ⋅ fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) in FMR0; r_solve.
+        eapply URA.wf_mon. et.
       }
       { 
         iIntros "[H H0]".
         iPoseProof (_ASSUME0 with "H") as "H". iPoseProof (CUR with "H0") as "H0". iMod "H0".
         iFrame; et.
       }  
-      { (* Can't prove WF with increased fmr *) admit. }
-      { eapply own_ctx in FMR0. rewrite !URA.add_assoc in FMR0. et. }
-
+      {
+        eapply own_ctx with (ctx := x) in FMR0; et. rewrite URA.add_assoc in FMR0.
+        replace (x ⋅ (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ x ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) in FMR0; r_solve.
+        et.
+      }
     - unfold interp_hp_body. steps.
       rewrite interp_hp_Assume.
       hexploit CUR. i. eapply iProp_sepconj in H0. des. rename rq into fmr0.
       unfold handle_Assume, assume, mget, mput. 
       steps. force_r. instantiate (1:= rp).
-      assert (WF1: URA.wf (fr_src ⋅ mr_src)).
-      { rewrite <- URA.add_assoc in WF. rewrite URA.add_comm in WF. eapply URA.wf_mon in WF. et. }
       steps. force_r.
       {
         eapply own_wf in FMR0; et.
-        rewrite <- URA.add_assoc in FMR0. rewrite URA.add_comm in FMR0.
+        rewrite <- URA.add_assoc in FMR0. rewrite URA.add_comm in FMR0. rewrite URA.add_assoc in FMR0.
         eapply own_ctx in H0. eapply own_wf in H0; et.
-        rewrite URA.add_assoc in H0. eapply URA.wf_mon in H0.
-        rewrite <- URA.add_assoc. rewrite URA.add_comm. et.
+        replace (fr_tgt ⋅ mr_tgt ⋅ ctx ⋅ (rp ⋅ fmr0)) with (rp ⋅ fr_tgt ⋅ mr_tgt ⋅ (ctx ⋅ fmr0)) in H0; r_solve.
+        eapply URA.wf_mon; et.
       }
       steps. force_r; et.
       steps. eapply H with (fmr0 := fmr0); et.
       {
         eapply own_wf in FMR0; et. rewrite <- URA.add_assoc in FMR0. eapply URA.wf_mon in FMR0.
+        eapply URA.wf_split in FMR0. des.
         eapply own_wf in H0; et. eapply URA.wf_mon. rewrite URA.add_comm. et.
       }
       { eapply own_mod; et. }
@@ -1727,44 +1742,48 @@ Section SIM.
         iIntros "H". iPoseProof (FMR0 with "H") as "H". iMod "H".
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
-        iPoseProof (H0 with "H") as "H"; et.
+        rewrite <- URA.add_assoc.
+        iDestruct "H" as "[H H0]". iSplitL "H"; et.
+        iPoseProof (H0 with "H0") as "H"; et. iMod "H".
+        iDestruct "H" as "[H H0]". iSplitL "H0"; et.
       }
     - unfold interp_hp_body. steps.
       rewrite interp_hp_Guarantee.
       hexploit CUR. i. eapply iProp_sepconj in H0. des. rename rq into fmr0.
       unfold handle_Guarantee, guarantee, mget, mput.
-      steps. force_l. instantiate (1:= (rp, fmr0 ⋅ fr_tgt, mr_tgt)).
+      steps. force_l. instantiate (1:= (rp, fmr0 ⋅ fr_tgt, ctx ⋅ mr_tgt)).
       steps. force_l. 
       {
-        replace (fmr0 ⋅ (rp ⋅ fr_tgt) ⋅ mr_tgt) with (rp ⋅ fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve. 
+        replace (rp ⋅ (fmr0 ⋅ fr_tgt) ⋅ (ctx ⋅ mr_tgt)) with (ctx ⋅ rp ⋅ fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve. 
         iIntros "H". iPoseProof (FMR0 with "H") as "H". iMod "H".
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
-        iPoseProof (H0 with "H") as "H"; et.
+        rewrite <- URA.add_assoc. 
+        iDestruct "H" as "[H H0]". iSplitL "H"; et.
+        iPoseProof (H0 with "H0") as "H"; et.
       }
       steps. force_l; et.
       steps. eapply H with (fmr0 := fmr0); et.
       {
-        rewrite <- URA.add_assoc in WF. rewrite URA.add_comm in WF. eapply URA.wf_mon in WF. et.
-        eapply own_wf in FMR0; et. rewrite <- URA.add_assoc in FMR0. eapply URA.wf_mon in FMR0.
-        eapply own_wf in H0; et. eapply URA.wf_mon. rewrite URA.add_comm. et.
+        eapply own_wf in FMR0; et. do 2 eapply URA.wf_mon in FMR0. eapply URA.wf_split in FMR0. des.
+        eapply own_wf in H0; et. eapply URA.wf_split in H0. des. et.
       }
       { eapply own_mod; et. }
       {
-        rewrite <- URA.add_assoc in WF. eapply own_ctx in FMR0. eapply own_wf in FMR0; et.
-        replace (ctx ⋅ (fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ fmr) in FMR0; r_solve.
+        eapply own_wf in FMR0; et.
+        replace (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (fr_tgt ⋅ mr_tgt ⋅ ctx ⋅ fmr) in FMR0; r_solve.
         eapply own_ctx in H0. eapply own_wf in H0; et.
-        replace (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ (rp ⋅ fmr0)) with (ctx ⋅ fmr0 ⋅ fr_tgt ⋅ mr_tgt ⋅ rp) in H0; r_solve.
+        replace (fr_tgt ⋅ mr_tgt ⋅ ctx ⋅ (rp ⋅ fmr0)) with (fmr0 ⋅ fr_tgt ⋅ ctx ⋅ mr_tgt ⋅ rp) in H0; r_solve.
         eapply URA.wf_mon; et.
       }
+      { replace (fmr0 ⋅ fr_tgt ⋅ (ctx ⋅ mr_tgt)) with (ctx ⋅ fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve; et. }
     - unfold interp_hp_body. steps.
       rewrite interp_hp_Guarantee. unfold handle_Guarantee, guarantee, mget, mput.
       steps. eapply H with (fmr0 := c0 ⋅ fmr); et.
       {
-        rewrite <- URA.add_assoc in WF. rewrite URA.add_comm in WF. eapply URA.wf_mon in WF.
         eapply own_wf in FMR0; et. rewrite <- URA.add_assoc in FMR0.
         eapply own_ctx in x. eapply own_wf in x; et.
-        replace (fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (c0 ⋅ fmr ⋅ (c1 ⋅ c)) in x; r_solve.
+        replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (c0 ⋅ fmr ⋅ (ctx ⋅ c1 ⋅ c)) in x; r_solve.
         eapply URA.wf_mon; et. 
       }
       {
@@ -1773,685 +1792,10 @@ Section SIM.
       }
       {
         eapply own_trans; et.
-        replace (c0 ⋅ fmr ⋅ c1 ⋅ c) with (fmr ⋅ (c0 ⋅ c1 ⋅ c)); [|r_solve].
+        replace (ctx ⋅ (c0 ⋅ fmr) ⋅ c1 ⋅ c) with (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)); [|r_solve].
         rewrite <- URA.add_assoc. eapply own_ctx. et.
       }
     - pclearbot. gstep. econs. gfinal. left. eapply CIH; et.   
   Qed.
-
-
-    
-
-
-
-
-
-
-
-
-      
-
-      
-
-      
-      
-      unfold interp_hp_fun.
-      
-      
-      rewrite !bind_bind. 
-    unfold interp_hp_fun.
-    gclo. eapply compatible'8_companion; eauto with paco.
-    { eapply compat8_compatible'. apply inlineSrcC_compatible. }	
-    econs. { grind. }
-    specialize (IHSIM st_src0 st_tgt0 ((f varg) >>= k_src) itr_tgt ctx (fr_src ⋅ mr_src) mr_tgt ε fr_tgt).
-    rewrite interp_hp_fun_bind in IHSIM.
-    rewrite bind_bind in IHSIM.
-    (* unfold interp_hp_fun in IHSIM. *)
-    eapply IHSIM; r_solve; et.
-  }
-
-
-
-  - unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
-    steps.
-    force_l. instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)). steps.
-    unfold guarantee. force_l.
-    { 
-      rewrite FMR. 
-      iIntros "H". iMod "H".
-      rewrite <- URA.add_assoc. 
-      iDestruct "H" as "[H H0]".
-      iPoseProof (x with "H0") as "H0".
-      iMod "H0".
-      iModIntro. r_solve.
-      iDestruct "H0" as "[H0 H1]".
-      iSplitR "H1"; et.
-      iCombine "H0 H" as "H". et.
-    } 
-    steps. force_l. 
-    { iIntros "H". et. } 
-    (* rr. uipropall. }  *)
-    steps. econs. esplits; et. econs. esplits; et.
-    instantiate (1:= ctx).
-    {
-      eapply own_ctx in FMR, x. rewrite URA.add_assoc in FMR. eapply own_wf in FMR; et.
-      rewrite <- URA.add_assoc in FMR. rewrite URA.add_assoc in FMR.
-      eapply own_wf in x; et.
-      replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (ctx ⋅ fmr ⋅ c ⋅ (c0 ⋅ c1)) in x; r_solve.
-      eapply URA.wf_mon; et.
-    }
-
-  - unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
-    hexploit INV. i.
-    eapply iProp_sepconj in H; et. 
-    (* 2: { admit. } *)
-    des.
-    rename rq into fr. rename rp into mr.
-    steps.
-    unfold handle_Guarantee, mget, mput. steps_safe.
-    force_l.
-    instantiate (1:= (c0, ε, fr ⋅ c1 ⋅ mr ⋅ c)).
-    steps_safe.
-    unfold guarantee. force_l.
-    { admit. }
-      (* iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H".
-      rewrite <- URA.add_assoc.
-      iDestruct "H" as "[H H0]". 
-      iPoseProof (H with "H") as "H".
-      replace (c0 ⋅ (fr ⋅ c1) ⋅ (mr ⋅ c)) with (mr ⋅ fr ⋅ (c0 ⋅ c1 ⋅ c)). 2: { r_solve. }
-      iPoseProof (_GUARANTEE with "H0") as "H0".
-      iSplitL "H"; et. *)
-    steps_safe. force_l.
-    { et. }
-    steps_safe. eapply safe_sim_sim; econs; esplits; i.
-    { 
-      econs. esplits; et.
-      { instantiate (1:= ctx). admit. }
-      { admit. }
-      (* { iIntros "H". iPoseProof (H0 with "H") as "H". et. } *)
-    }
-    inv WF0. des.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee in K.
-    steps.
-    hexploit K; swap 1 2. 
-    { 
-      instantiate (1:= st_tgt). instantiate (1:= st_src).
-      iIntros "[H1 H2]".
-      iPoseProof (H1 with "H1") as "H1". 
-      iPoseProof (MR with "H2") as "H2".
-      iSplitL "H2"; et.
-    }
-    { admit. }
-    i. des.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    eapply IH; et.
-    {
-      
-    }
-  - steps. hexploit K; et. i. des.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    eapply IH; et.
-  - admit. (* need to clarify the relation between fl_src ~ fl_src0 *)
-  - admit. 
-  - steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-  - steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-  - steps. force_l. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-  - steps. hexploit K; et. i. des.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    eapply IH; et.
-  - steps. hexploit K; et. i. des.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    eapply IH; et.
-  - steps. force_r. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-  - steps. rewrite ! Any.pair_split. rewrite RUN. s.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    exploit IHSIM; et.
-  - steps. rewrite ! Any.pair_split. rewrite RUN. s.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    exploit IHSIM; et.
-  - steps. rewrite interp_hp_Assume. unfold handle_Assume, mget, mput. steps.  
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    hexploit K; et.
-    { 
-      instantiate (1:= x ⋅ fmr).
-      iIntros "[H H0]". 
-      iPoseProof (_ASSUME0 with "H") as "H".
-      iPoseProof (CUR with "H0") as "H0".
-      iMod "H0". iModIntro. iFrame. 
-    }
-    i. des. eapply IH; et.
-    rewrite <- ! URA.add_assoc.
-    {
-      iIntros "[H H0]".
-      iSplitL "H"; et.
-      iPoseProof (FMR0 with "H0") as "H".
-      rewrite URA.add_assoc. et.
-    }
-  -	steps. rewrite interp_hp_Assume. 
-    hexploit CUR. i.
-    apply iProp_sepconj in H. 2: { admit. }
-    des. rename rq into fmr0.
-    unfold handle_Assume, mget, mput, assume. steps.
-    force_r.
-    instantiate (1:= rp).
-    steps. force_r.
-    { 
-      clear -H FMR0.
-      assert (URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt)). { admit. }
-      assert (URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ε)). { admit. }
-      eapply own_ctx with (ctx := (fr_tgt ⋅ mr_tgt)) in H.
-      uipropall.
-      eapply H in H0. 2: { admit. }
-      des.
-      eapply URA.wf_extends in H0. admit.
-      specialize (H2 ε H1).
-      admit.
-    }
-
-    steps. force_r; et. 
-    steps.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    hexploit K; et. 
-    {
-      iIntros "H". iPoseProof (H1 with "H") as "H". et.
-    }
-    i. des. 
-    eapply IH; et.
-    {
-      iIntros "H". 
-      iPoseProof (FMR0 with "H") as "H". iMod "H". rewrite <- ! URA.add_assoc.
-      iDestruct "H" as "[H H0]".
-      replace (fmr0 ⋅ (rp ⋅ (fr_tgt ⋅ mr_tgt))) with ((rp ⋅ fmr0) ⋅ (fr_tgt ⋅ mr_tgt)). 2: { r_solve. }
-      iPoseProof (H with "H") as "H". iMod "H".
-      iSplitL "H"; et.
-    } 
-  - steps. rewrite interp_hp_Guarantee.
-    unfold handle_Guarantee, mget, mput, guarantee. steps.
-    hexploit CUR. i.
-    apply iProp_sepconj in H.  2: { admit. }
-    des. rename rq into fmr0.
-    force_l.
-    instantiate (1:= (rp, fr_tgt, fmr0 ⋅ mr_tgt)).
-    steps. force_l.
-    {
-      iIntros "H". 
-      iPoseProof (FMR0 with "H") as "H". iMod "H".
-      rewrite <- URA.add_assoc.
-      iDestruct "H" as "[H H0]". 
-      iPoseProof (H with "H") as "H". iMod "H".
-      replace (rp ⋅ fr_tgt ⋅ (fmr0 ⋅ mr_tgt)) with (rp ⋅ fmr0 ⋅ (fr_tgt ⋅ mr_tgt)). 2: { r_solve. }
-      iSplitL "H"; et.
-    }
-    steps. force_l; et.
-    steps.
-    hexploit K; et.
-    {
-      iIntros "H". iPoseProof (H1 with "H") as "H". et.	
-    }
-    i. des.
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-    eapply IH; et.
-    {
-      replace (fr_tgt ⋅ (fmr0 ⋅ mr_tgt)) with (fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve.
-      et.
-    }
-  - steps. rewrite interp_hp_Guarantee. unfold handle_Guarantee, mget, mput, guarantee. steps. 
-    unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.			
-    hexploit K; et.
-    { 
-      instantiate (1:= (c0 ⋅ fmr)).
-      iIntros "[H H0]".
-      iPoseProof (x0 with "H") as "H".
-      iPoseProof (CUR with "H0") as "H0".
-      iSplitL "H"; et. 	
-    } 
-    i. des.
-    eapply IH; et.
-    {
-      iIntros "H".
-      iPoseProof (FMR0 with "H") as "H". iMod "H".
-      rewrite <- URA.add_assoc. 
-      iDestruct "H" as "[H H0]".
-      iPoseProof (x with "H0") as "H0". iMod "H0".
-      replace (c0 ⋅ fmr ⋅ c1 ⋅ c) with (fmr ⋅ (c0 ⋅ c1 ⋅ c)). 2: { r_solve. }
-      iSplitL "H"; et.
-    }
-  - gstep. econs. gfinal. left. eapply CIH; et. 
-  
-    (* (fr_src ⋅ mr_src) -> fmr in 'SIM' *)
-Admitted.
-
-
-
-
-
-  Inductive hpsim_adeq_rel : Σ -> (itree hAGEs Any.t)-> (itree Es (Σ * Any.t)) -> Σ -> (itree hAGEs Any.t)-> (itree Es (Σ * Any.t)) -> Prop :=
-  | hpsim_adeq_base (fr fr': Σ) st st' 
-    : hpsim_adeq_rel fr (Ret st) (@interp_hp_fun Σ Any.t (Ret st) fr)
-                     fr' (Ret st') (@interp_hp_fun Σ Any.t (Ret st') fr')
-
-  | hpsim_adeq_seq itrH0 itrH1 itrL0 itrL1 itrH0' itrH1' itrL0' itrL1' (fr fr': Σ)
-      (ITR0: itrL0 = @interp_hp_fun Σ Any.t itrH0)
-      (ITR0': itrL0' = @interp_hp_fun Σ Any.t itrH0')
-      (ADEQ: forall st st',
-              hpsim_adeq_rel ε (itrH1 st) (itrL1 st (ε:Σ)) 
-                             ε (itrH1' st') (itrL1' st' (ε:Σ)))
-    : hpsim_adeq_rel fr (st0 <- itrH0;; itrH1 st0) ('(_, st1) <- (itrL0 fr);; (itrL1 st1 ε))
-                     fr' (st0 <- itrH0';; itrH1' st0) ('(_, st1) <- (itrL0' fr');; (itrL1' st1 ε))
-  .
-
-
-  Lemma hpsim_adequacy
-      (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
-      (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
-      (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
-      p_src p_tgt st_src st_tgt itrH_src itrH_tgt itrL_src itrL_tgt
-      (ctx mr_src mr_tgt fr_src fr_tgt fmr: Σ)
-      (SIM: hpsim p_src p_tgt (st_src, itrH_src) (st_tgt, itrH_tgt) fmr)
-      (WF: URA.wf (ctx ⋅ fr_src ⋅ mr_src))
-      (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (fmr ⋅ fr_tgt ⋅ mr_tgt))
-      (REL: hpsim_adeq_rel fr_src itrH_src itrL_src fr_tgt itrH_tgt itrL_tgt)
-    :
-
-      @sim_itree Σ (mk_inv I) eq fl_src0 fl_tgt0 p_src p_tgt ctx 
-      (Any.pair st_src mr_src↑, itrL_src >>= (fun r => Ret (snd r)))
-      (Any.pair st_tgt mr_tgt↑, itrL_tgt >>= (fun r => Ret (snd r))).
-  Proof.
-    revert_until FLT.
-    ginit. gcofix CIH. i.
-    move REL before CIH. revert_until REL. induction REL.
-    { i. punfold SIM. inv SIM; (try rewrite ! bind_trigger in H3); (try rewrite ! bind_trigger in H5); clarify.
-      -	unfold interp_hp_fun, handle_Guarantee, mput, mget, guarantee. 
-        steps. force_l. instantiate (1:= (c0 ⋅ c1, ε, fmr ⋅ c)).
-        steps. force_l.
-        {  
-          rewrite FMR. 
-          iIntros "H". iMod "H".
-          rewrite <- URA.add_assoc. 
-          iDestruct "H" as "[H H0]".
-          iPoseProof (x with "H0") as "H0". iMod "H0". 
-          iModIntro. r_solve.
-          replace (c0 ⋅ c1 ⋅ fmr ⋅ c) with (c0 ⋅ c1 ⋅ c ⋅ fmr); r_solve.
-          iSplitR "H"; et.
-        }
-        steps. force_l; et.
-        steps.
-        econs; esplits; et. econs; esplits; et.
-        {  
-          eapply own_ctx in FMR. rewrite URA.add_assoc in FMR. eapply own_wf in FMR; et.
-          rewrite <- URA.add_assoc in FMR. rewrite URA.add_assoc in FMR.
-          eapply own_ctx, own_wf in x; et.
-          replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (ctx ⋅ fmr ⋅ c ⋅ (c0 ⋅ c1)) in x; r_solve.
-          eapply URA.wf_mon; et.
-        }
-      - pclearbot. punfold SIM0. inv SIM0; (try rewrite ! bind_trigger in H3); (try rewrite ! bind_trigger in H5); clarify.
-        unfold interp_hp_fun, handle_Guarantee, mput, mget, guarantee. steps.
-        force_l. instantiate (1:= (c0 ⋅ c1, ε, fmr ⋅ c)).
-        steps. force_l.
-        {  
-          rewrite FMR. 
-          iIntros "H". iMod "H".
-          rewrite <- URA.add_assoc. 
-          iDestruct "H" as "[H H0]".
-          iPoseProof (x with "H0") as "H0". iMod "H0". 
-          iModIntro. r_solve.
-          replace (c0 ⋅ c1 ⋅ fmr ⋅ c) with (c0 ⋅ c1 ⋅ c ⋅ fmr); r_solve.
-          iSplitR "H"; et.
-        }
-        steps. force_l; et.
-        steps.
-        econs; esplits; et. econs; esplits; et.
-        {  
-          eapply own_ctx in FMR. rewrite URA.add_assoc in FMR. eapply own_wf in FMR; et.
-          rewrite <- URA.add_assoc in FMR. rewrite URA.add_assoc in FMR.
-          eapply own_ctx, own_wf in x; et.
-          replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (ctx ⋅ fmr ⋅ c ⋅ (c0 ⋅ c1)) in x; r_solve.
-          eapply URA.wf_mon; et.
-        }
-    }
-
-    i.
-    remember (st_src, ` st0 : Any.t <- itrH0;; itrH1 st0) as sti_src.
-    remember (st_tgt, ` st0 : Any.t <- itrH0';; itrH1' st0) as sti_tgt.
-    move SIM before CIH. revert_until SIM.
-    induction SIM using hpsim_ind; i. 
-    (* ; clarify; unfold interp_hp_fun, handle_Guarantee, mget, mput. *)
-    - 
-      steps.
-      ides itrH0; ides itrH0'; revert H1 H2; try rewrite bind_vis; grind.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
-      steps. force_l.
-      instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)).
-      steps. force_l.
-      {
-        admit.
-      }
-      steps. force_l; et. steps.
-      specialize (ADEQ r0 r1). depdes ADEQ; cycle 1.
-      {
-        eapply H.
-        { rewrite <- H1. rewrite <- H2. et. }
-        admit. admit.
-      }
-      
-      rewrite <- x1. rewrite <- x.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee.
-      steps. force_l.
-      instantiate (1 := (c3 ⋅ c4, ε, fmr ⋅ c2 )).
-      steps. force_l.
-      {
-        admit.
-      } 
-      steps. force_l; et.
-      steps.
-      econs. esplits; et.
-      {
-        econs. esplits; et.	admit.
-      }
-      rewrite <- H1 in x2.
-      rewrite <- H2 in x0.
-      clarify.
-      
-    - steps. move K at bottom.
-      ides itrH0; ides itrH0'; clarify.
-
-
-
-
-      {
-          
-      }
-        admit. steps. 
-        force_l. steps. admit. steps. eapply H; et.
-
-
-    unfold interp_hp_fun, handle_Guarantee, mget, mput.
-      steps.
-
-      force_l. instantiate (1 := (c0 ⋅ c1, ε, fmr ⋅ c)). steps.
-      unfold guarantee. force_l.
-      { 
-        rewrite FMR. 
-        iIntros "H". iMod "H".
-        rewrite <- URA.add_assoc. 
-        iDestruct "H" as "[H1 H2]".
-        iPoseProof (_GUARANTEE with "H2") as "H2".
-        iMod "H2".
-        iModIntro. r_solve.
-        iDestruct "H2" as "[H3 H4]".
-        iSplitR "H4"; et.
-        iCombine "H3 H1" as "H". et.
-      } 
-      steps. force_l. 
-      { iIntros "H". et. } 
-      steps. econs; esplits; et.
-      + econs. esplits; et.
-        eapply own_ctx with (ctx:= ctx ⋅ fmr) in _GUARANTEE.
-        eapply own_ctx with (ctx:= ctx) in FMR.
-        rewrite <- URA.add_assoc in WF. eapply own_wf in FMR; et.
-        rewrite ! URA.add_assoc in FMR.
-        rewrite URA.add_assoc in _GUARANTEE.
-        eapply own_wf in _GUARANTEE; et.
-        replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (ctx ⋅ (fmr ⋅ c) ⋅ c0 ⋅ c1) in _GUARANTEE. 2: { r_solve. }
-        do 2 eapply URA.wf_mon; et.
-    - hexploit INV. i.
-      eapply iProp_sepconj in H. et.
-      des.
-      rename rq into fr. rename rp into mr.
-      steps.
-      unfold handle_Guarantee, mget, mput. steps_safe.
-      force_l.
-      instantiate (1:= (c0, fr ⋅ c1, mr ⋅ c)).
-      rename c1 into fr_tgt'. rename c into mr_tgt'.
-      steps_safe.
-      unfold guarantee. force_l.
-      { 
-        iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H".
-        rewrite <- URA.add_assoc.
-        iDestruct "H" as "[H H0]". 
-        iPoseProof (H with "H") as "H".
-        replace (c0 ⋅ (fr ⋅ fr_tgt') ⋅ (mr ⋅ mr_tgt')) with (mr ⋅ fr ⋅ (c0 ⋅ fr_tgt' ⋅ mr_tgt')). 2: { r_solve. }
-        iPoseProof (_GUARANTEE with "H0") as "H0".
-        iSplitL "H"; et.
-      }
-      steps_safe. force_l.
-      { et. }
-      steps_safe. eapply safe_sim_sim; econs; i.
-      exists (fr ⋅ ctx). esplits.
-      { 
-        econs. esplits; et.
-        {
-          eapply own_ctx with (ctx:= ctx ⋅ fmr) in _GUARANTEE.
-          eapply own_ctx with (ctx:= ctx) in FMR.
-          rewrite <- URA.add_assoc in WF. eapply own_wf in FMR; et.
-          rewrite ! URA.add_assoc in FMR.
-          rewrite URA.add_assoc in _GUARANTEE.
-          eapply own_wf in _GUARANTEE; et.
-          rewrite URA.add_comm in _GUARANTEE. rewrite URA.add_assoc in _GUARANTEE.
-          eapply own_ctx in H. eapply own_wf in H; et.
-          replace (c0 ⋅ fr_tgt' ⋅ mr_tgt' ⋅ ctx ⋅ (mr ⋅ fr)) with (fr ⋅ ctx ⋅ mr ⋅ mr_tgt' ⋅ (c0 ⋅ fr_tgt')) in H; r_solve.
-          eapply URA.wf_mon; et.
-        } 
-        iIntros "H". iPoseProof (H0 with "H") as "H". et.
-      }
-      i. inv WF0. des.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput, guarantee in K.
-      hexploit K; swap 1 2.
-      { 
-        iIntros "[H1 H2]".
-        iPoseProof (H1 with "H1") as "H1". 
-        iPoseProof (MR with "H2") as "H2".
-        iSplitL "H2"; et.
-      }
-      {
-        eapply own_ctx in MRS. eapply own_wf in MRS; et.
-        replace (fr ⋅ ctx ⋅ (mr0 ⋅ mr_tgt0)) with (fr ⋅ mr0 ⋅ (ctx ⋅ mr_tgt0)) in MRS; r_solve.
-        eapply URA.wf_mon; et.				
-      }
-      i. des.
-      steps. 
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IH; et.
-      { 
-        iIntros "[H H0]".
-        iPoseProof (MRS with "H0") as "H0".
-        replace (fr ⋅ mr0 ⋅ fr_tgt' ⋅ mr_tgt0) with (fr ⋅ fr_tgt' ⋅ (mr0 ⋅ mr_tgt0)). 2: { r_solve. }  
-        iSplitL "H"; et.
-      }
-      {
-        clear IH.
-
-        admit.	
-      }
-    - steps. hexploit K; et. i. des.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IH; et.
-    - steps. unfold handle_Guarantee, mget, mput, guarantee. steps.
-      force_l.
-      instantiate (1:= (ε, ε, fr_src ⋅ mr_src)).
-      steps. force_l. { r_solve. et. }
-      steps. force_l; et. 
-      steps. 
-      { 
-        instantiate (1:= interp_hp_fun f).
-        rewrite alist_find_map. rewrite FUN. et.
-      }
-      unfold interp_hp_fun, interp_hp_fun. steps.
-      do 3 rewrite <- bind_bind in *.
-      (* set (` x : Σ * Any.t <- interp_hp (f varg) ε;; (let '(_, x0) := x in Ret x0)) as itr. *)
-      (* assert () *)
-      set ((` x : Σ * Any.t <- (` x : Any.t <- (` x : Σ * Any.t <- interp_hp (f varg) ε;; (let '(_, x0) := x in Ret x0));; (tau;; Ret (fr_src, x)));;
-      interp_hp (k_src x.2) x.1)) as itr0.
-      set (interp_hp (` x : Any.t <- (f varg);; k_src x) fr_src) as itr1.
-      assert (itr0 = itr1 ). {
-        unfold itr0, itr1. grind. rewrite interp_hp_bind.	
-      admit. }
-      rewrite H. unfold itr1.
-      (* assert (itr_src = interp_hp (` x : Any.t <- (f varg);; ` x : Σ * Any.t <- (k_src x)) fr_src).
-      { unfold itr_src. grind. }
-      rewrite <- interp_hp_bind. *)
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IHSIM; et.
-  
-    - admit. 
-    - steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-    - steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-    - steps. force_l. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-    - steps. hexploit K; et. i. des.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IH; et.
-    - steps. hexploit K; et. i. des.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IH; et.
-    - steps. force_r. steps. unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *. et.
-    - steps. rewrite ! Any.pair_split. rewrite RUN. s.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IHSIM; et.
-    - steps. rewrite ! Any.pair_split. rewrite RUN. s.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IHSIM; et.
-    - steps. rewrite interp_hp_Assume. unfold handle_Assume, mget, mput. steps.  
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      (* hexploit K. *)
-      hexploit (K (x ⋅ fmr)). et.
-      { 
-        eapply own_ctx in FMR0. eapply own_wf in FMR0; cycle 1.
-        { rewrite URA.add_assoc; et.  }
-        { rewrite ! URA.add_assoc in FMR0. do 2 eapply URA.wf_mon; et.  }
-      }
-      et.
-      {
-        iIntros "[H H0]". 
-        iPoseProof (_ASSUME0 with "H") as "H".
-        iPoseProof (CUR with "H0") as "H0".
-        iMod "H0". iModIntro. iFrame. 
-      }
-      i. des. eapply IH; et.
-      {
-        rewrite <- ! URA.add_assoc.
-        iIntros "[H H0]".
-        iSplitL "H"; et.
-        iPoseProof (FMR0 with "H0") as "H".
-        rewrite URA.add_assoc. et.
-      }
-      {
-        clear IH. admit.
-      }
-    -	steps. rewrite interp_hp_Assume. 
-      hexploit CUR. i.
-      apply iProp_sepconj in H.
-      des. rename rq into fmr0.
-      unfold handle_Assume, mget, mput, assume. steps.
-      force_r.
-      instantiate (1:= rp).
-      steps. force_r.
-      { 
-        eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0. eapply own_wf in FMR0; et.
-        replace (ctx ⋅ (fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ fmr) in FMR0; r_solve.
-        eapply own_ctx in H. eapply own_wf in H; et.
-        replace (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ (rp ⋅ fmr0)) with (rp ⋅ fr_tgt ⋅ mr_tgt ⋅ (ctx ⋅ fmr0)) in H; r_solve.
-        eapply URA.wf_mon; et.	
-      }
-      steps. force_r; et. 
-      steps.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      hexploit (K fmr0).
-      {
-        eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0; et. eapply own_wf in FMR0; et.
-        replace (ctx ⋅ (fmr ⋅ fr_tgt ⋅ mr_tgt )) with (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) in FMR0; r_solve.
-        eapply URA.wf_mon in FMR0. eapply own_wf in H; et.
-        rewrite URA.add_comm in H. eapply URA.wf_mon; et.
-      }
-      { 
-        iIntros "H". iPoseProof (H1 with "H") as "H". et.
-      }
-      i. des.
-      eapply IH; et.
-      {
-        clear IH.
-        iIntros "H". iPoseProof (FMR0 with "H") as "H".
-        rewrite <- URA.add_assoc. iMod "H". iDestruct "H" as "[H H0]".
-        r_solve. rewrite <- URA.add_assoc. iSplitL "H"; et.
-        iPoseProof (H with "H") as "H". iMod "H".
-        iDestruct "H" as "[H H0]". iSplitL "H0"; et.  				
-      }
-    - steps. rewrite interp_hp_Guarantee.
-      unfold handle_Guarantee, mget, mput, guarantee. steps.
-      hexploit CUR. i.
-      apply iProp_sepconj in H.
-      des. rename rq into fmr0.
-      force_l.
-      instantiate (1:= (rp, fr_tgt, fmr0 ⋅ mr_tgt)).
-      steps. force_l.
-      {
-        iIntros "H". 
-        iPoseProof (FMR0 with "H") as "H". iMod "H".
-        rewrite <- URA.add_assoc.
-        iDestruct "H" as "[H H0]". 
-        iPoseProof (H with "H") as "H". iMod "H".
-        replace (rp ⋅ fr_tgt ⋅ (fmr0 ⋅ mr_tgt)) with (rp ⋅ fmr0 ⋅ (fr_tgt ⋅ mr_tgt)). 2: { r_solve. }
-        iSplitL "H"; et.
-      }
-      steps. force_l; et.
-      steps.
-      hexploit (K fmr0); et.
-      {
-        eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0. eapply own_wf in FMR0; et.
-        replace (ctx ⋅ (fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ fmr) in FMR0; r_solve.
-        eapply own_ctx, own_wf in H; et.
-        rewrite URA.add_assoc in H.
-        eapply URA.wf_mon. rewrite URA.add_comm. et.
-      }
-      {
-        iIntros "H". iPoseProof (H1 with "H") as "H". et.	
-      }
-      i. des.
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.
-      eapply IH; et.
-      {
-        replace (fr_tgt ⋅ (fmr0 ⋅ mr_tgt)) with (fmr0 ⋅ fr_tgt ⋅ mr_tgt); r_solve.
-        et.
-      }
-      {
-        clear IH. 
-        eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0. eapply own_wf in FMR0; et.
-        replace (ctx ⋅ (fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ fmr) in FMR0; r_solve.
-        eapply own_ctx, own_wf in H; et.
-        replace (ctx ⋅ fr_tgt ⋅ mr_tgt ⋅ (rp ⋅ fmr0)) with (ctx ⋅ fr_tgt ⋅ fmr0 ⋅ mr_tgt ⋅ rp) in H; r_solve.
-        eapply URA.wf_mon; et.
-      }
-    - steps. rewrite interp_hp_Guarantee. unfold handle_Guarantee, mget, mput, guarantee. steps. 
-      unfold interp_hp_fun, handle_Guarantee, mget, mput in *. rewrite <- ! bind_bind in *.			
-      hexploit (K (c0 ⋅ fmr)). 
-      {
-        eapply own_ctx in FMR0. rewrite URA.add_assoc in FMR0. eapply own_wf in FMR0; et.
-        rewrite <- URA.add_assoc in FMR0. rewrite URA.add_assoc in FMR0.
-        eapply own_ctx, own_wf in x; et.
-        replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (c0 ⋅ fmr ⋅ (ctx ⋅ c1 ⋅ c)) in x; r_solve.
-        eapply URA.wf_mon; et.
-      }
-      { 
-        iIntros "[H H0]".
-        iPoseProof (x0 with "H") as "H".
-        iPoseProof (CUR with "H0") as "H0".
-        iSplitL "H"; et. 	
-      } 
-      i. des.
-      eapply IH; et.
-      {
-        iIntros "H".
-        iPoseProof (FMR0 with "H") as "H". iMod "H".
-        rewrite <- URA.add_assoc. 
-        iDestruct "H" as "[H H0]".
-        iPoseProof (x with "H0") as "H0". iMod "H0".
-        replace (c0 ⋅ fmr ⋅ c1 ⋅ c) with (fmr ⋅ (c0 ⋅ c1 ⋅ c)). 2: { r_solve. }
-        iSplitL "H"; et.
-      }
-    - gstep. econs. gfinal. left. eapply CIH; et. 
-  Admitted.
-
-
-
-
 
 
