@@ -496,3 +496,104 @@ Section AUX.
   Lemma lookup_wf: forall (f: @URA.car RA) k (WF: URA.wf f), URA.wf (f k).
   Proof. ii; ss. rewrite URA.unfold_wf in WF. ss. Qed.
 End AUX.
+
+
+Section OWN.
+  Context `{Σ: GRA.t}.
+  Lemma own_ctx a b
+      (OWN: Own a ⊢ #=> Own b)
+    :
+      forall ctx, Own (ctx ⋅ a) ⊢ #=> Own (ctx ⋅ b)
+  .
+  Proof.
+    i. iIntros "[H H0]".
+    iPoseProof (OWN with "H0") as "H0".
+    iSplitL "H"; et.
+  Qed.
+
+  Lemma own_wf (r r': Σ)
+      (OWN: Own r ⊢ #=> Own r')
+      (WF: URA.wf r)
+    :
+      URA.wf r'
+  .
+  Proof. 
+    uipropall. hexploit OWN; et. { refl. }
+    esplits; et. des.
+    eapply URA.wf_extends; et.
+    specialize (H0 ε). rewrite ! URA.unit_id in H0.
+    et.
+  Qed.
+
+  (* replace with imod_trans *)
+  Lemma own_trans (a b c: Σ) (A: Own a ⊢ #=> Own b) (B: Own b ⊢ #=> Own c): Own a ⊢ #=> Own c.
+  Proof.
+    iIntros "H". 
+    iPoseProof (A with "H") as "H". iMod "H".
+    iPoseProof (B with "H") as "H". et.
+  Qed.
+
+  Lemma own_mod (r: Σ) P (OWN: Own r ⊢ P): Own r ⊢ #=> P.
+  Proof. iIntros "H". iModIntro. iPoseProof (OWN with "H") as "H"; et. Qed.
+
+  Lemma own_pure (P: Prop) (fmr: Σ) (WF: URA.wf fmr) (OWN: Own fmr ⊢ ⌜P⌝) : P.
+  Proof.
+    uipropall. hexploit OWN; [et|refl|].
+    i. rr in H. uipropall.
+  Qed.
+
+  Lemma not_wf_sat (r: Σ) (ILL: ¬ URA.wf r) P: Own r ⊢ P.
+  Proof.
+    rr. uipropall. i.
+    eapply URA.wf_extends in WF; et.
+    clarify.
+  Qed.
+
+  Lemma iProp_sepconj_aux P Q r 
+      (SAT: Own r ⊢ #=> (P ** Q))
+    :
+      exists rp rq, (URA.updatable r (rp ⋅ rq)) /\ 
+                    (Own rp ⊢ P) /\ 
+                    (Own rq ⊢ Q)
+  .
+  Proof.
+    destruct (classic (URA.wf r)); cycle 1.
+    {
+      exists r, r. esplits; eauto using not_wf_sat.
+      rr. i. eapply URA.wf_mon in H0. clarify. 
+    }
+
+    uipropall.
+    hexploit SAT; et. { r_solve. }
+    i. des.
+    esplits; et; uipropall.
+    {
+      instantiate (1:= b). instantiate (1:=a).
+      unfold URA.updatable. subst. et. 
+    }
+    {
+      i. destruct P. ss.
+      hexploit H4. i.
+      eapply URA.wf_extends in H4; et.
+    }
+    {
+      i. destruct Q. ss.
+      hexploit H4. i.
+      eapply URA.wf_extends in H4; et.
+    }
+  Qed.
+
+  Lemma iProp_sepconj P Q r 
+      (SAT: Own r ⊢ #=> (P ** Q))
+    :
+      exists rp rq, (Own r ⊢ #=> Own (rp ⋅ rq)) /\ 
+                    (Own rp ⊢ P) /\ 
+                    (Own rq ⊢ Q)
+  .
+  Proof.
+    eapply iProp_sepconj_aux in SAT; et. des.
+    eapply Own_Upd in SAT.
+    esplits; et. 	
+  Qed.	
+
+End OWN.

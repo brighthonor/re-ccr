@@ -395,14 +395,22 @@ End PSEUDOTYPING.
 
 Section TRANSL. 
   Context {Σ: GRA.t}.
-  Variable stb: gname -> option fspec.
-  Variable o: ord.
 
-  Definition body_spec_hp (body: itree hEs Any.t): itree hAGEs Any.t :=
+  Definition body_spec_hp stb o (body: itree hEs Any.t): itree hAGEs Any.t :=
     interp_hEs_hAGEs stb o body.
-  Definition fun_spec_hp (f: Any.t -> itree hEs Any.t): Any.t -> itree hAGEs Any.t :=
-    fun x => body_spec_hp (f x).
 
+  Definition fun_spec_hp stb o (f: Any.t -> itree hEs Any.t): Any.t -> itree hAGEs Any.t :=
+    fun x => body_spec_hp stb o (f x).
+
+  Definition interp_Es_hAGEs: itree Es ~> itree hAGEs :=
+    interp trivial_Handler.
+    
+  Definition lift_Es_fun (f: Any.t -> itree Es Any.t): Any.t -> itree hAGEs Any.t :=
+    fun x => interp_Es_hAGEs (f x).
+
+  Definition fun_to_tgt stb (sb: fspecbody): (Any.t -> itree Es Any.t) :=
+    interp_hp_fun (interp_sb_hp stb sb).
+    
 End TRANSL.
 
 
@@ -418,17 +426,59 @@ Section HMODSEM.
   }
   .
 
+  Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: t -> Any.t) (ms: t): ModSem.t := {|
+    ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
+    ModSem.init_st := mst ms;
+  |}
+  .
 
+  Definition to_mod (ms: t): ModSem.t := transl (interp_hp_fun) initial_st ms.
+
+
+  (* move lifting Mod -> HMod into somewhere else *)
+  Definition lift (ms: ModSem.t): t := {|
+    fnsems := List.map (fun '(fn, bd) => (fn, lift_Es_fun bd)) (ModSem.fnsems ms);
+    initial_st := ModSem.init_st ms;
+  |}
+  .
+  
 
 End HMODSEM.
 End HModSem.
+
+Module HMod.
+Section HMOD.
+  Context `{Σ: GRA.t}.
+
+  Record t: Type := mk {
+    get_modsem: Sk.t -> HModSem.t;
+    sk: Sk.t;
+  }
+  .
+
+  Definition transl (tr: Sk.t -> (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: HModSem.t -> Any.t) (md: t): Mod.t := {|
+    Mod.get_modsem := fun sk => HModSem.transl (tr sk) mst (md.(get_modsem) sk);
+    Mod.sk := md.(sk);
+  |}
+  . 
+
+  Definition to_mod (md: t): Mod.t := transl (fun _ => interp_hp_fun) HModSem.initial_st md.
+
+  Definition lift (md: Mod.t): t := {|
+    get_modsem := fun sk => HModSem.lift (md.(Mod.get_modsem) sk);
+    sk := md.(Mod.sk);
+  |}
+  .
+    
+End HMOD.
+End HMod.
 
 Module SModSem.
 Section SMODSEM.
 
   Context `{Σ: GRA.t}.
   Variable stb: gname -> option fspec.
-  Variable o: ord.
+  (* Variable o: ord. *)
 
   Record t: Type := mk {
     fnsems: list (gname * fspecbody);
@@ -444,10 +494,16 @@ Section SMODSEM.
   |}
   .
 
-  Definition to_hmod (ms: t): HModSem.t := transl ((fun_spec_hp stb o) ∘ fsb_body) initial_st ms.
+  Definition compile (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> Any.t) (ms: t) : ModSem.t := {|
+    ModSem.fnsems := List.map (fun '(fn, sb) => (fn, tr sb)) ms.(fnsems);
+    ModSem.init_st := mst ms;
+  |}
+ .
+  Definition to_hmod (ms: t): HModSem.t := transl (interp_sb_hp stb) initial_st ms.
+  (* Definition to_hmod (ms: t): HModSem.t := transl ((fun_spec_hp stb o) ∘ fsb_body) initial_st ms. *)
   (* Definition to_mid (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid stb ∘ fsb_body) initial_st ms.
   Definition to_mid2 (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid2 ∘ fsb_body) initial_st ms. *)
-  (* Definition to_tgt (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_tgt stb) (fun ms => Any.pair ms.(initial_st) ms.(initial_mr)↑) ms. *)
+  Definition to_tgt (stb: gname -> option fspec) (ms: t): ModSem.t := compile (fun_to_tgt stb) (fun ms => Any.pair ms.(initial_st) ms.(initial_mr)↑) ms.
 
   Definition main (mainpre: Any.t -> iProp) (mainbody: Any.t -> itree hEs Any.t): t := {|
       fnsems := [("main", (mk_specbody (mk_simple (fun (_: unit) => (ord_top, mainpre, fun _ => (⌜True⌝: iProp)%I))) mainbody))];
@@ -460,7 +516,301 @@ End SMODSEM.
 End SModSem.
 
 
+Module SMod.
+Section SMOD.
 
+  Context `{Σ: GRA.t}.
+  Variable stb: gname -> option fspec.
+  Variable o: ord.
+
+  Record t: Type := mk {
+    get_modsem: Sk.t -> SModSem.t;
+    sk: Sk.t;
+  }
+  .
+
+  Definition transl (tr: Sk.t -> fspecbody -> ( Any.t -> itree hAGEs Any.t)) (mst: SModSem.t -> Any.t) (md: t): HMod.t := {|
+    HMod.get_modsem := fun sk => SModSem.transl (tr sk) mst (md.(get_modsem) sk);
+    HMod.sk := md.(sk);
+  |}
+  .
+
+  Definition compile (tr: Sk.t -> fspecbody -> (Any.t -> itree Es Any.t)) (mst: SModSem.t -> Any.t) (md: t) : Mod.t := {|
+    Mod.get_modsem := fun sk => SModSem.compile (tr sk) mst (md.(get_modsem) sk);
+    Mod.sk := md.(sk);
+  |}
+  .
+
+  Definition to_hmod (md:t): HMod.t := transl (fun _ => (fun_spec_hp stb o) ∘ fsb_body) SModSem.initial_st md.
+  (* Definition to_src (md: t): Mod.t := transl (fun _ => fun_to_src ∘ fsb_body) SModSem.initial_st md. *)
+  (* Definition to_mid (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid stb ∘ fsb_body) SModSem.initial_st md. *)
+  (* Definition to_mid2 (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid2 ∘ fsb_body) SModSem.initial_st md. *)
+  Definition to_tgt (stb: Sk.t -> gname -> option fspec) (md: t): Mod.t :=
+    compile (fun sk => fun_to_tgt (stb sk)) (fun ms => Any.pair ms.(SModSem.initial_st) ms.(SModSem.initial_mr)↑) md.
+
+    
+  Definition get_stb (mds: list t): Sk.t -> alist gname fspec :=
+    fun sk => map (map_snd fsb_fspec) (flat_map (SModSem.fnsems ∘ (flip get_modsem sk)) mds).
+
+  Definition get_sk (mds: list t): Sk.t :=
+    Sk.sort (fold_right Sk.add Sk.unit (List.map sk mds)).
+
+  Definition get_initial_mrs (mds: list t): Sk.t -> Σ :=
+    fun sk => fold_left (⋅) (List.map (SModSem.initial_mr ∘ (flip get_modsem sk)) mds) ε.
+
+End SMOD.
+End SMod.
+
+  (* Definition get_stb (md: t): Sk.t -> alist gname fspec :=
+    fun sk => map (map_snd fsb_fspec) (SModSem.fnsems (get_modsem md sk)).
+
+  Definition get_sk (md: t): Sk.t :=
+    Sk.sort (Sk.add Sk.unit (sk md)).
+
+  Definition get_init_mr (md: t): Sk.t -> Σ :=
+    fun sk => (SModSem.initial_mr (get_modsem md sk)).
+ *)
+
+    
+
+  (* Definition transl (tr: SModSem.t -> ModSem.t) (md: t): Mod.t := {| *)
+  (*   Mod.get_modsem := (SModSem.transl tr) ∘ md.(get_modsem); *)
+  (*   Mod.sk := md.(sk); *)
+  (* |} *)
+  (* . *)
+
+  (* Definition to_src (md: t): Mod.t := transl SModSem.to_src md. *)
+  (* Definition to_mid (md: t): Mod.t := transl SModSem.to_mid md. *)
+  (* Definition to_tgt (stb: list (gname * fspec)) (md: t): Mod.t := transl (SModSem.to_tgt stb) md. *)
+
+  (* Lemma to_src_comm: forall sk smd,
+      (SModSem.to_src) (get_modsem smd sk) = (to_src smd).(Mod.get_modsem) sk.
+  Proof. refl. Qed. *)
+  (* Lemma to_mid_comm: forall sk stb smd,
+      (SModSem.to_mid stb) (get_modsem smd sk) = (to_mid stb smd).(Mod.get_modsem) sk.
+  Proof. refl. Qed. *)
+  (* Lemma to_tgt_comm: forall sk stb smd,
+      (SModSem.to_tgt (stb sk)) (get_modsem smd sk) = (to_tgt stb smd).(Mod.get_modsem) sk.
+  Proof. refl. Qed. *)
+
+
+
+
+  (* Definition l_bind A B (x: list A) (f: A -> list B): list B := List.flat_map f x. *)
+  (* Definition l_ret A (a: A): list A := [a]. *)
+
+  (* Declare Scope l_monad_scope.
+  Local Open Scope l_monad_scope.
+  Notation "'do' X <- A ; B" := (List.flat_map (fun X => B) A) : l_monad_scope.
+  Notation "'do' ' X <- A ; B" := (List.flat_map (fun _x => match _x with | X => B end) A) : l_monad_scope.
+  Notation "'ret'" := (fun X => [X]) (at level 60) : l_monad_scope.
+
+  Lemma unconcat
+        A (xs: list A)
+    :
+      List.concat (List.map (fun x => [x]) xs) = xs
+  .
+  Proof.
+    induction xs; ii; ss. f_equal; ss.
+  Qed.
+
+  Lemma red_do_ret A B (xs: list A) (f: A -> B)
+    :
+      (do x <- xs; ret (f x)) = List.map f xs
+  .
+  Proof.
+    rewrite flat_map_concat_map.
+    erewrite <- List.map_map with (f:=f) (g:=ret).
+    rewrite unconcat. ss.
+  Qed.
+
+  Lemma red_do_ret2 A0 A1 B (xs: list (A0 * A1)) (f: A0 -> A1 -> B)
+    :
+      (do '(x0, x1) <- xs; ret (f x0 x1)) = List.map (fun '(x0, x1) => f x0 x1) xs
+  .
+  Proof.
+    induction xs; ss. rewrite IHxs. destruct a; ss.
+  Qed.
+
+
+
+  Local Opaque Mod.add_list.
+
+  Lemma transl_sk
+        tr0 mr0 mds
+    :
+      <<SK: Mod.sk (Mod.add_list (List.map (transl tr0 mr0) mds)) = fold_right Sk.add Sk.unit (List.map sk mds)>>
+  .
+  Proof.
+    induction mds; ss.
+    destruct mds.
+    - Local Transparent Mod.add_list. s. r. rewrite Sk.add_unit_r. Local Opaque Mod.add_list. refl. 
+    - rewrite ModFacts.add_list_cons; ss. r. f_equal. ss.
+  Qed.
+
+  Lemma transl_sk_stable
+        tr0 tr1 mr0 mr1 mds
+    :
+      Mod.sk (Mod.add_list (List.map (transl tr0 mr0) mds)) =
+      Mod.sk (Mod.add_list (List.map (transl tr1 mr1) mds))
+  .
+  Proof. rewrite ! transl_sk. ss. Qed.
+
+  Definition get_fnsems (sk: Sk.t) (md: t) (tr0: fspecbody -> Any.t -> itree Es Any.t) :=
+    let ms := (get_modsem md sk) in
+    (do '(fn, fsb) <- ms.(SModSem.fnsems);
+      let fsem := tr0 fsb in
+      ret (fn, fsem))
+  .
+
+  Fixpoint load_fnsems (sk: Sk.t) (mds: list t) (tr0: fspecbody -> Any.t -> itree Es Any.t) : list (string * (Any.t -> itree Es Any.t)):=
+    match mds with
+    | [] => nil
+    | h::[] => get_fnsems sk h tr0
+    | h::t => (List.map ModSem.trans_l (get_fnsems sk h tr0)) ++ (List.map ModSem.trans_r (load_fnsems sk t tr0))
+    end.
+    
+  Let transl_fnsems_aux
+        tr0 mr0 mds
+        (sk: Sk.t)
+    :
+      (ModSem.fnsems (Mod.get_modsem (Mod.add_list (List.map (transl tr0 mr0) mds)) sk)) =
+      (load_fnsems sk mds (tr0 sk))
+  .
+  Proof.
+    induction mds; ss.
+    destruct mds.
+    - Local Transparent Mod.add_list.
+      ss. unfold get_fnsems.
+      rewrite flat_map_concat_map.
+      replace (fun _x: string * fspecbody => let (fn, fsb) := _x in [(fn, (tr0 sk fsb))]) with
+      (ret ∘ (fun _x: string * fspecbody => let (fn, fsb) := _x in (fn, (tr0 sk fsb))));
+      cycle 1.
+      { apply func_ext. i. des_ifs. }
+      erewrite <- List.map_map with (g:=ret).
+      rewrite unconcat.
+      apply map_ext. ii. des_ifs.
+      Local Opaque Mod.add_list.
+    - rewrite ModFacts.add_list_cons; ss.
+      cbn. rewrite List.map_map. 
+      unfold get_fnsems in *.
+      rewrite ! flat_map_concat_map in *.
+      replace (fun _x: string * fspecbody => let (fn, fsb) := _x in [(fn, (tr0 sk fsb))]) with
+      (ret ∘ (fun _x: string * fspecbody => let (fn, fsb) := _x in (fn, (tr0 sk fsb)))) in *;
+      cycle 1.
+      { apply func_ext. i. des_ifs. }
+      f_equal.
+      { erewrite <- List.map_map with (g:=ret); rewrite unconcat.
+        rewrite List.map_map. ss. }
+      f_equal. ss.
+Qed.
+
+  Lemma transl_fnsems
+        tr0 mr0 mds
+    :
+      (ModSem.fnsems (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds)))) =
+      (load_fnsems (Sk.sort (List.fold_right Sk.add Sk.unit (List.map sk mds))) mds (tr0 (Sk.sort (List.fold_right Sk.add Sk.unit (List.map sk mds)))))
+  .
+  Proof.
+    unfold Mod.enclose.
+    rewrite transl_fnsems_aux. do 2 f_equal.
+    { rewrite transl_sk. ss. }
+    rewrite transl_sk. auto.
+  Qed.
+
+
+  Lemma flat_map_assoc
+        A B C
+        (f: A -> list B)
+        (g: B -> list C)
+        (xs: list A)
+    :
+      (do y <- (do x <- xs; f x); g y) =
+      (do x <- xs; do y <- (f x); g y)
+  .
+  Proof.
+    induction xs; ii; ss.
+    rewrite ! flat_map_concat_map in *. rewrite ! map_app. rewrite ! concat_app. f_equal; ss.
+  Qed.
+
+  Lemma transl_fnsems_stable
+        tr0 tr1 mr0 mr1 mds
+    :
+      List.map fst (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds))).(ModSem.fnsems) =
+      List.map fst (Mod.enclose (Mod.add_list (List.map (transl tr1 mr1) mds))).(ModSem.fnsems)
+  .
+
+  Proof.
+    rewrite ! transl_fnsems.
+    set (Sk.sort (foldr Sk.add Sk.unit (map sk mds))).
+    clearbody a. revert a.
+    induction mds; ss. i.
+    unfold get_fnsems.
+    destruct mds. 
+    { 
+      rewrite <- ! red_do_ret.
+      rewrite ! flat_map_assoc. eapply flat_map_ext. i. des_ifs.
+    }
+    rewrite ! List.map_app.
+    rewrite ! List.map_map.
+    rewrite fun_fst_trans_l.
+    rewrite fun_fst_trans_r.
+    rewrite <- IHmds.
+    f_equal.
+    rewrite <- ! red_do_ret.
+    rewrite ! flat_map_assoc. eapply flat_map_ext. i. des_ifs.
+Qed.
+
+  Fixpoint link_mrs mrs : Any.t :=
+    match mrs with
+    | [] => tt↑
+    | h::[] => h
+    | h::t => Any.pair h (link_mrs t)
+    end.
+
+
+  Definition load_initial_mrs (sk: Sk.t) (mds: list t) (mr0: SModSem.t -> Any.t): Any.t :=
+    let mrs := (do md <- mds;
+    let ms := (get_modsem md sk) in
+    ret (mr0 ms)) in
+    link_mrs mrs
+    (* How to link initial states *)
+  .
+
+  Let transl_initial_mrs_aux
+        tr0 mr0 mds
+        (sk: Sk.t)
+    :
+      (ModSem.init_st (Mod.get_modsem (Mod.add_list (List.map (transl tr0 mr0) mds)) sk)) =
+      (load_initial_mrs sk mds mr0)
+  .
+  Proof.
+    induction mds; ii; ss.
+    destruct mds; ss.
+    rewrite ModFacts.add_list_cons; ss. cbn. f_equal; ss.
+  Qed.
+
+  Lemma transl_initial_mrs
+        tr0 mr0 mds
+    :
+      (ModSem.init_st (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds)))) =
+      (load_initial_mrs (Sk.sort (List.fold_right Sk.add Sk.unit (List.map sk mds))) mds mr0)
+  .
+  Proof.
+    unfold Mod.enclose.
+    rewrite transl_initial_mrs_aux. do 2 f_equal. rewrite transl_sk. ss.
+  Qed.
+
+            
+
+  Definition main (mainpre: Any.t -> iProp) (mainbody: Any.t -> itree hEs Any.t): t := {|
+    get_modsem := fun _ => (SModSem.main mainpre mainbody);
+    sk := Sk.unit;
+  |}
+  .
+
+End SMOD.
+End SMod. *)
 
 
 
@@ -862,9 +1212,199 @@ Global Program Instance interp_hp_rdb: red_database (mk_box (@interp_hp)) :=
 
 End AUX.
 
+Section AUX.
 
+Context `{Σ: GRA.t}.
 
+(* itree reduction *)
+Lemma interp_hAGEs_bind
+      (R S: Type)
+      stb o
+      (s : itree hEs R) (k : R -> itree hEs S)
+  :
+    interp_hEs_hAGEs stb o (s >>= k)
+    =
+    st <- interp_hEs_hAGEs stb o s;; interp_hEs_hAGEs stb o (k st).
+Proof.
+  unfold interp_hEs_hAGEs in *. grind.
+Qed.
 
+Lemma interp_hAGEs_tau
+      (U: Type)
+      (t : itree _ U)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (tau;; t)
+    =
+    tau;; (interp_hEs_hAGEs stb o t).
+Proof.
+  unfold interp_hEs_hAGEs in *. grind.
+Qed.
+
+Lemma interp_hAGEs_ret
+      (U: Type)
+      (t: U)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (Ret t)
+    =
+    Ret t.
+Proof.
+  unfold interp_hEs_hAGEs in *. grind.
+Qed.
+
+Lemma interp_hAGEs_call
+      (R: Type)
+      (i: callE R)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (trigger i)
+    =
+    r <- handle_callE_hAGEs stb o i;; tau;; Ret r.
+    (* '(fr', _) <- handle_Guarantee (True%I:iProp) fr;; r <- trigger i;; tau;; Ret (fr', r). *)
+Proof.
+  unfold interp_hEs_hAGEs in *. rewrite interp_trigger. grind.
+Qed.
+
+Lemma interp_hAGEs_hapc
+      (R: Type)
+      (i: hAPCE R)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (trigger i)
+    =
+    (handle_hAPCE_hAGEs stb o i) >>= (fun r => tau;; Ret r).
+Proof.
+  unfold interp_hEs_hAGEs. rewrite interp_trigger. grind.
+Qed.
+
+Lemma interp_hAGEs_triggerp
+      (R: Type)
+      (i: sE R)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (trigger i)
+    =
+    r <- trigger i;; tau;; Ret r.
+Proof.
+  unfold interp_hEs_hAGEs. rewrite interp_trigger. grind.
+Qed.
+
+Lemma interp_hAGEs_triggere
+      (R: Type)
+      (i: eventE R)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (trigger i)
+    =
+    r <- trigger i;; tau;; Ret r.
+Proof.
+  unfold interp_hEs_hAGEs. rewrite interp_trigger. grind.
+Qed.
+
+Lemma interp_hAGEs_triggerUB
+      (R: Type)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (triggerUB)
+    =
+    triggerUB (A:=R).
+Proof.
+  unfold interp_hEs_hAGEs, triggerUB in *. rewrite unfold_interp. grind.
+Qed.
+
+Lemma interp_hAGEs_triggerNB
+      (R: Type)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (triggerNB)
+    =
+    triggerNB (A:=R).
+Proof.
+  unfold interp_hEs_hAGEs, triggerNB in *. rewrite unfold_interp. grind.
+Qed.
+
+Lemma interp_hAGEs_unwrapU 
+      (R: Type)
+      (i: option R)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (@unwrapU hEs _ _ i)
+    =
+    r <- (unwrapU i);; Ret r.
+Proof.
+  unfold interp_hEs_hAGEs, unwrapU in *. des_ifs; grind.
+  eapply interp_hAGEs_triggerUB.
+Qed.
+
+Lemma interp_hAGEs_unwrapN
+      (R: Type)
+      (i: option R)
+      stb o
+  :
+    interp_hEs_hAGEs stb o (@unwrapN hEs _ _ i)
+    =
+    r <- (unwrapN i);; Ret r.
+Proof.
+  unfold interp_hEs_hAGEs, unwrapN in *. des_ifs; grind.
+  eapply interp_hAGEs_triggerNB.
+Qed.
+
+Lemma interp_hAGEs_Assume
+      P
+      stb o
+  :
+    interp_hEs_hAGEs stb o (trigger (Assume P))
+    =
+    x <- trigger (Assume P) ;; tau;; Ret x
+.
+Proof.
+  unfold interp_hEs_hAGEs. rewrite interp_trigger. grind.
+Qed.
+
+Lemma interp_hAGEs_Guarantee
+      P
+      stb o
+  :
+    interp_hEs_hAGEs stb o (trigger (Guarantee P))
+    =
+    x <- trigger (Guarantee P);; tau;; Ret x
+.
+Proof.
+  unfold interp_hEs_hAGEs. rewrite interp_trigger. grind. 
+Qed.
+
+Lemma interp_hAGEs_ext
+      R (itr0 itr1: itree _ R)
+      (EQ: itr0 = itr1)
+      stb o
+  :
+    interp_hEs_hAGEs stb o itr0
+    =
+    interp_hEs_hAGEs stb o itr1
+.
+Proof. subst; et. Qed.
+
+Global Program Instance interp_hAGEs_rdb: red_database (mk_box (@interp_hEs_hAGEs)) :=
+  mk_rdb
+    1
+    (mk_box interp_hAGEs_bind)
+    (mk_box interp_hAGEs_tau)
+    (mk_box interp_hAGEs_ret)
+    (mk_box interp_hAGEs_call)
+    (mk_box interp_hAGEs_triggere)
+    (mk_box interp_hAGEs_triggerp)
+    (mk_box interp_hAGEs_triggerp)
+    (mk_box interp_hAGEs_triggerUB)
+    (mk_box interp_hAGEs_triggerNB)
+    (mk_box interp_hAGEs_unwrapU)
+    (mk_box interp_hAGEs_unwrapN)
+    (mk_box interp_hAGEs_Assume)
+    (mk_box interp_hAGEs_Guarantee)
+    (mk_box interp_hAGEs_ext)
+.
+
+End AUX.
 
 (* TODO: Modify the Definition of  Spec Module *)
 (* TODO: Modify the Definition of  Spec Module *)
@@ -2295,6 +2835,7 @@ Ltac ired_both := ired_l; ired_r.
 
 
 Notation Es' := (hCallE +' sE +' eventE).
+*)
 
 Module IPCNotations.
   Notation ";;; t2" :=
@@ -2311,4 +2852,4 @@ Module IPCNotations.
       (at level 62, t1 at next level, p pattern, right associativity) : itree_scope.
 End IPCNotations.
 
-Export IPCNotations. *)
+Export IPCNotations. 

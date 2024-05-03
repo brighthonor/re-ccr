@@ -34,9 +34,9 @@ def set_by_user(k: int) ≡
 Section M.
   Context `{@GRA.inG MapRA0 Σ}.
 
-  Let Es := (hAPCE +' Es).
+  (* Let Es := (hAPCE +' Es). *)
 
-  Definition initF: list val -> itree Es val :=
+  Definition initF: list val -> itree hEs val :=
     fun varg =>
       `sz: Z <- (pargs [Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, _) := data in
@@ -44,7 +44,7 @@ Section M.
       Ret Vundef
   .
 
-  Definition getF: list val -> itree Es val :=
+  Definition getF: list val -> itree hEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, sz) := data in
@@ -52,7 +52,7 @@ Section M.
       Ret (Vint (f k))
   .
 
-  Definition setF: list val -> itree Es val :=
+  Definition setF: list val -> itree hEs val :=
     fun varg =>
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, sz) := data in
@@ -61,7 +61,7 @@ Section M.
       Ret Vundef
   .
 
-  Definition set_by_userF: list val -> itree Es val :=
+  Definition set_by_userF: list val -> itree hEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       v <- trigger (Syscall "input" (([]: list Z)↑) (fun _ => True));; v <- v↓?;;

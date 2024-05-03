@@ -32,15 +32,15 @@ Section A.
   Context `{@GRA.inG MapRA0 Σ}.
   Context `{@GRA.inG MapRA1 Σ}.
 
-  Let Es := (hAPCE +' Es).
+  (* Let Es := (hAPCE +' Es). *)
 
-  Definition initF: list val -> itree Es val :=
+  Definition initF: list val -> itree hEs val :=
     fun varg =>
       ;;;
       Ret Vundef
   .
 
-  Definition setF: list val -> itree Es val :=
+  Definition setF: list val -> itree hEs val :=
     fun varg =>
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       f <- pget;;
@@ -48,14 +48,14 @@ Section A.
       Ret Vundef
   .
 
-  Definition getF: list val -> itree Es val :=
+  Definition getF: list val -> itree hEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       f <- pget;;;
       Ret (Vint (f k))
   .
 
-  Definition set_by_userF: list val -> itree Es val :=
+  Definition set_by_userF: list val -> itree hEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       v <- trigger (Syscall "input" (([]: list Z)↑) (fun _ => True));; v <- v↓?;;

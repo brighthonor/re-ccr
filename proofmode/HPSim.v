@@ -808,8 +808,136 @@ Section HPSIM.
     @hpsim <7= paco7 (@_hpsim true) bot7.
   Proof. ginit. eauto with paco. Qed.
 
+
+  Definition hpsim_fsem: relation (Any.t -> itree hAGEs Any.t) :=
+    (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: I st_src st_tgt ε),
+                hpsim_body false false (st_src, itr_src) (st_tgt, itr_tgt) ε))%signature.
+
+  Definition hpsim_fnsem: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq hpsim_fsem.
+
+  (* Arguments _hpsim {with_dummy} hpsim {R} RR.
+
+  Definition hpsim {R} RR := paco7 (@_hpsim false) bot7 R RR.
+
+  Definition hpsim_end : Any.t*Any.t -> Any.t*Any.t -> iProp :=
+    fun '(st_src, v_src) '(st_tgt, v_tgt) => I st_src st_tgt ** ⌜v_src = v_tgt⌝. *)
+
 End HPSIM.
 
 Hint Resolve _hpsim_mon: paco.
 Hint Resolve cpn7_wcompat: paco.
+
+(**********)
+
+
+Lemma hpsim_self {Σ: GRA.t}:
+  forall st itr fl fmr,
+    hpsim_body fl fl (fun src tgt => ⌜src = tgt⌝%I) false false (st, itr) (st, itr) fmr.
+Proof.
+  ginit. gcofix CIH. i. ides itr.
+  { gstep. eapply hpsim_ret; ss.
+    iIntros "H". et.
+  }
+  { guclo hpsimC_spec. econs. 
+    guclo hpsimC_spec. econs. 
+    eapply hpsim_progress_flag. gbase. auto.
+  }
+  destruct e.
+  { dependent destruction h; rewrite <-! bind_trigger; resub.
+    - guclo hpsimC_spec. econs. { instantiate (1:= ⌜True⌝%I). et. }
+      guclo hpsimC_spec. econs; et.
+      ii. eapply hpsim_progress_flag. gbase. et.
+    - guclo hpsimC_spec. econs 17. { instantiate (1:= ⌜True⌝%I). et. }
+      guclo hpsimC_spec. econs; et.
+      ii. eapply hpsim_progress_flag. gbase. et.
+  }
+  destruct e.
+  { dependent destruction c. rewrite <- ! bind_trigger. resub.
+    gstep.
+    eapply hpsim_call; ss. { instantiate (1:= ⌜True⌝%I). et. }
+    ii. econs; et.
+    eapply iProp_sepconj in INV; et. des.
+    eapply own_wf in INV; et. eapply URA.wf_split in INV; des.
+    eapply own_pure in INV0; et. clarify.
+    gbase. auto.
+  }
+  destruct s.
+  { rewrite <- ! bind_trigger. resub. dependent destruction s.
+    destruct (run st) eqn:RUN.
+    guclo hpsimC_spec. econs; et. 
+    guclo hpsimC_spec. econs; et. 
+
+      eapply hpsim_progress_flag. gbase. et.
+  }
+  { rewrite <- ! bind_trigger. resub. dependent destruction e.
+    { guclo hpsimC_spec. econs 9. i.
+      guclo hpsimC_spec. econs.
+      eapply hpsim_progress_flag. gbase. eauto.
+    }
+    { guclo hpsimC_spec. econs 10. i.
+      guclo hpsimC_spec. econs.
+      eapply hpsim_progress_flag. gbase. eauto.
+    }
+    { guclo hpsimC_spec. econs. i.
+      eapply hpsim_progress_flag. gbase. eauto.
+    }
+  }
+Qed.
+
+
+
+Module HModSemPair.
+Section HPSIMMODSEM.
+
+  Context `{Σ: GRA.t}.
+
+  Variable (ms_src ms_tgt: HModSem.t).
+  
+  Definition fl_src := ms_src.(HModSem.fnsems).
+  Definition fl_tgt := ms_tgt.(HModSem.fnsems).
+
+  Let W: Type := (Any.t) * (Any.t).
+  Inductive sim: Prop := mk {
+    I: Any.t -> Any.t -> iProp;
+    hpsim_fnsems: Forall2 (hpsim_fnsem fl_src fl_tgt I) ms_src.(HModSem.fnsems) ms_tgt.(HModSem.fnsems);
+    hpsim_initial: I (ms_src.(HModSem.initial_st)) (ms_tgt.(HModSem.initial_st)) ε;
+    (* sim_fnsems: Forall2 (sim_fnsem wf le fl_src fl_tgt) ms_src.(ModSem.fnsems) ms_tgt.(ModSem.fnsems); *)
+    (* sim_initial: exists w_init, wf w_init (ms_src.(HModSem.initial_st), ms_tgt.(HModSem.initial_st)); *)
+  }.
+
+End HPSIMMODSEM.
+
+Lemma self_sim {Σ: GRA.t} (ms: HModSem.t):
+  sim ms ms.
+Proof.
+  econs; et.
+  - instantiate (1:=(fun src tgt => ⌜src = tgt⌝%I)). (* fun p => fst p = snd p *)
+    generalize (HModSem.fnsems ms).
+    induction a; ii; ss.
+    econs; et. econs; ss. ii; clarify.
+    rr in INV. uipropall. clarify.
+    eapply hpsim_self.
+  - rr. uipropall.
+Qed.
+
+End HModSemPair.
+
+
+Module HModPair.
+Section HPSIMMOD.
+  Context `{Σ: GRA.t}.
+
+   Variable (md_src md_tgt: HMod.t).
+   Inductive sim: Prop := mk {
+     sim_modsem:
+       forall sk
+              (SKINCL: Sk.incl md_tgt.(HMod.sk) sk)
+              (SKWF: Sk.wf sk),
+         <<SIM: HModSemPair.sim (md_src.(HMod.get_modsem) sk) (md_tgt.(HMod.get_modsem) sk)>>;
+     sim_sk: <<SIM: md_src.(HMod.sk) = md_tgt.(HMod.sk)>>;
+   }.
+
+End HPSIMMOD.
+End HModPair.
+
 
