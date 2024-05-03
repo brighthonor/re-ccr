@@ -441,7 +441,35 @@ Section HMODSEM.
     initial_st := ModSem.init_st ms;
   |}
   .
+
+  (**** Linking (need refactor)****)
+
+  (* Definition translate_emb : Type := forall T, itree Es T -> itree Es T. *)
+
+  Definition emb_ : ModSem.RUN -> (forall T, hAGEs T -> hAGEs T) :=
+    fun run_ch T es =>
+      match es with
+      | inr1 (inr1 (inl1 (SUpdate run))) => inr1 (inr1 (inl1 (SUpdate (run_ch T run))))
+      | _ => es
+      end.
+
+  Definition emb_l := emb_ ModSem.run_l.
+
+  Definition emb_r := emb_ ModSem.run_r.
+
+  Definition trans_l '(fn, f): gname * (Any.t -> itree _ Any.t) :=
+    (fn, (fun args => translate (emb_ ModSem.run_l) (f args))).
+
+  Definition trans_r '(fn, f) : gname * (Any.t -> itree _ Any.t) :=
+    (fn, (fun args => translate (emb_ ModSem.run_r) (f args))).
   
+  Definition add_fnsems ms1 ms2: alist gname (Any.t -> itree _ Any.t) :=
+    (List.map trans_l ms1.(fnsems)) ++ (List.map trans_r ms2.(fnsems)).
+  
+  Definition add ms1 ms2: t := {|
+    initial_st := Any.pair (initial_st ms1) (initial_st ms2);
+    fnsems := add_fnsems ms1 ms2;
+  |}.
 
 End HMODSEM.
 End HModSem.
@@ -467,6 +495,14 @@ Section HMOD.
   Definition lift (md: Mod.t): t := {|
     get_modsem := fun sk => HModSem.lift (md.(Mod.get_modsem) sk);
     sk := md.(Mod.sk);
+  |}
+  .
+
+  (***** LINKING ****)
+
+  Definition add (md0 md1: t): t := {|
+    get_modsem := fun sk => HModSem.add (md0.(get_modsem) sk) (md1.(get_modsem) sk);
+    sk := Sk.add md0.(sk) md1.(sk);
   |}
   .
     
