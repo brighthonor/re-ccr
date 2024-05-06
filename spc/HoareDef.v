@@ -1421,7 +1421,9 @@ Lemma interp_hAGEs_ext
 .
 Proof. subst; et. Qed.
 
-Global Program Instance interp_hAGEs_rdb: red_database (mk_box (@interp_hEs_hAGEs)) :=
+End AUX.
+
+Global Program Instance interp_hAGEs_rdb `{Σ: GRA.t}: red_database (mk_box (@interp_hEs_hAGEs)) :=
   mk_rdb
     1
     (mk_box interp_hAGEs_bind)
@@ -1440,7 +1442,171 @@ Global Program Instance interp_hAGEs_rdb: red_database (mk_box (@interp_hEs_hAGE
     (mk_box interp_hAGEs_ext)
 .
 
+Section AUX.
+
+  Context `{Σ: GRA.t}.
+
+  Lemma translate_emb_bind
+    A B
+    run_
+    (itr: itree hAGEs A) (ktr: A -> itree hAGEs B)
+  :
+    translate (HModSem.emb_ run_) (itr >>= ktr) = a <- (translate (HModSem.emb_ run_) itr);; (translate (HModSem.emb_ run_) (ktr a))
+  .
+  Proof. rewrite (bisim_is_eq (translate_bind _ _ _)). et. Qed.
+
+  Lemma translate_emb_tau
+    A
+    run_
+    (itr: itree hAGEs A)
+  :
+    translate (HModSem.emb_ run_) (tau;; itr) = tau;; (translate (HModSem.emb_ run_) itr)
+  .
+  Proof. rewrite (bisim_is_eq (translate_tau _ _)). et. Qed.
+
+  Lemma translate_emb_ret
+      A (a: A) run_
+  :
+    translate (HModSem.emb_ run_) (Ret a) = Ret a
+  .
+  Proof. rewrite (bisim_is_eq (translate_ret _ _)). et. Qed.
+
+  Lemma translate_emb_callE
+      run_ fn args
+  :
+    translate (HModSem.emb_ run_) (trigger (Call fn args)) =
+    trigger (Call fn args)
+  .
+  Proof. 
+    unfold trigger. 
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). ss. 
+    do 2 f_equal. extensionalities. apply translate_emb_ret. 
+  Qed.
+
+  Lemma translate_emb_sE
+      T run_
+      (run : Any.t -> Any.t * T)
+  :
+    translate (HModSem.emb_ run_) (trigger (SUpdate run)) = trigger (SUpdate (run_ T run))
+  .
+  Proof. 
+    unfold trigger. 
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). 
+    do 2 f_equal. extensionalities. apply translate_emb_ret. 
+  Qed.
+
+  Lemma translate_emb_eventE
+      T run_ 
+      (e: eventE T)
+    :
+      translate (HModSem.emb_ run_) (trigger e) = trigger e.
+  Proof.
+    unfold trigger.
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). ss.
+    do 2 f_equal.
+    extensionalities. rewrite translate_emb_ret. et.
+  Qed.
+
+  Lemma translate_emb_triggerUB
+    T run_
+  :
+    translate (HModSem.emb_ run_) (triggerUB: itree _ T) = triggerUB
+  .
+  Proof. 
+    unfold triggerUB. rewrite translate_emb_bind. f_equal.
+    { apply translate_emb_eventE. }
+    extensionalities. ss.
+  Qed.
+
+  Lemma translate_emb_triggerNB
+    T run_
+  :
+    translate (HModSem.emb_ run_) (triggerNB: itree _ T) = triggerNB
+  .
+  Proof.
+    unfold triggerNB. rewrite translate_emb_bind. f_equal. 
+    { apply translate_emb_eventE. }
+    extensionalities. ss.
+  Qed.
+  
+  Lemma translate_emb_unwrapU
+    R run_ (r: option R)
+  :
+    translate (HModSem.emb_ run_) (unwrapU r) = unwrapU r
+  .
+  Proof.
+    unfold unwrapU. destruct r.
+    - apply translate_emb_ret.
+    - apply translate_emb_triggerUB.
+  Qed.
+
+  Lemma translate_emb_unwrapN
+    R run_ (r: option R)
+  :
+    translate (HModSem.emb_ run_) (unwrapN r) = unwrapN r
+  .
+  Proof.
+    unfold unwrapN. destruct r.
+    - apply translate_emb_ret.
+    - apply translate_emb_triggerNB.
+  Qed.
+
+  Lemma translate_emb_assume
+    run_ P
+  :
+    translate (HModSem.emb_ run_) (assume P) = assume P
+  .
+  Proof.
+    unfold assume. rewrite translate_emb_bind.
+    rewrite translate_emb_eventE. f_equal.
+    extensionalities.
+    rewrite translate_emb_ret. et.
+  Qed.
+
+  Lemma translate_emb_guarantee
+    run_ P
+  :
+    translate (HModSem.emb_ run_) (guarantee P) = guarantee P
+  .
+  Proof.
+    unfold guarantee. rewrite translate_emb_bind.
+    rewrite translate_emb_eventE. f_equal.
+    extensionalities.
+    rewrite translate_emb_ret. et.
+  Qed.
+
+  Lemma translate_emb_ext
+    T run_ (itr0 itr1: itree _ T)
+    (EQ: itr0 = itr1)
+  :
+    translate (HModSem.emb_ run_) itr0 = translate (HModSem.emb_ run_) itr1
+  .
+  Proof. subst. refl. Qed.
+  
+
+  Global Program Instance translate_emb_rdb: red_database (mk_box (@translate)) :=
+  mk_rdb
+    0
+    (mk_box translate_emb_bind)
+    (mk_box translate_emb_tau)
+    (mk_box translate_emb_ret)
+    (mk_box translate_emb_sE)
+    (mk_box translate_emb_sE)
+    (mk_box translate_emb_callE)
+    (mk_box translate_emb_eventE)
+    (mk_box translate_emb_triggerUB)
+    (mk_box translate_emb_triggerNB)
+    (mk_box translate_emb_unwrapU)
+    (mk_box translate_emb_unwrapN)
+    (mk_box translate_emb_assume)
+    (mk_box translate_emb_guarantee)
+    (mk_box translate_emb_ext)
+.
+
 End AUX.
+
+
+
 
 (* TODO: Modify the Definition of  Spec Module *)
 (* TODO: Modify the Definition of  Spec Module *)

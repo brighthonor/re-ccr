@@ -301,12 +301,12 @@ Section TEST.
     |}.
 
     Definition mtt0: HModSem.t := {|
-      HModSem.fnsems := [("g0", (fun _ => Ret tt↑))];
+      HModSem.fnsems := [("f0", (fun _ => Ret tt↑))];
       HModSem.initial_st := tt↑
     |}.
 
     Definition mtt1: HModSem.t := {|
-      HModSem.fnsems := [("g1", (fun _ => Ret tt↑)); ("main", (fun _ => trigger (Call "g0" tt↑) >>= (fun _ => trigger (Call "g1" tt↑))))];
+      HModSem.fnsems := [("f1", (fun _ => Ret tt↑)); ("main", (fun _ => trigger (Call "f0" tt↑) >>= (fun _ => trigger (Call "f1" tt↑))))];
       HModSem.initial_st := tt↑
     |}.
 
@@ -333,13 +333,22 @@ Section TEST.
 
     Goal HModPair.sim (HMod.add ms0 ms1) (HMod.add mt0 mt1).
     Proof.
-      econs.
-      2: { admit. }
-      ii. econs. 2: { admit. }
+      econs; ss.
+      ii. econs. 
       econs.
       { econs; ss.
-        {  }
+        grind. ginit. hsteps. et.  
       }
+      econs.
+      {
+        econs; ss. 
+        grind. ginit. hsteps. et. 
+      }
+      econs; et.
+      econs; ss.
+      grind. ginit. hprep. inline. hprep. inline. hsteps; et.
+      ss. uipropall. refl.
+    Qed.
 
   End LINKING.
 
