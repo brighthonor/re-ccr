@@ -2,6 +2,7 @@ Require Import Coqlib.
 Require Import String.
 Require Import PCM.
 Require Import Any.
+Require Import Program.
 
 Set Implicit Arguments.
 Set Typeclasses Depth 5.
@@ -29,6 +30,7 @@ Section IPROP.
       "iProp"
       (iProp_intro (fun r => exists a b, r = URA.add a b /\ P a /\ Q b) _).
   Next Obligation.
+    i.
     red in LE. des; subst.
     exists H, (H0 ⋅ ctx). rewrite URA.add_assoc. splits; auto.
     eapply iProp_mono; eauto.

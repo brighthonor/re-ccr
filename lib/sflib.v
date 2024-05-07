@@ -16,7 +16,7 @@ Require Import Bool List Arith ZArith String Program.
 
 Set Implicit Arguments.
 
-Hint Unfold not iff id.
+#[export] Hint Unfold not iff id: core.
 
 Export ListNotations.
 
@@ -45,7 +45,7 @@ Proof. intros []; (reflexivity || discriminate). Qed.
 Lemma sflib__andb_split: forall {b1 b2}, b1 && b2 -> b1 /\ b2.
 Proof. intros [] []; try discriminate; auto. Qed.
 
-Hint Resolve sflib__true_is_true sflib__not_false_is_true.
+#[export] Hint Resolve sflib__true_is_true sflib__not_false_is_true: core.
 
 (* ************************************************************************** *)
 (** * Basic automation tactics *)
@@ -183,7 +183,7 @@ Notation "<< t >>" := (NW (fun _ => (t):Prop)) (at level 79, no associativity, o
 Ltac unnw := unfold NW in *.
 Ltac rednw := red; unnw.
 
-Hint Unfold NW.
+#[export] Hint Unfold NW: core.
 
 Ltac get_concl := lazymatch goal with [ |- ?G ] => G end.
 
@@ -723,7 +723,8 @@ Tactic Notation "extensionalities" ident(a) ident(b) ident(c) ident(d) ident(e) 
 
 (* short for common tactics *)
 
-Tactic Notation "inst" := instantiate.
+(* Deprecated in Coq 8.18 *)
+(* Tactic Notation "inst" := instantiate. *)
 Tactic Notation "econs" := econstructor.
 Tactic Notation "econs" int_or_var(x) := econstructor x.
 Tactic Notation "i" := intros.
@@ -787,16 +788,28 @@ Ltac clear_upto H :=
 
 Definition _Evar_sflib_ (A:Type) (x:A) := x.
 
-Tactic Notation "hide_evar" int_or_var(n) := let QQ := fresh "QQ" in
-  hget_evar n; intro;
-  lazymatch goal with [ H := ?X |- _] =>
-    set (QQ := X) in *; fold (_Evar_sflib_ X) in QQ; clear H
+(* Deprecated in Coq 8.18 *)
+(* Tactic Notation "hide_evar" int_or_var(n) := let QQ := fresh "QQ" in *)
+(*  hget_evar n; intro;                                                 *)
+(*  lazymatch goal with [ H := ?X |- _] =>                              *)
+(*    set (QQ := X) in *; fold (_Evar_sflib_ X) in QQ; clear H          *)
+(*  end.                                                                *)
+
+Ltac hide_evars :=
+  repeat match goal with
+  | [ |- context [?x] ] => is_evar x; set x;
+    lazymatch goal with [ H := x |- _ ] =>
+      fold (_Evar_sflib_ x) in H
+    end
   end.
 
-Ltac hide_evars := repeat (hide_evar 1).
-
-Ltac show_evars := repeat (match goal with [ H := @_Evar_sflib_ _ _ |- _ ] => unfold
- _Evar_sflib_ in H; unfold H in *; clear H end).
+Ltac show_evars :=
+  repeat match goal with
+  | [ H := @_Evar_sflib_ _ _ |- _ ] =>
+    unfold _Evar_sflib_ in H;
+    unfold H in *;
+    clear H
+  end.
 
 Ltac revert1 := match goal with [H: _|-_] => revert H end.
 
@@ -810,6 +823,9 @@ Tactic Notation "greflgen" constr(t) "as" ident(g)  :=
   let EQ := fresh "XEQ" in
   generalize (eq_refl t); generalize t at -2 as g
   ; intros ? EQ ?; revert EQ.
+
+Ltac eadmit :=
+  exfalso; clear; admit.
 
 Ltac special H :=
   (* eapply mp; refine (H _). *)
@@ -950,90 +966,95 @@ Tactic Notation "econsby" tactic(tac) :=
 
 
 
+
+
+  (*********************************************************************************************************)
+
+
 Lemma f_equal6 (A1 A2 A3 A4 A5 A6 B: Type) (f: A1 -> A2 -> A3 -> A4 -> A5 -> A6 -> B)
-      (x1 y1: A1) (EQ1: x1 = y1)
-      (x2 y2: A2) (EQ2: x2 = y2)
-      (x3 y3: A3) (EQ3: x3 = y3)
-      (x4 y4: A4) (EQ4: x4 = y4)
-      (x5 y5: A5) (EQ5: x5 = y5)
-      (x6 y6: A6) (EQ6: x6 = y6)
-  :
-    <<EQ: f x1 x2 x3 x4 x5 x6 = f y1 y2 y3 y4 y5 y6>>
+(x1 y1: A1) (EQ1: x1 = y1)
+(x2 y2: A2) (EQ2: x2 = y2)
+(x3 y3: A3) (EQ3: x3 = y3)
+(x4 y4: A4) (EQ4: x4 = y4)
+(x5 y5: A5) (EQ5: x5 = y5)
+(x6 y6: A6) (EQ6: x6 = y6)
+:
+<<EQ: f x1 x2 x3 x4 x5 x6 = f y1 y2 y3 y4 y5 y6>>
 .
 Proof. subst. reflexivity. Qed.
 
 Lemma f_equal7 (A1 A2 A3 A4 A5 A6 A7 B: Type) (f: A1 -> A2 -> A3 -> A4 -> A5 -> A6 -> A7 -> B)
-      (x1 y1: A1) (EQ1: x1 = y1)
-      (x2 y2: A2) (EQ2: x2 = y2)
-      (x3 y3: A3) (EQ3: x3 = y3)
-      (x4 y4: A4) (EQ4: x4 = y4)
-      (x5 y5: A5) (EQ5: x5 = y5)
-      (x6 y6: A6) (EQ6: x6 = y6)
-      (x7 y7: A7) (EQ7: x7 = y7)
-  :
-    <<EQ: f x1 x2 x3 x4 x5 x6 x7 = f y1 y2 y3 y4 y5 y6 y7>>
+(x1 y1: A1) (EQ1: x1 = y1)
+(x2 y2: A2) (EQ2: x2 = y2)
+(x3 y3: A3) (EQ3: x3 = y3)
+(x4 y4: A4) (EQ4: x4 = y4)
+(x5 y5: A5) (EQ5: x5 = y5)
+(x6 y6: A6) (EQ6: x6 = y6)
+(x7 y7: A7) (EQ7: x7 = y7)
+:
+<<EQ: f x1 x2 x3 x4 x5 x6 x7 = f y1 y2 y3 y4 y5 y6 y7>>
 .
 Proof. subst. reflexivity. Qed.
 
 Lemma f_equal8 (A1 A2 A3 A4 A5 A6 A7 A8 B: Type) (f: A1 -> A2 -> A3 -> A4 -> A5 -> A6 -> A7 -> A8 -> B)
-      (x1 y1: A1) (EQ1: x1 = y1)
-      (x2 y2: A2) (EQ2: x2 = y2)
-      (x3 y3: A3) (EQ3: x3 = y3)
-      (x4 y4: A4) (EQ4: x4 = y4)
-      (x5 y5: A5) (EQ5: x5 = y5)
-      (x6 y6: A6) (EQ6: x6 = y6)
-      (x7 y7: A7) (EQ7: x7 = y7)
-      (x8 y8: A8) (EQ8: x8 = y8)
-  :
-    <<EQ: f x1 x2 x3 x4 x5 x6 x7 x8 = f y1 y2 y3 y4 y5 y6 y7 y8>>
+(x1 y1: A1) (EQ1: x1 = y1)
+(x2 y2: A2) (EQ2: x2 = y2)
+(x3 y3: A3) (EQ3: x3 = y3)
+(x4 y4: A4) (EQ4: x4 = y4)
+(x5 y5: A5) (EQ5: x5 = y5)
+(x6 y6: A6) (EQ6: x6 = y6)
+(x7 y7: A7) (EQ7: x7 = y7)
+(x8 y8: A8) (EQ8: x8 = y8)
+:
+<<EQ: f x1 x2 x3 x4 x5 x6 x7 x8 = f y1 y2 y3 y4 y5 y6 y7 y8>>
 .
 Proof. subst. reflexivity. Qed.
 
 Ltac rpapply_raw H :=
-  first[erewrite f_equal8 | erewrite f_equal7 | erewrite f_equal6 | erewrite f_equal5 |
-        erewrite f_equal4 | erewrite f_equal3 | erewrite f_equal2 | erewrite f_equal];
-  [eapply H|..]; try reflexivity.
+first[erewrite f_equal8 | erewrite f_equal7 | erewrite f_equal6 | erewrite f_equal5 |
+  erewrite f_equal4 | erewrite f_equal3 | erewrite f_equal2 | erewrite f_equal];
+[eapply H|..]; try reflexivity.
 
 Ltac is_applied_function TARGET :=
-  match TARGET with
-  | ?f ?x =>
-    idtac
-  | _ => fail
-  end
+match TARGET with
+| ?f ?x =>
+idtac
+| _ => fail
+end
 .
 
 Ltac has_inside_strict A B :=
-  match A with
-  | context[B] => tryif (check_equal A B) then fail else idtac
-  | _ => fail
-  end
+match A with
+| context[B] => tryif (check_equal A B) then fail else idtac
+| _ => fail
+end
 .
 
 Ltac is_inside_others_body TARGET :=
-  tryif (repeat multimatch goal with
-                | [ |- context[?f ?x] ] =>
-                  (* idtac f; idtac x; *)
-                  tryif (has_inside_strict x TARGET)
-                  then fail 2
-                  else fail
-                end)
-  then fail
-  else idtac
+tryif (repeat multimatch goal with
+          | [ |- context[?f ?x] ] =>
+            (* idtac f; idtac x; *)
+            tryif (has_inside_strict x TARGET)
+            then fail 2
+            else fail
+          end)
+then fail
+else idtac
 .
 
 Ltac on_leftest_function TAC :=
-  (* repeat *)
-  multimatch goal with
-  | [ |- context[?f ?x] ] =>
-    tryif (is_applied_function f)
-    then fail
-    else
-      tryif (is_inside_others_body f)
-      then fail
-      else TAC f
-  (* else TAC constr:(f) *)
-  (* TODO: What is the difference? *)
-  end
+(* repeat *)
+multimatch goal with
+| [ |- context[?f ?x] ] =>
+tryif (is_applied_function f)
+then fail
+else
+tryif (is_inside_others_body f)
+then fail
+else TAC f
+(* else TAC constr:(f) *)
+(* TODO: What is the difference? *)
+end
 .
 (* TODO: more cannonical way to get leftest function? *)
 (* I tried match reverse but it was not good *)
@@ -1041,17 +1062,17 @@ Ltac on_leftest_function TAC :=
 (* TODO: try tactic notation ? *)
 
 Ltac leftest_rpapply H :=
-  on_leftest_function ltac:(fun f =>
-     (idtac f; first
-                 (* TODO: why rewrite "with" doesn't work? *)
-                 [ erewrite (f_equal8 f)
-                 | erewrite (f_equal7 f)
-                 | erewrite (f_equal6 f)
-                 | erewrite (f_equal5 f)
-                 | erewrite (f_equal4 f)
-                 | erewrite (f_equal3 f)
-                 | erewrite (f_equal2 f)
-                 | erewrite (f_equal  f) | fail]); [ eapply H | .. ]; try reflexivity)
+on_leftest_function ltac:(fun f =>
+(idtac f; first
+           (* TODO: why rewrite "with" doesn't work? *)
+           [ erewrite (f_equal8 f)
+           | erewrite (f_equal7 f)
+           | erewrite (f_equal6 f)
+           | erewrite (f_equal5 f)
+           | erewrite (f_equal4 f)
+           | erewrite (f_equal3 f)
+           | erewrite (f_equal2 f)
+           | erewrite (f_equal  f) | fail]); [ eapply H | .. ]; try reflexivity)
 .
 
 
@@ -1059,56 +1080,56 @@ Ltac leftest_rpapply H :=
 
 
 Ltac is_type x :=
-     match type of x with
-     | Type => idtac
-     | Set => idtac
-     | Prop => idtac (* TODO: needed? *)
-     | _ => fail
-     end.
+match type of x with
+| Type => idtac
+| Set => idtac
+| Prop => idtac (* TODO: needed? *)
+| _ => fail
+end.
 
 Ltac is_term_applied_function TARGET :=
-  match TARGET with
-  | ?f ?x =>
-    tryif (is_type x) then fail else idtac
-  | _ => fail
-  end
+match TARGET with
+| ?f ?x =>
+tryif (is_type x) then fail else idtac
+| _ => fail
+end
 .
 
 Ltac on_leftest_function_with_type TAC :=
-  (* repeat *)
-  multimatch goal with
-  | [ |- context[?f ?x] ] =>
-    tryif (is_term_applied_function f)
-    then fail
-    else
-      tryif (is_inside_others_body f)
-      then fail
-      else TAC f
-  end
+(* repeat *)
+multimatch goal with
+| [ |- context[?f ?x] ] =>
+tryif (is_term_applied_function f)
+then fail
+else
+tryif (is_inside_others_body f)
+then fail
+else TAC f
+end
 .
 
 Ltac rpapply H :=
-  on_leftest_function_with_type ltac:(fun f =>
-     (idtac f; first
-                 (* TODO: why rewrite "with" doesn't work? *)
-                 [ erewrite (f_equal8 f)
-                 | erewrite (f_equal7 f)
-                 | erewrite (f_equal6 f)
-                 | erewrite (f_equal5 f)
-                 | erewrite (f_equal4 f)
-                 | erewrite (f_equal3 f)
-                 | erewrite (f_equal2 f)
-                 | erewrite (f_equal  f) | fail]); [ eapply H | .. ]; try reflexivity)
+on_leftest_function_with_type ltac:(fun f =>
+(idtac f; first
+           (* TODO: why rewrite "with" doesn't work? *)
+           [ erewrite (f_equal8 f)
+           | erewrite (f_equal7 f)
+           | erewrite (f_equal6 f)
+           | erewrite (f_equal5 f)
+           | erewrite (f_equal4 f)
+           | erewrite (f_equal3 f)
+           | erewrite (f_equal2 f)
+           | erewrite (f_equal  f) | fail]); [ eapply H | .. ]; try reflexivity)
 .
 
 
 
 (* it may run infinite loop *)
 Ltac all TAC :=
-  repeat multimatch goal with
-         | H: _ |- _ => TAC H
-         end;
-  try TAC
+repeat multimatch goal with
+   | H: _ |- _ => TAC H
+   end;
+try TAC
 .
 
 Ltac fold_in x H := fold x in H; fold x.
@@ -1116,134 +1137,134 @@ Ltac fold_in x H := fold x in H; fold x.
 Ltac fold_all x := all ltac:(fold_in x).
 
 Ltac clears x :=
-  repeat match goal with
-         | H: context[x] |- _ => clear H
-         | |- context[x] => fail 2 "It appears in the goal!"
-         end
+repeat match goal with
+   | H: context[x] |- _ => clear H
+   | |- context[x] => fail 2 "It appears in the goal!"
+   end
 .
 
 
 
 Ltac hide_goal :=
-  match goal with
-  | [ |- ?G ] => let name := fresh "HIDDEN_GOAL" in
-                 set (name := G); replace G with name by reflexivity
-  (* ; move name at top <---- it breaks "unhide (hide X) = X". User may do it manually *)
-  end.
+match goal with
+| [ |- ?G ] => let name := fresh "HIDDEN_GOAL" in
+           set (name := G); replace G with name by reflexivity
+(* ; move name at top <---- it breaks "unhide (hide X) = X". User may do it manually *)
+end.
 Ltac unhide_goal :=
-  match goal with
-  | [ |- ?G ] => subst G
-  end.
+match goal with
+| [ |- ?G ] => subst G
+end.
 Ltac is_local_definition X :=
-  hide_goal;
-  tryif (unfold X)
-  then (unhide_goal)
-  else (unhide_goal; fail)
+hide_goal;
+tryif (unfold X)
+then (unhide_goal)
+else (unhide_goal; fail)
 .
 Ltac negate TAC := tryif TAC then fail else idtac.
 Ltac clear_unused :=
-  repeat multimatch goal with
-         | [H: ?T |- _] =>
-           negate ltac:(is_local_definition H);
-           match (type of T) with
-           | Prop => idtac
-           | _ => try clear H
-           end
-         end
+repeat multimatch goal with
+   | [H: ?T |- _] =>
+     negate ltac:(is_local_definition H);
+     match (type of T) with
+     | Prop => idtac
+     | _ => try clear H
+     end
+   end
 .
 Goal let x := 0 in forall n: nat, False.
 Proof.
-  intros.
-  clear_unused.
+intros.
+clear_unused.
 Abort.
 
 (* TODO: Currently I use "is_local_definition" filter, but it may replaced with checking if it is Prop *)
 Ltac clear_tautology :=
-  repeat multimatch goal with
-         | [H: ?A = ?B, H2: ?B = ?A |- _] => clear H2
-         (* | [H: True |- _] => clear H *) (* clear_universal_truth takes care of this now *)
-         | [H: ?X, H2: ?X |- _] =>
-           negate ltac:(is_local_definition H2);
-           clear H2
-         (* | [H: ?A = ?A |- _] => clear H *) (* clear_universal_truth takes care of this now *)
-         end
+repeat multimatch goal with
+   | [H: ?A = ?B, H2: ?B = ?A |- _] => clear H2
+   (* | [H: True |- _] => clear H *) (* clear_universal_truth takes care of this now *)
+   | [H: ?X, H2: ?X |- _] =>
+     negate ltac:(is_local_definition H2);
+     clear H2
+   (* | [H: ?A = ?A |- _] => clear H *) (* clear_universal_truth takes care of this now *)
+   end
 .
 
 Ltac clear_reducible_truth :=
-  let smart_tac := ss in
-  repeat multimatch goal with
-         | [H: ?P |- _ ] =>
-           match (type of P) with
-           | Prop =>
-             let temp := fresh "temp" in
-             tryif assert(temp: P) by (clear H; smart_tac)
-             (* check if it is reducible from other premises *)
-             then clear temp; clear H
-             else idtac
-           | _ => idtac
-           end
-         end
+let smart_tac := ss in
+repeat multimatch goal with
+   | [H: ?P |- _ ] =>
+     match (type of P) with
+     | Prop =>
+       let temp := fresh "temp" in
+       tryif assert(temp: P) by (clear H; smart_tac)
+       (* check if it is reducible from other premises *)
+       then clear temp; clear H
+       else idtac
+     | _ => idtac
+     end
+   end
 .
 
 Ltac clear_universal_truth :=
-  let smart_tac := ss in
-  repeat multimatch goal with
-         | [H: ?P |- _ ] =>
-           match (type of P) with
-           | Prop =>
-             let temp := fresh "temp" in
-             tryif assert(temp: P) by (all clear; smart_tac)
-             (* check if it is reducible without any premise *)
-             then clear temp; clear H
-             else idtac
-           | _ => idtac
-           end
-         end
+let smart_tac := ss in
+repeat multimatch goal with
+   | [H: ?P |- _ ] =>
+     match (type of P) with
+     | Prop =>
+       let temp := fresh "temp" in
+       tryif assert(temp: P) by (all clear; smart_tac)
+       (* check if it is reducible without any premise *)
+       then clear temp; clear H
+       else idtac
+     | _ => idtac
+     end
+   end
 .
 
 Ltac clear_tac := repeat (clear_unused; clear_tautology; clear_universal_truth).
 
 Ltac des_ifs_safe_aux TAC :=
-  TAC;
-  repeat
-    multimatch goal with
-    | |- context[match ?x with _ => _ end] =>
-      match (type of x) with
-      | { _ } + { _ } => destruct x; TAC; []
-      | _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
-      end
-    | H: context[ match ?x with _ => _ end ] |- _ =>
-      match (type of x) with
-      | { _ } + { _ } => destruct x; TAC; []
-      | _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
-      end
-    end.
+TAC;
+repeat
+multimatch goal with
+| |- context[match ?x with _ => _ end] =>
+match (type of x) with
+| { _ } + { _ } => destruct x; TAC; []
+| _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
+end
+| H: context[ match ?x with _ => _ end ] |- _ =>
+match (type of x) with
+| { _ } + { _ } => destruct x; TAC; []
+| _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
+end
+end.
 Tactic Notation "des_ifs_safe" := des_ifs_safe_aux clarify.
 Tactic Notation "des_ifs_safe" tactic(TAC) := des_ifs_safe_aux TAC.
 
 Ltac abstr_aux x var_name :=
-  let hyp_name := fresh "abstr_hyp_name" in
-  remember x as var_name eqn:hyp_name; clear hyp_name
+let hyp_name := fresh "abstr_hyp_name" in
+remember x as var_name eqn:hyp_name; clear hyp_name
 .
 
 Tactic Notation "abstr" constr(H) := let var_name := fresh "abstr_var_name" in abstr_aux H var_name.
 Tactic Notation "abstr" constr(H) ident(var_name) := abstr_aux H var_name.
 
 Hint Rewrite
-     andb_true_iff andb_false_iff
-     orb_true_iff orb_false_iff
-     negb_true_iff negb_false_iff
+andb_true_iff andb_false_iff
+orb_true_iff orb_false_iff
+negb_true_iff negb_false_iff
 
-     andb_true_r andb_true_l andb_false_r andb_false_l
-     orb_true_r orb_true_l orb_false_r orb_false_l
-     negb_andb negb_orb negb_involutive
-  : simpl_bool.
+andb_true_r andb_true_l andb_false_r andb_false_l
+orb_true_r orb_true_l orb_false_r orb_false_l
+negb_andb negb_orb negb_involutive
+: simpl_bool.
 
 Ltac simpl_bool := unfold Datatypes.is_true; unfold is_true;  autorewrite with simpl_bool in *.
 
 Ltac des_safe_aux TAC :=
-  TAC;
-  repeat (des1; TAC; [])
+TAC;
+repeat (des1; TAC; [])
 .
 
 Tactic Notation "des_safe" := des_safe_aux clarify.
@@ -1254,80 +1275,80 @@ Tactic Notation "des_safe" tactic(TAC) := des_safe_aux TAC.
 (** ** Generalization *)
 
 (** [gen X1 .. XN] is a shorthand for calling [generalize dependent]
-    successively on variables [XN]...[X1]. Note that the variables
-    are generalized in reverse order, following the convention of
-    the [generalize] tactic: it means that [X1] will be the first
-    quantified variable in the resulting goal. *)
+successively on variables [XN]...[X1]. Note that the variables
+are generalized in reverse order, following the convention of
+the [generalize] tactic: it means that [X1] will be the first
+quantified variable in the resulting goal. *)
 
 Tactic Notation "gen" ident(X1) :=
-  generalize dependent X1.
+generalize dependent X1.
 Tactic Notation "gen" ident(X1) ident(X2) :=
-  gen X2; gen X1.
+gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) :=
-  gen X3; gen X2; gen X1.
+gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4)  :=
-  gen X4; gen X3; gen X2; gen X1.
+gen X4; gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5) :=
-  gen X5; gen X4; gen X3; gen X2; gen X1.
+gen X5; gen X4; gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5)
- ident(X6) :=
-  gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
+ident(X6) :=
+gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5)
- ident(X6) ident(X7) :=
-  gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
+ident(X6) ident(X7) :=
+gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5)
- ident(X6) ident(X7) ident(X8) :=
-  gen X8; gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
+ident(X6) ident(X7) ident(X8) :=
+gen X8; gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5)
- ident(X6) ident(X7) ident(X8) ident(X9) :=
-  gen X9; gen X8; gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
+ident(X6) ident(X7) ident(X8) ident(X9) :=
+gen X9; gen X8; gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
 Tactic Notation "gen" ident(X1) ident(X2) ident(X3) ident(X4) ident(X5)
- ident(X6) ident(X7) ident(X8) ident(X9) ident(X10) :=
-  gen X10; gen X9; gen X8; gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
+ident(X6) ident(X7) ident(X8) ident(X9) ident(X10) :=
+gen X10; gen X9; gen X8; gen X7; gen X6; gen X5; gen X4; gen X3; gen X2; gen X1.
 
 (* ---------------------------------------------------------------------- *)
 
 Ltac exists_prop PROP :=
-  tryif
-    (repeat multimatch goal with
-            | [H: PROP |- _ ] => (* idtac "Found!"; idtac H; *) fail 2
-            end)
-  then fail
-  else idtac
+tryif
+(repeat multimatch goal with
+      | [H: PROP |- _ ] => (* idtac "Found!"; idtac H; *) fail 2
+      end)
+then fail
+else idtac
 .
 
 Ltac propagate_eq :=
-  repeat (multimatch goal with
-          | [H1: ?A = ?B, H2: ?B = ?C |- _ ] =>
-            tryif (check_equal A C)
-            then fail
-            else
-              tryif (exists_prop (A = C) + exists_prop (C = A))
-              then idtac
-              else
-                let name := fresh "EQ_CLOSURE_TAC" in
-                hexploit eq_trans; [exact H1|exact H2|]; intro name
-          | [H1: ?B = ?A, H2: ?B = ?C |- _ ] =>
-            tryif (check_equal A C)
-            then fail
-            else
-              tryif (exists_prop (A = C) + exists_prop (C = A))
-              then idtac
-              else
-                let name := fresh "EQ_CLOSURE_TAC" in
-                hexploit eq_trans; [exact (eq_sym H1)|exact H2|]; intro name
-          end)
+repeat (multimatch goal with
+    | [H1: ?A = ?B, H2: ?B = ?C |- _ ] =>
+      tryif (check_equal A C)
+      then fail
+      else
+        tryif (exists_prop (A = C) + exists_prop (C = A))
+        then idtac
+        else
+          let name := fresh "EQ_CLOSURE_TAC" in
+          hexploit eq_trans; [exact H1|exact H2|]; intro name
+    | [H1: ?B = ?A, H2: ?B = ?C |- _ ] =>
+      tryif (check_equal A C)
+      then fail
+      else
+        tryif (exists_prop (A = C) + exists_prop (C = A))
+        then idtac
+        else
+          let name := fresh "EQ_CLOSURE_TAC" in
+          hexploit eq_trans; [exact (eq_sym H1)|exact H2|]; intro name
+    end)
 .
 
 (* get equality's transitive closure *)
 (* TODO: it checks equality too naive way; "(0, 1).fst != 0" here. *)
 Ltac eq_closure_tac :=
-  repeat (propagate_eq; clarify); clear_tac
+repeat (propagate_eq; clarify); clear_tac
 .
 
 Ltac rev_all TAC :=
-  repeat multimatch reverse goal with
-         | H: _ |- _ => TAC H
-         end;
-  try TAC
+repeat multimatch reverse goal with
+   | H: _ |- _ => TAC H
+   end;
+try TAC
 .

@@ -6,7 +6,7 @@ From ExtLib Require Export
      Structures.Maps
      Data.Map.FMapAList.
 
-Require Import sflib.
+From sflib Require Import sflib.
 Require Import Coqlib.
 
 

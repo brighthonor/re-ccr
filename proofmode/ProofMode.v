@@ -93,7 +93,7 @@ Section ILIST.
     destruct a. iIntros "[H0 H1]".
     rewrite eq_rel_dec_correct in *. des_ifs; ss.
     { iPoseProof (IHl with "H1") as "> H1"; et.
-      iModIntro. iFrame. iFrame. }
+      iModIntro. iFrame. iFrame.  }
     { iFrame. iApply iPropL_clear. iFrame. }
   Qed.
 
@@ -121,7 +121,9 @@ Section ILIST.
     revert P0 P1 FIND ENTAIL. induction l; ss. i.
     destruct a. iIntros "[H0 H1]".
     rewrite eq_rel_dec_correct in *. des_ifs.
-    { ss. iPoseProof (IHl with "H1") as "H1"; et. repeat iFrame. }
+    { ss. iPoseProof (IHl with "H1") as "H1"; et. repeat iFrame.
+      iMod "H1". iDestruct "H1" as "[H H0]". iSplitL "H"; et.  
+    }
     { ss. iPoseProof (ENTAIL with "H0") as "> H0".
       iPoseProof (iPropL_clear with "H1") as "> H1".
       iModIntro. iFrame. }
@@ -154,9 +156,11 @@ Section ILIST.
     destruct a. iIntros "[H0 H1]".
     rewrite eq_rel_dec_correct in *. des_ifs; ss.
     { iPoseProof (IHl with "H1") as (a) "H1"; et.
-      iExists a. repeat iFrame. }
+      iExists a. repeat iFrame.
+      iMod "H1". iDestruct "H1" as "[H H0]". iSplitL "H"; et.   
+    }
     { iDestruct "H0" as (a) "H0". iExists a.
-      iFrame. iApply iPropL_clear. iFrame. }
+      iFrame. iSplitR; et. iApply iPropL_clear. iFrame. }
   Qed.
 
   Lemma iPropL_destruct_or Hn (l: iPropL) (P0 P1: iProp)
@@ -168,12 +172,13 @@ Section ILIST.
     destruct a. iIntros "[H0 H1]".
     rewrite eq_rel_dec_correct in *. des_ifs; ss.
     { iPoseProof (IHl with "H1") as "[H1|H1]"; et.
-      { iLeft. repeat iFrame. }
-      { iRight. repeat iFrame. }
+      { iLeft. repeat iFrame. iApply iFrame_true; et.
+      }
+      { iRight. repeat iFrame. iApply iFrame_true; et. }
     }
     { iDestruct "H0" as "[H0|H0]".
-      { iLeft. iFrame. iApply iPropL_clear. iFrame. }
-      { iRight. iFrame. iApply iPropL_clear. iFrame. }
+      { iLeft. iFrame. iSplitR; et. iApply iPropL_clear. iFrame. }
+      { iRight. iFrame. iSplitR; et. iApply iPropL_clear. iFrame. }
     }
   Qed.
 
@@ -182,7 +187,7 @@ Section ILIST.
       P ** from_iPropL l -∗ #=> (from_iPropL (alist_add Hn P l)).
   Proof.
     unfold alist_add. ss. iIntros "[H0 H1]".
-    iFrame. iApply iPropL_clear. iFrame.
+    iFrame. iSplitR; et. iApply iPropL_clear. iFrame.
   Qed.
 
   Lemma iPropL_destruct_sep Hn_old Hn_new0 Hn_new1 (l: iPropL) (P0 P1: iProp)
@@ -205,7 +210,7 @@ Section ILIST.
     revert P l1 FIND. induction l0; ss. i.
     destruct a. rewrite eq_rel_dec_correct in *. des_ifs.
     ss. hexploit IHl0; et. i.
-    iIntros "[H0 H1]". iFrame. iApply H. iFrame.
+    iIntros "[H0 H1]". iFrame. iApply iFrame_true. iApply H. iFrame.
   Qed.
 
   Lemma iPropL_alist_pops l Hns
@@ -215,8 +220,10 @@ Section ILIST.
     induction Hns. ss.
     { iIntros "H0". iFrame. }
     { ss. des_ifs. ss. etrans; et.
-      iIntros "[H0 H1]". iFrame.
-      iApply iPropL_alist_pop; et. }
+      iIntros "[H0 H1]". iFrame. 
+      iPoseProof (iPropL_alist_pop with "H1") as "H"; et.
+      iDestruct "H" as "[H H0]". iSplitL "H"; et.
+    }
   Qed.
 
   Lemma iPropL_assert (Hns: list string) (Hn_new: string) (l: iPropL) (P: iProp)
@@ -263,7 +270,7 @@ Ltac start_ipm_proof :=
   | _ => try unfold from_iPropL
   end.
 
-Section CURRENT.
+(* Section CURRENT.
   Context `{Σ: GRA.t}.
 
   Variant current_iProp (fmr: Σ) (I: iProp): Prop :=
@@ -379,11 +386,11 @@ Section CURRENT.
     eapply URA.updatable_add; et.
   Qed.
 
-End CURRENT.
+End CURRENT. *)
 
 
 
-Section TACTICS.
+(* Section TACTICS.
   Context `{Σ: GRA.t}.
 
   Definition current_iPropL (fmr: Σ) (l: iPropL) :=
@@ -636,8 +643,8 @@ Section TACTICS.
   Qed.
 
 End TACTICS.
-Arguments current_iPropL: simpl never.
-
+Arguments current_iPropL: simpl never. *)
+(* 
 Section INW.
   Context `{Σ: GRA.t}.
   Definition iNW (name: string) (P: iProp'): iProp' := P.
@@ -930,9 +937,9 @@ Ltac mDesAll :=
 
 Goal <<A: True>>. ss. Abort.
 Notation "{{ x : t }}" := (@iNW _ x t) (at level 80, x at next level, t at next level, no associativity).
-Goal <<A: True>>. ss. Abort.
+Goal <<A: True>>. ss. Abort. *)
 
-Section TEST.
+(* Section TEST.
   Context {Σ: GRA.t}.
   Context {M: URA.t}.
   Context `{@GRA.inG M Σ}.
@@ -1207,7 +1214,7 @@ Section TEST.
     i. mRename "H0" into "H".
   Abort.
 
-End TEST.
+End TEST. *)
 
 
 Module PARSE.
@@ -1286,7 +1293,7 @@ Ltac clear_fast :=
          end
 .
 
-Ltac iSplits :=
+(* Ltac iSplits :=
   intros; unfold NW, iNW;
   repeat match goal with
          | [ |- @ex _ _ ] => eexists
@@ -1298,7 +1305,7 @@ Ltac iSplits :=
          | _ => iSplit
          end
 .
-
+ *)
 
 Section IMOD.
 

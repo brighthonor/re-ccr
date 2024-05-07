@@ -346,7 +346,22 @@ Global Opaque _APC.
          match e with
          | SUpdate run => pupdate run
          end).
+(*   
+  Definition handle_Assume (P: iProp) : stateT (iProp) (itree Es) unit :=
+    fun ifr =>
+      imr <- mget;; 
+      assume( ⊢ P ** ifr ** imr);;; 
+      Ret ( (#=> (P ** ifr)), tt).
   
+  Definition handle_Guarantee P: stateT (Σ) (itree Es) unit :=
+    fun ifr =>
+      imr <- mget;;
+      guarantee(Own (fr ⋅ mr) ⊢ #=> Own (r ⋅ fr' ⋅ mr'));;;
+      guarantee(Own r ⊢ P);;;
+      mput mr';;;
+      Ret (P -* ifr, tt).
+ *)
+
   Definition handle_Assume P: stateT (Σ) (itree Es) unit :=
     fun fr =>
       r <- trigger (Take Σ);;

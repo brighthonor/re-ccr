@@ -1,4 +1,4 @@
-Require Import sflib.
+From sflib Require Import sflib.
 Require Import String.
 Require Import Coqlib.
 Require Import Any.

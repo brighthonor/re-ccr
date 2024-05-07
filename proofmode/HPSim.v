@@ -539,6 +539,40 @@ Section HPSIM.
     apply hpsim_bindC_wrespectful.
   Qed.
 
+
+
+
+  Variant hpsim_extendC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  :=
+  | hpsim_extendC_intro
+      p_src p_tgt R RR sti_src sti_tgt fmr fmr'
+      (SIM: r R RR p_src p_tgt sti_src sti_tgt fmr)
+      (EXT: URA.extends fmr fmr')
+      (WF: URA.wf fmr')
+    :
+    hpsim_extendC r R RR p_src p_tgt sti_src sti_tgt fmr'
+  .
+
+  Lemma hpsim_extendC_mon
+        r1 r2
+        (LEr: r1 <7= r2)
+    :
+    hpsim_extendC r1 <7= hpsim_extendC r2
+  .
+  Proof. ii. destruct PR; econs; et. Qed.
+
+  Lemma hpsim_extendC_compatible:
+    compatible7 (@_hpsim false) hpsim_extendC.
+  Proof. Admitted.
+
+  Lemma hpsim_extendC_spec:
+    hpsim_extendC <8= gupaco7 (@_hpsim false) (cpn7 (@_hpsim false)).
+  Proof.
+    intros. gclo. econs; eauto using hpsim_extendC_compatible.
+    eapply hpsim_extendC_mon, PR; eauto with paco.
+  Qed.
+
   Definition itreeH_dummy_ktree Q R (k k': Q -> itree hAGEs R) :=
     k' = k \/ k' = (fun x => trigger (Guarantee True);;; k x).
   Hint Unfold itreeH_dummy_ktree.

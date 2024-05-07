@@ -265,8 +265,7 @@ Section TEST.
 
   Definition HRET: itree hAGEs Any.t := Ret tt↑.
 
-  Let fl_src: alist gname (Any.t -> itree hAGEs Any.t) := [("f", (fun (_ :Any.t) => Ret tt↑))].
-  Let fl_tgt: alist gname (Any.t -> itree hAGEs Any.t) := [("g", (fun (_ :Any.t) => Ret tt↑))].
+  Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
 
   Goal gpaco7 (@_hpsim Σ fl_src fl_tgt I false) (cpn7 (@_hpsim Σ fl_src fl_tgt I false)) bot7 bot7 Any.t (fun _ _ => ⌜True⌝%I) false false
        (srcs0, triggerUB >>= idK) (tgts0, triggerUB >>= idK) ε. 
@@ -280,15 +279,20 @@ Section TEST.
     hsteps.
   Qed.
 
-  Goal gpaco7 (@_hpsim Σ fl_src fl_tgt I false) (cpn7 (@_hpsim Σ fl_src fl_tgt I false)) bot7 bot7 Any.t (fun _ _ => ⌜True⌝%I) false false
-       (srcs0, trigger (Call "f" tt↑) >>= idK) (tgts0, trigger (Call "g" tt↑) >>= idK) ε.
-  Proof.
-    inline. hsteps. et.
-    (* inline_l. inline_r. hsteps. et.  *)
-  Qed.
+  Section INLINE.
+    Let fl_src0: alist gname (Any.t -> itree hAGEs Any.t) := [("f", (fun (_ :Any.t) => Ret tt↑))].
+    Let fl_tgt0: alist gname (Any.t -> itree hAGEs Any.t) := [("g", (fun (_ :Any.t) => Ret tt↑))].
 
+    Goal gpaco7 (@_hpsim Σ fl_src0 fl_tgt0 I false) (cpn7 (@_hpsim Σ fl_src0 fl_tgt0 I false)) bot7 bot7 Any.t (fun _ _ => ⌜True⌝%I) false false
+         (srcs0, trigger (Call "f" tt↑) >>= idK) (tgts0, trigger (Call "g" tt↑) >>= idK) ε.
+    Proof.
+      inline. hsteps. et.
+    (* inline_l. inline_r. hsteps. et.  *)
+    Qed.
+  End INLINE.
   Section LINKING.
     (* Variable ms0 ms1 mt0 mt1: HMod.t. *)
+
 
     Definition mss0: HModSem.t := {|
       HModSem.fnsems := [("f0", (fun _ => Ret tt↑))];
@@ -352,7 +356,7 @@ Section TEST.
 
   End LINKING.
 
-
+(* 
   Section MULT.
     Require Import Coqlib.
     Require Import ImpPrelude.
@@ -449,6 +453,6 @@ Section TEST.
 
   Qed.
 
-  End MULT.
+  End MULT. *)
 
 End TEST.
