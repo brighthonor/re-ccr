@@ -58,8 +58,8 @@ Module RA.
 
     extends := fun a b => exists ctx, add a ctx = b;
     updatable := fun a b => forall ctx, wf (add a ctx) -> wf (add b ctx);
-    updatable_set := fun a B => exists b, <<IN: B b>> /\ 
-                              (forall ctx (WF: wf (add a ctx)), wf (add b ctx));
+    updatable_set := fun a B => forall ctx (WF: wf (add a ctx)),
+                         exists b, <<IN: B b>> /\ <<WF: wf (add b ctx)>>;
   }
   .
 
@@ -273,8 +273,8 @@ Module URA.
     (* updatable := fun a b => forall ctx, wf (add a ctx) -> wf (add b ctx); *)
     extends := fun a b => exists ctx, add a ctx = b;
     updatable := fun a b => forall ctx, wf (add a ctx) -> wf (add b ctx);
-    updatable_set := fun a B => exists b, <<IN: B b>> /\ 
-                                (forall ctx (WF: wf (add a ctx)), wf (add b ctx));
+    updatable_set := fun a B => forall ctx (WF: wf (add a ctx)),
+                         exists b, <<IN: B b>> /\ <<WF: wf (add b ctx)>>;
   }
   .
 
@@ -432,18 +432,15 @@ Module URA.
     :
     @updatable_set (prod A B) (a0, b0) (fun '(a1, b1) => PA a1 /\ PB b1).
   Proof.
-    (* ii. destruct ctx.
-    unfold wf, add in WF. unseal "ra". ss. des. *)
-    destruct UPD0, UPD1. des.
-    exists (x, x0). ss. splits; ss.
-    unfold wf. unseal "ra". ss.
     ii. destruct ctx.
-    specialize (H0 c).
-    specialize (H1 c0).
-    des_ifs.
-    unfold add in Heq0, Heq. unseal "ra". ss. des. clarify.
-    unnw. et. 
+    unfold wf, add in WF. unseal "ra". ss. des.
+    exploit UPD0; eauto. i. des.
+    exploit UPD1; eauto. i. des.
+    exists (b, b1). ss. splits; ss.
+    unfold wf. unseal "ra". ss. des_ifs.
+    unfold add in Heq. unseal "ra". ss. clarify.
   Qed.
+
 
   Program Definition to_RA (M: t): RA.t := {|
     RA.car := car;
@@ -1379,16 +1376,15 @@ Section POINTWISE.
 
   Lemma updatable_set_impl (M: URA.t)
         (P0 P1: M -> Prop)
-        (IMPL: forall r, P0 r -> P1 r)
-        (* (IMPL: forall r, URA.wf r -> P0 r -> P1 r) *)
+        (IMPL: forall r, URA.wf r -> P0 r -> P1 r)
         (m: M)
-        (* (WF: URA.wf m) *)
         (UPD: URA.updatable_set m P0)
     :
     URA.updatable_set m P1.
   Proof.
-    destruct UPD. des.
-    r. exists x. esplits; i; et.
+    ii. eapply UPD in WF; eauto. des.
+    esplits; eauto. eapply IMPL; auto.
+    eapply URA.wf_mon. eauto.
   Qed.
 
   Lemma pointwise_extends A (M: URA.t)
@@ -1420,9 +1416,11 @@ Section POINTWISE.
     :
     URA.updatable_set f (fun f' => forall a, P a (f' a)).
   Proof.
-    hexploit (choice (fun a b => P a b ∧ (∀ ctx : M, URA.wf (f a ⋅ ctx) → URA.wf (b ⋅ ctx)))); et.
-    i. des. hdes. exists f0. esplits; et.
-    i. ur. i. ur in WF. et. 
+    ii. hexploit (choice (fun a m => P a m /\ URA.wf (m ⋅ ctx a))).
+    { i. eapply (UPD x). ur in WF. auto. }
+    i. des. exists f0. splits; auto.
+    { i. specialize (H a). des. auto. }
+    { ur. i. specialize (H k). des. auto. }
   Qed.
 
   Definition maps_to_res {A} {M: URA.t}
@@ -1463,16 +1461,17 @@ Section POINTWISE.
   Proof.
     eapply updatable_set_impl; cycle 1.
     { eapply pointwise_updatable_set.
-      (* instantiate (1:= fun a' m' => (a' = a -> P m') /\ (a' <> a -> m' = URA.unit)). *)
-      destruct UPD. des.
-      ii. r. exists ( if excluded_middle_informative (a0 = a) then x else URA.unit). 
-      esplits; cycle 1.
-      { i. unfold maps_to_res in WF. des_ifs. eapply a1; et. }
       instantiate (1:= fun a' m' => (a' = a -> P m') /\ (a' <> a -> m' = URA.unit)).
-      ss. splits; i; des_ifs.
+      ii. unfold maps_to_res in WF. des_ifs.
+      { exploit UPD; eauto. i. des. esplits; eauto. ss. }
+      { exists URA.unit. splits; ss. }
     }
-    i. ss. hdes. exists (r a). splits; auto.
-    { extensionality a'. unfold maps_to_res. des_ifs. et. }
+    { i. ss. exists (r a). splits; auto.
+      { extensionality a'. unfold maps_to_res. des_ifs.
+        specialize (H0 a'). des. auto.
+      }
+      { specialize (H0 a). des. auto. }
+    }
   Qed.
 
   Definition map_update {A} {M: URA.t}

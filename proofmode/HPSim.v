@@ -890,10 +890,9 @@ Proof.
     gstep.
     eapply hpsim_call; ss. { instantiate (1:= ⌜True⌝%I). et. }
     ii. econs; et.
-    eapply iProp_sepconj in INV; et. des.
-    eapply own_wf in INV; et. eapply URA.wf_split in INV; des.
-    eapply own_pure in INV0; et. clarify.
-    gbase. auto.
+    uipropall. hexploit INV; [et|refl|instantiate (1:= ε); r_solve; et|]. i. des.  
+    rr in H1. uipropall. clarify.
+    gbase. auto. 
   }
   destruct s.
   { rewrite <- ! bind_trigger. resub. dependent destruction s.

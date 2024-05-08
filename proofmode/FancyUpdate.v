@@ -105,11 +105,33 @@ Section WORLD_SATISFACTION.
     (INF : forall (E : gset positive) , exists i, i ∉ E /\ φ i)
     : ⊢ |==> ∃ i, ⌜φ i⌝ ∧ OwnD {[i]}.
   Proof.
+    assert (forall ctx, @URA.updatable_set Gset.t (ctx) (fun r => exists i, r = Some {[i]} /\ φ i)) as UPD.
+    { clear - INF. ii. destruct ctx as [D|].
+      - specialize (INF D). des. r. esplits; eauto.
+        i. eapply URA.wf_split in WF. rr in WF. des. unfold URA.wf, URA.add. unseal "ra". ss. des_ifs; set_solver.
+      - rr in WF. des. rr in WF0. unseal "ra". ss.
+    }
+
+    specialize (INF gset_empty). des.
+    iPoseProof (@OwnM_unit _ _ H1) as "-# H".
+    (* iMod (OwnM_Upd_set UPD with "H") as "[% [% DIS]]". *)
+    iModIntro. des. subst. iExists i. eauto.
+
+    iPoseProof (@OwnM_unit _ _ H1) as "-# H".
+    iMod (OwnM_Upd_set UPD with "H") as "[% [% DIS]]".
+    iModIntro. des. subst. iExists i. eauto.
+  Qed.
+
+
+  Lemma alloc_name φ
+    (INF : forall (E : gset positive) , exists i, i ∉ E /\ φ i)
+    : ⊢ |==> ∃ i, ⌜φ i⌝ ∧ OwnD {[i]}.
+  Proof.
     assert (@URA.updatable_set Gset.t (Some ∅) (fun r => exists i, r = Some {[i]} /\ φ i)) as UPD.
-    { clear - INF. ii. apply URA.wf_split in WF; des. destruct ctx as [D|].
+    { clear - INF. r. ii. apply URA.wf_split in WF; des. destruct ctx as [D|].
       - specialize (INF D). des. esplits; eauto.
         unfold URA.wf, URA.add. unseal "ra". ss. des_ifs; set_solver.
-      - rr in WF0. unseal "ra". ss.
+      - rr in WF. des. rr in WF0. unseal "ra". ss.
     }
     iPoseProof (@OwnM_unit _ _ H1) as "-# H".
     iMod (OwnM_Upd_set UPD with "H") as "[% [% DIS]]".

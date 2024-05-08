@@ -9,6 +9,24 @@ Set Typeclasses Depth 5.
 
 
 Create HintDb iprop.
+Definition aof_true: Type := True.
+Global Opaque aof_true.
+
+Ltac place_bar name :=
+  first [ on_last_hyp ltac:(fun H => revert H; place_bar name; intros H) | assert(name: aof_true) by constructor].
+
+Ltac all_once_fast TAC :=
+  generalize (I: aof_true);
+  let name := fresh "bar" in
+  place_bar name; revert_until name;
+  repeat
+    match goal with
+    | [ |- aof_true -> _ ] => fail 1
+    | _ => intro; on_last_hyp TAC
+    end;
+  intro; on_last_hyp ltac:(fun H => clear H);
+  clear name.
+
 Ltac uipropall :=
   repeat (autounfold with iprop; autorewrite with iprop;
        all_once_fast ltac:(fun H => autounfold with iprop in H; autorewrite with iprop in H); ss).
@@ -133,7 +151,18 @@ Section IPROP.
   Qed.
 
   (*** this is deprecated in 1.1 ***)
-  Program Definition WeakUpd (P: iProp'): iProp' :=
+  (* Program Definition WeakUpd (P: iProp'): iProp' :=
+    Seal.sealing
+      "iProp"
+      (iProp_intro (fun r0 => forall ctx, URA.wf (r0 ⋅ ctx) -> exists r1, URA.wf (r1 ⋅ ctx) /\ P r1) _).
+  Next Obligation.
+    red in LE. des. subst. hexploit (H (ctx0 ⋅ ctx)).
+    { rewrite URA.add_assoc. auto. }
+    i. des. esplits; [..|eauto]. eapply URA.wf_mon.
+    instantiate (1:=ctx0). r_wf H1.
+  Qed. *)
+
+  Program Definition Upd (P: iProp'): iProp' :=
     Seal.sealing
       "iProp"
       (iProp_intro (fun r0 => forall ctx, URA.wf (r0 ⋅ ctx) -> exists r1, URA.wf (r1 ⋅ ctx) /\ P r1) _).
@@ -144,13 +173,6 @@ Section IPROP.
     instantiate (1:=ctx0). r_wf H1.
   Qed.
 
-  Program Definition Upd (P: iProp'): iProp' :=
-    Seal.sealing
-      "iProp"
-      (iProp_intro (fun r0 => exists r1, P r1 /\ (forall ctx, URA.wf (r0 ⋅ ctx) -> URA.wf (r1 ⋅ ctx))) _).
-  Next Obligation.
-    esplits; et. i. eapply H1. r in LE. des. subst. eapply URA.wf_mon; et. instantiate (1:=ctx0). r_wf H2.
-  Qed.
 
   Definition Entails (P Q : iProp') : Prop :=
     Seal.sealing
@@ -332,18 +354,21 @@ Section IPROP.
 
   Lemma Upd_mono: forall P Q : iProp', Entails P Q -> Entails (Upd P) (Upd Q).
   Proof.
-    ii. uipropall. ii. des. esplits; eauto. eapply H; et. specialize (H1 ε). rewrite ! URA.unit_id in H1. et.
-  Qed.
+  ii. uipropall. ii. exploit H0; eauto. i. des.
+  exploit (H r1); eauto. eapply URA.wf_mon; eauto.
+Qed.
 
   Lemma Upd_trans: forall P : iProp', Entails (Upd (Upd P)) (Upd P).
   Proof.
-    ii. uipropall. ii. des. esplits; et.
+    ii. uipropall. ii. exploit H; eauto. i. des. hexploit x0; eauto.
   Qed.
 
   Lemma Upd_frame_r: forall P R : iProp', Entails (Sepconj (Upd P) R) (Upd (Sepconj P R)).
   Proof.
-    ii. uipropall. ii. unfold Sepconj in *. des. subst. esplits; et. i.
-    rewrite <- URA.add_assoc in H. eapply H2 in H. r_wf H.
+    ii. uipropall. ii. unfold Sepconj in *. des. subst. exploit (H1 (b ⋅ ctx)); eauto.
+    { rewrite URA.add_assoc. eauto. }
+    i. des. esplits; [..|eapply x1|eapply H2]; ss.
+    rewrite <- URA.add_assoc. eauto.
   Qed.
 End IPROP.
 Hint Rewrite (Seal.sealing_eq "iProp"): iprop.

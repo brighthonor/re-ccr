@@ -178,8 +178,10 @@ Section IPM.
   Proof.
     econs.
     - ii. econs. unfold bupd. uipropall. i. split.
-      { ii. des. esplits; et. eapply H; et. eapply URA.wf_mon; et. eapply H2. rewrite URA.unit_id. et. }
-      { ii. des. esplits; et. eapply H; et. eapply URA.wf_mon; et. eapply H2. rewrite URA.unit_id. et. }
+      { ii. exploit H1; eauto. i. des. esplits; eauto.
+        eapply H; eauto. eapply URA.wf_mon; eauto. }
+      { ii. exploit H1; eauto. i. des. esplits; eauto.
+        eapply H; eauto. eapply URA.wf_mon; eauto. }
     - exact Upd_intro.
     - exact Upd_mono.
     - exact Upd_trans.
@@ -381,7 +383,9 @@ Section ILEMMAS.
       Own a ⊢ #=> P.
   Proof.
     uipropall. ss. i. unfold URA.extends in *. des. subst.
-    esplits; et. i. eapply (URA.wf_mon (b:=ctx)). r_wf H.
+    uipropall. i. esplits; [|apply SAT]. eapply URA.wf_mon.
+    instantiate (1:=ctx0). replace (a ⋅ ctx ⋅ ctx0) with (a ⋅ ctx0 ⋅ ctx); eauto.
+    repeat rewrite <- URA.add_assoc. f_equal. eapply URA.add_comm.
   Qed.
 
   Lemma to_semantic (a: Σ) (P: iProp') (SAT: Own a ⊢ P) (WF: URA.wf a)
@@ -403,7 +407,10 @@ Section ILEMMAS.
     :
       #=> ⌜P⌝ ⊢ ⌜P⌝.
   Proof.
-    rr. uipropall. i. rr. uipropall. des. rr in H. uipropall.
+    rr. uipropall. i. rr. uipropall.
+    hexploit (H URA.unit).
+    { rewrite URA.unit_id. eauto. }
+    i. des. rr in H1. uipropall.
   Qed.
 
   Lemma Own_Upd_set
@@ -413,11 +420,21 @@ Section ILEMMAS.
       (Own r1) ⊢ (#=> (∃ b, ⌜B b⌝ ** (Own b)))
   .
   Proof.
-    destruct UPD. des.
     cut (Entails (Own r1) (Upd (Ex (fun b => Sepconj (Pure (B b)) (Own b))))); ss.
-    uipropall. i. esplits; cycle 1.
-    { i. instantiate (1:= x). eapply H0. eapply URA.wf_extends; et. eapply URA.extends_add. et. }
-    uipropall. exists ε, x. esplits; et; [r_solve|refl]. 
+    unfold Entails.
+
+     autounfold with iprop; autorewrite with iprop.
+    all_once_fast ltac:(fun H => autounfold with iprop in H; autorewrite with iprop in H); ss.
+
+
+
+    uipropall. i. red in H. des. subst.
+    exploit (UPD (ctx0 ⋅ ctx)).
+    { rewrite URA.add_assoc. eauto. }
+    i. des. exists (b ⋅ ctx0). split.
+    { rewrite <- URA.add_assoc. eauto. }
+    { exists b. uipropall. esplits; [|apply IN|reflexivity].
+      eapply URA.add_comm. }
   Qed.
 
   Lemma Own_Upd
@@ -427,8 +444,12 @@ Section ILEMMAS.
       (Own r1) ⊢ (#=> (Own r2))
   .
   Proof.
-    uipropall. i. exists r2. esplits; et. { refl. } i. eapply UPD. eapply URA.wf_extends; et.
-    eapply URA.extends_add; et.
+    iStartProof. iIntros "H".
+    iAssert (#=> (∃ b, ⌜((eq r2) b)⌝ ** (Own b)))%I with "[H]" as "H".
+    { iApply Own_Upd_set; [|iFrame].
+      red. red in UPD. i. hexploit UPD; eauto. }
+    iMod "H". iDestruct "H" as (b) "[#H0 H1]".
+    iPure "H0" as Hs. subst. iApply "H1".
   Qed.
 
   Lemma Own_extends
@@ -468,10 +489,8 @@ Section ILEMMAS.
     assert (UPDM: URA.updatable_set
                     (GRA.embed r1)
                     (fun r => exists m, r = GRA.embed m /\ B m)).
-    {
-      destruct UPD. des. r.
-      exists (GRA.embed x). esplits; et. i.
-      unshelve hexploit H1.
+    { red. i. red in UPD.
+      unshelve hexploit UPD.
       { eapply (@eq_rect URA.t (Σ (@GRA.inG_id _ _ H)) (@URA.car)).
         { eapply (ctx (@GRA.inG_id _ _ H)). }
         { symmetry. eapply (@GRA.inG_prf _ _ H). }
@@ -484,7 +503,8 @@ Section ILEMMAS.
           with (@left (inG_id = inG_id) (inG_id <> inG_id) eq_refl) in WF; ss.
         { des_ifs. repeat f_equal. eapply proof_irrelevance. }
       }
-      i. ur. Local Transparent GRA.to_URA. ss.
+      i. des. exists (GRA.embed b). esplits; eauto.
+      ur. Local Transparent GRA.to_URA. ss.
       i. unfold GRA.embed. des_ifs.
       { ss. unfold PCM.GRA.cast_ra. destruct  H. subst. ss. }
       { ur in WF. specialize (WF k). rewrite URA.unit_idl.
@@ -505,10 +525,12 @@ Section ILEMMAS.
       (OwnM r1) ⊢ (#=> (OwnM r2))
   .
   Proof.
-    uipropall. i. exists (GRA.embed r2). esplits; et.
-    { unfold OwnM in *. uipropall. refl. }
-    i. eapply GRA.embed_updatable in UPD. eapply UPD. eapply URA.wf_extends; et. eapply URA.extends_add; et.
-    unfold OwnM in H0. uipropall.
+    iStartProof. iIntros "H".
+    iAssert (#=> (∃ b, ⌜((eq r2) b)⌝ ** (OwnM b)))%I with "[H]" as "H".
+    { iApply OwnM_Upd_set; [|iFrame].
+      red. red in UPD. i. hexploit UPD; eauto. }
+    iMod "H". iDestruct "H" as (b) "[#H0 H1]".
+    iPure "H0" as Hs. subst. iApply "H1".
   Qed.
 
   Lemma OwnM_extends (M: URA.t) `{@GRA.inG M Σ}
@@ -701,10 +723,10 @@ Section OWN.
   .
   Proof. 
     uipropall. hexploit OWN; et. { refl. }
+    { instantiate (1:= ε). r_solve. eapply WF. }
     esplits; et. des.
     eapply URA.wf_extends; et.
-    specialize (H0 ε). rewrite ! URA.unit_id in H0.
-    et.
+    eapply URA.wf_mon. et.
   Qed.
 
   (* replace with imod_trans *)
@@ -730,28 +752,60 @@ Section OWN.
     eapply URA.wf_extends in WF; et.
     clarify.
   Qed.
+  
+  Lemma iProp_sepconj P Q r r0 ctx
+      (SAT: Own r ⊢ #=> (P ** Q))
+      (EXT: URA.extends r r0)
+      (WF: URA.wf (r0 ⋅ ctx))
+    :
+      exists a b: Σ, URA.wf (a ⋅ b ⋅ ctx) /\ P a /\ Q b
+      (* need r0 = a ⋅ b, URA.extends r0 (a ⋅ b), Own r0 ⊢ #=> a ⋅ b, .... *)
+  .
+  Proof.
+    uipropall. hexploit (SAT r0); et. 
+    { eapply URA.wf_mon; et. }
+    i. des. 
+    rewrite H0 in H. 
+    assert (URA.extends r0 (a ⋅ b)).
+    { unfold URA.extends.
+      
+    }
+    esplits; et.
+  Qed.
 
-  Lemma iProp_sepconj_aux P Q r 
+
+  (* Lemma iProp_sepconj_aux P Q r 
       (SAT: Own r ⊢ #=> (P ** Q))
     :
       exists rp rq, (URA.updatable r (rp ⋅ rq)) /\ 
                     (Own rp ⊢ P) /\ 
                     (Own rq ⊢ Q)
   .
-  Proof.
+  Proof. 
     destruct (classic (URA.wf r)); cycle 1.
     {
       exists r, r. esplits; eauto using not_wf_sat.
       rr. i. eapply URA.wf_mon in H0. clarify. 
     }
 
+
+    esplits; et.
+    { unfold URA.updatable. i.
+      uipropall. hexploit (SAT r); et. { refl. }
+      i. des.  
+    }
+
+
     uipropall.
-    hexploit SAT; et. { r_solve. }
+    
+    hexploit SAT; et. 
+    { r_solve. }
+    { instantiate (1:= ε). r_solve. et. }
     i. des.
-    esplits; et; uipropall.
+    esplits; uipropall; cycle 1.
     {
       instantiate (1:= b). instantiate (1:=a).
-      unfold URA.updatable. subst. et. 
+      unfold URA.updatable. subst. i. et. admit. 
     }
     {
       i. destruct P. ss.
@@ -776,6 +830,6 @@ Section OWN.
     eapply iProp_sepconj_aux in SAT; et. des.
     eapply Own_Upd in SAT.
     esplits; et. 	
-  Qed.	
+  Qed.	 *)
 
 End OWN.

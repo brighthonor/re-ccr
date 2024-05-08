@@ -122,7 +122,7 @@ Section ILIST.
     destruct a. iIntros "[H0 H1]".
     rewrite eq_rel_dec_correct in *. des_ifs.
     { ss. iPoseProof (IHl with "H1") as "H1"; et. repeat iFrame.
-      iMod "H1". iDestruct "H1" as "[H H0]". iSplitL "H"; et.  
+      (* iMod "H1". iDestruct "H1" as "[H H0]". iSplitL "H"; et.   *)
     }
     { ss. iPoseProof (ENTAIL with "H0") as "> H0".
       iPoseProof (iPropL_clear with "H1") as "> H1".
@@ -157,10 +157,10 @@ Section ILIST.
     rewrite eq_rel_dec_correct in *. des_ifs; ss.
     { iPoseProof (IHl with "H1") as (a) "H1"; et.
       iExists a. repeat iFrame.
-      iMod "H1". iDestruct "H1" as "[H H0]". iSplitL "H"; et.   
+      (* iMod "H1". iDestruct "H1" as "[H H0]". iSplitL "H"; et.    *)
     }
     { iDestruct "H0" as (a) "H0". iExists a.
-      iFrame. iSplitR; et. iApply iPropL_clear. iFrame. }
+      iFrame. iApply iPropL_clear. iFrame. }
   Qed.
 
   Lemma iPropL_destruct_or Hn (l: iPropL) (P0 P1: iProp)
@@ -172,13 +172,13 @@ Section ILIST.
     destruct a. iIntros "[H0 H1]".
     rewrite eq_rel_dec_correct in *. des_ifs; ss.
     { iPoseProof (IHl with "H1") as "[H1|H1]"; et.
-      { iLeft. repeat iFrame. iApply iFrame_true; et.
+      { iLeft. repeat iFrame. 
       }
-      { iRight. repeat iFrame. iApply iFrame_true; et. }
+      { iRight. repeat iFrame.  }
     }
     { iDestruct "H0" as "[H0|H0]".
-      { iLeft. iFrame. iSplitR; et. iApply iPropL_clear. iFrame. }
-      { iRight. iFrame. iSplitR; et. iApply iPropL_clear. iFrame. }
+      { iLeft. iFrame. iApply iPropL_clear. iFrame. }
+      { iRight. iFrame. iApply iPropL_clear. iFrame. }
     }
   Qed.
 
@@ -187,7 +187,7 @@ Section ILIST.
       P ** from_iPropL l -∗ #=> (from_iPropL (alist_add Hn P l)).
   Proof.
     unfold alist_add. ss. iIntros "[H0 H1]".
-    iFrame. iSplitR; et. iApply iPropL_clear. iFrame.
+    iFrame. iApply iPropL_clear. iFrame.
   Qed.
 
   Lemma iPropL_destruct_sep Hn_old Hn_new0 Hn_new1 (l: iPropL) (P0 P1: iProp)
@@ -210,7 +210,7 @@ Section ILIST.
     revert P l1 FIND. induction l0; ss. i.
     destruct a. rewrite eq_rel_dec_correct in *. des_ifs.
     ss. hexploit IHl0; et. i.
-    iIntros "[H0 H1]". iFrame. iApply iFrame_true. iApply H. iFrame.
+    iIntros "[H0 H1]". iFrame. iApply H. iFrame.
   Qed.
 
   Lemma iPropL_alist_pops l Hns
@@ -222,7 +222,6 @@ Section ILIST.
     { ss. des_ifs. ss. etrans; et.
       iIntros "[H0 H1]". iFrame. 
       iPoseProof (iPropL_alist_pop with "H1") as "H"; et.
-      iDestruct "H" as "[H H0]". iSplitL "H"; et.
     }
   Qed.
 

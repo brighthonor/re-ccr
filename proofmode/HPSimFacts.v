@@ -372,20 +372,22 @@ punfold SIM. induction SIM; i; clarify.
     { iIntros "H". iPoseProof (RET with "H") as "H". iMod "H". iDestruct "H" as "[H H0]". et. }
   }
   {
-    eapply own_wf in FMR; et. do 2 eapply URA.wf_mon in FMR. eapply URA.wf_split in FMR. des. 
-    eapply iProp_sepconj in RET. des.
-    eapply own_wf in RET; et. eapply URA.wf_split in RET. des.
-    eapply own_pure in RET1; et.
+    eapply own_wf in FMR; et. do 2 eapply URA.wf_mon in FMR. eapply URA.wf_split in FMR. des.
+    rr in RET. uipropall. hexploit RET; [et|refl|instantiate (1:= ε); r_solve; et|].
+    i. des. rr in H2. uipropall.
   }
 - unfold interp_hp_body. hexploit INV. i.
-  eapply iProp_sepconj in H0; et. des. rename rq into fr. rename rp into mr.
+  assert (FMRWF: URA.wf (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt))). 
+  { eapply own_wf in FMR; et. replace (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt); r_solve. et. }
+  eapply iProp_sepconj in H0; [|refl|et]. des. rename a into fr. rename b into mr.
   steps. unfold handle_Guarantee, guarantee, mget, mput. steps_safe.
   force_l. instantiate (1:= (c0, ε, ctx ⋅ fr ⋅ c1 ⋅ mr ⋅ c)). steps_safe.
   rename c1 into frt. rename c into mrt.
   force_l.
   { 
     replace (c0 ⋅ ε ⋅ (ctx ⋅ fr ⋅ frt ⋅ mr ⋅ mrt)) with (ctx ⋅ (mr ⋅ fr) ⋅ (c0 ⋅ frt ⋅ mrt)); [|r_solve].
-    eapply own_trans; et. rewrite <- (URA.add_assoc (ctx ⋅ fmr) fr_tgt mr_tgt).
+    eapply own_trans; et.     
+    rewrite <- (URA.add_assoc (ctx ⋅ fmr) fr_tgt mr_tgt).
     iIntros "[[H H0] X]". iSplitL "H H0".
     { iSplitL "H"; et. iPoseProof (H0 with "H0") as "H"; et. }
     { iPoseProof (x with "X") as "H"; et. }
