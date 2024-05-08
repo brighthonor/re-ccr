@@ -90,8 +90,26 @@ Section PROOF.
   Let GURA: URA.t := GRA.to_URA Σ.
   Local Existing Instance GURA.
 
+  Definition mput E `{sE -< E} `{eventE -< E} (mi: iProp): itree E unit :=
+    st <- trigger sGet;; '(mp, _) <- ((Any.split st)?);;
+    trigger (sPut (Any.pair mp mi↑))
+  .
 
-  Definition mput E `{sE -< E} `{eventE -< E} (mr: Σ): itree E unit :=
+  Definition mget E `{sE -< E} `{eventE -< E}: itree E iProp :=
+    st <- trigger sGet;; '(_, mi) <- ((Any.split st)?);;
+    mi↓?
+  .
+
+  Definition pupdate E `{sE -< E} `{eventE -< E} {X} (run: Any.t -> Any.t * X) : itree E X :=
+    trigger (SUpdate (fun st => 
+      match (Any.split st) with
+      | Some (x, mi) => ((Any.pair (fst (run x)) mi), snd (run x))
+      | None => run tt↑
+      end
+    ))
+    .
+
+  (* Definition mput E `{sE -< E} `{eventE -< E} (mr: Σ): itree E unit :=
     st <- trigger sGet;; '(mp, _) <- ((Any.split st)?);;
     trigger (sPut (Any.pair mp mr↑))
   .
@@ -108,17 +126,17 @@ Section PROOF.
       | None => run tt↑
       end
     ))
-  .
+  . *)
 
 End PROOF.
 
-Notation "'update_and_discard' fr0" :=
+(* Notation "'update_and_discard' fr0" :=
   ('(rarg, fr1, mr1) <- trigger (Choose (_ * _ * _));;
    mr0 <- mget;;
    guarantee(Own (fr0 ⋅ mr0) ⊢ #=> Own (rarg ⋅ fr1 ⋅ mr1));;;
    mput mr1;;;
    Ret (fr1, rarg)) (at level 60)
-.  
+.   *)
 
 
 (* Section PROOF.
@@ -346,23 +364,46 @@ Global Opaque _APC.
          match e with
          | SUpdate run => pupdate run
          end).
-(*   
-  Definition handle_Assume (P: iProp) : stateT (iProp) (itree Es) unit :=
-    fun ifr =>
-      imr <- mget;; 
-      assume( ⊢ P ** ifr ** imr);;; 
-      Ret ( (#=> (P ** ifr)), tt).
   
-  Definition handle_Guarantee P: stateT (Σ) (itree Es) unit :=
-    fun ifr =>
-      imr <- mget;;
-      guarantee(Own (fr ⋅ mr) ⊢ #=> Own (r ⋅ fr' ⋅ mr'));;;
-      guarantee(Own r ⊢ P);;;
-      mput mr';;;
-      Ret (P -* ifr, tt).
- *)
+  Definition handle_Assume (P: iProp) : stateT (iProp) (itree Es) unit :=
+    fun fP =>
+      (* mP <- mget;;  *)
+      (* assume( ⊢ P ** fP ** mP);;;  *)
+      Ret (P ** fP, tt).
+  
+  Definition handle_Guarantee (P: iProp) : stateT (iProp) (itree Es) unit :=
+    fun fP =>
+      mP <- mget;;
+      '(fP', mP') <- trigger (Choose (iProp * iProp));;
+      guarantee(fP ** mP ⊢ #=> (P ** fP' ** mP'));;;
+      mput mP';;;
+      Ret (fP', tt).
 
-  Definition handle_Assume P: stateT (Σ) (itree Es) unit :=
+  Definition handle_hAGE_tgt: hAGE ~> stateT (iProp) (itree Es) :=
+    fun _ e fr =>
+      match e with
+      | Assume P => handle_Assume P fr
+      | Guarantee P => handle_Guarantee P fr
+      end
+  .      
+
+  Definition interp_hp : itree hAGEs ~> stateT iProp (itree Es) :=
+      interp_state 
+        (case_ (bif:=sum1) (handle_hAGE_tgt)
+        (case_ (bif:=sum1) ((fun T X fP => '(fP', _) <- (handle_Guarantee (True%I) fP);; x <- trigger X;; Ret (fP', x)): _ ~> stateT iProp (itree Es)) 
+        (case_ (bif:=sum1) ((fun T X fP => x <- handle_sE_tgt X;; Ret (fP, x)): _ ~> stateT iProp (itree Es)) 
+                           ((fun T X fP => x <- trigger X;; Ret (fP, x)): _ ~> stateT iProp (itree Es)))))
+    .
+
+  Definition hp_fun_tail := (fun '(fr, x) => handle_Guarantee (True%I) fr ;;; Ret (x: Any.t)).
+    
+  Definition interp_hp_body (i: itree hAGEs Any.t) (fP: iProp) : itree Es Any.t :=
+    interp_hp i fP >>= hp_fun_tail.
+
+  Definition interp_hp_fun (f: Any.t -> itree hAGEs Any.t) : Any.t -> itree Es Any.t :=
+    fun x => interp_hp_body (f x) True.    
+
+  (* Definition handle_Assume P: stateT (Σ) (itree Es) unit :=
     fun fr =>
       r <- trigger (Take Σ);;
       mr <- mget;; 
@@ -385,7 +426,7 @@ Global Opaque _APC.
       | Assume P => handle_Assume P fr
       | Guarantee P => handle_Guarantee P fr
       end
-  .
+  
 
   Definition interp_hp : itree hAGEs ~> stateT Σ (itree Es) :=
       interp_state 
@@ -402,7 +443,8 @@ Global Opaque _APC.
 
   Definition interp_hp_fun (f: Any.t -> itree hAGEs Any.t) : Any.t -> itree Es Any.t :=
     fun x => interp_hp_body (f x) ε.
-  
+*)
+
 End CANCEL.
 
 End PSEUDOTYPING.
@@ -1151,7 +1193,7 @@ Lemma interp_hp_triggerUB
   :
     interp_hp (triggerUB) fmr
     =
-    triggerUB (A:=Σ*R).
+    triggerUB (A:=iProp*R).
 Proof.
   unfold interp_hp, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
 Qed.
@@ -1162,7 +1204,7 @@ Lemma interp_hp_triggerNB
   :
     interp_hp (triggerNB) fmr
     =
-    triggerNB (A:=Σ*R).
+    triggerNB (A:=iProp*R).
 Proof.
   unfold interp_hp, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
 Qed.

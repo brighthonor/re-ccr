@@ -47,7 +47,7 @@ Section HPSIM.
       fn varg k_src k_tgt FR
       (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
       (K: forall vret st_src0 st_tgt0 fmr0 
-     (WF: URA.wf fmr0)
+                 (WF: URA.wf fmr0)
                  (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
     _hpsim hpsim true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
