@@ -31,24 +31,23 @@ Section HPSIM.
   Variable I: Any.t -> Any.t -> iProp.
 
   Inductive _hpsim {with_dummy: bool}
-    (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-    {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
+    (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop)
+    {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop :=
   | hpsim_ret
       (HPSIM_RET: True)
       p_src p_tgt st_src st_tgt fmr
       v_src v_tgt
-      (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
-      (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
+      (RET: fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
+      (* Note: (INV: fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
     :
     _hpsim hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
   | hpsim_call
       (HPSIM_CALL: True)
       p_src p_tgt st_src st_tgt fmr
       fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
+      (INV: fmr ⊢ #=> (I st_src st_tgt ** FR))
       (K: forall vret st_src0 st_tgt0 fmr0 
-                 (WF: URA.wf fmr0)
-                 (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
+                 (INV: fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
     _hpsim hpsim true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
     _hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
@@ -151,8 +150,9 @@ Section HPSIM.
       (HPSIM_ASSUME_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (* remove FMR *)
+      (CUR: fmr ⊢ #=> FMR)
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> (iP ** FMR)),
           _hpsim hpsim true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
     _hpsim hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
@@ -161,8 +161,8 @@ Section HPSIM.
       (HPSIM_ASSUME_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
+      (CUR: fmr ⊢ #=> (iP ** FMR))
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> FMR),
           _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
@@ -171,8 +171,8 @@ Section HPSIM.
       (HPSIM_GUARANTEE_SRC: True)
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
+      (CUR: fmr ⊢ #=> (iP ** FMR))
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> FMR),
           _hpsim hpsim true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
     _hpsim hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
@@ -181,8 +181,8 @@ Section HPSIM.
       (HPSIM_GUARANTEE_TGT: True)
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (CUR: fmr ⊢ #=> FMR)
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> (iP ** FMR)),
           _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
     _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
@@ -269,22 +269,21 @@ Section HPSIM.
   
   
   Variant hpsimC {with_dummy: bool}
-  (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-  {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
+  (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop)
+  {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop :=
   | hpsimC_ret
       p_src p_tgt st_src st_tgt fmr
       v_src v_tgt
-      (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
-      (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
+      (* Note: (INV: fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
+      (RET: fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
     :
       hpsimC hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
   | hpsimC_call
       p_src p_tgt st_src st_tgt fmr
       fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
+      (INV: fmr ⊢ #=> (I st_src st_tgt ** FR))
       (K: forall vret st_src0 st_tgt0 fmr0 
-          (WF: URA.wf fmr0)
-          (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
+          (INV: fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
           hpsim _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
       hpsimC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
@@ -375,8 +374,8 @@ Section HPSIM.
   | hpsimC_assume_src
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (CUR: fmr ⊢ #=> FMR)
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> (iP ** FMR)),
           hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
       hpsimC hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
@@ -384,8 +383,8 @@ Section HPSIM.
   | hpsimC_assume_tgt
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
+      (CUR: fmr ⊢ #=> (iP ** FMR))
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> FMR),
           hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
       hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
@@ -393,8 +392,8 @@ Section HPSIM.
   | hpsimC_guarantee_src
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
+      (CUR: fmr ⊢ #=> (iP ** FMR))
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> FMR),
           hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
       hpsimC hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
@@ -402,8 +401,8 @@ Section HPSIM.
   | hpsimC_guarantee_tgt
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (CUR: fmr ⊢ #=> FMR)
+      (K: forall fmr0 (NEW: fmr0 ⊢ #=> (iP ** FMR)),
           hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
     hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
@@ -442,7 +441,7 @@ Section HPSIM.
   Qed.
 
   Lemma hpsim_flag_mon with_dummy
-        (hpsim: forall (R: Type) (RR: Any.t * R -> Any.t * R -> iProp),  bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
+        (hpsim: forall (R: Type) (RR: Any.t * R -> Any.t * R -> iProp),  bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop)
         R (RR: Any.t * R -> Any.t * R -> iProp)
         p_src0 p_tgt0 p_src1 p_tgt1 st_src st_tgt fmr
         (SIM: (@_hpsim with_dummy) hpsim _ RR p_src0 p_tgt0 st_src st_tgt fmr)
@@ -457,8 +456,8 @@ Section HPSIM.
   Qed.              
 
   Variant hpsim_flagC 
-    (r: forall (R: Type) (RR: Any.t * R -> Any.t * R -> iProp),  bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-    {R} (RR: Any.t * R -> Any.t * R -> iProp): bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop := 
+    (r: forall (R: Type) (RR: Any.t * R -> Any.t * R -> iProp),  bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop)
+    {R} (RR: Any.t * R -> Any.t * R -> iProp): bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop := 
   | hpsim_flagC_intro
     p_src0 p_tgt0 p_src1 p_tgt1 st_src st_tgt fmr
     (SIM: r _ RR p_src0 p_tgt0 st_src st_tgt fmr)
@@ -492,8 +491,8 @@ Section HPSIM.
   Qed.
 
 
-  Variant hpsim_bindC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
-    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  Variant hpsim_bindC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop
   :=
   | hpsim_bindC_intro
       p_src p_tgt Q QQ st_src st_tgt i_src i_tgt fmr
@@ -501,7 +500,7 @@ Section HPSIM.
 
       R RR k_src k_tgt
       (SIMK: forall st_src0 st_tgt0 vret_src vret_tgt fmr0
-               (RET: Own fmr0 ⊢ #=> QQ (st_src0, vret_src) (st_tgt0, vret_tgt)),
+               (RET: fmr0 ⊢ #=> QQ (st_src0, vret_src) (st_tgt0, vret_tgt)),
              r R RR false false (st_src0, k_src vret_src) (st_tgt0, k_tgt vret_tgt) fmr0)
     :
     hpsim_bindC r R RR p_src p_tgt (st_src, i_src >>= k_src) (st_tgt, i_tgt >>= k_tgt) fmr
@@ -541,9 +540,9 @@ Section HPSIM.
 
 
 
-
-  Variant hpsim_extendC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
-    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+(* 
+  Variant hpsim_extendC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop
   :=
   | hpsim_extendC_intro
       p_src p_tgt R RR sti_src sti_tgt fmr fmr'
@@ -571,7 +570,7 @@ Section HPSIM.
   Proof.
     intros. gclo. econs; eauto using hpsim_extendC_compatible.
     eapply hpsim_extendC_mon, PR; eauto with paco.
-  Qed.
+  Qed. *)
 
   Definition itreeH_dummy_ktree Q R (k k': Q -> itree hAGEs R) :=
     k' = k \/ k' = (fun x => trigger (Guarantee True);;; k x).
@@ -600,12 +599,12 @@ Section HPSIM.
   Qed.
   Hint Resolve itreeH_dummy_dummy.
 
-  Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
-    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop
   :=
   | hpsim_dummyC_src_intro R RR ps pt st_src i_src i_src' st_tgt i_tgt fmr fmr'
       (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
-      (RELr: Own fmr' ⊢ #=> Own fmr)
+      (RELr: fmr' ⊢ #=> fmr)
       (DUMMY: itreeH_dummy R i_src i_src')
     :
     hpsim_dummyC_src r R RR ps pt (st_src, i_src') (st_tgt, i_tgt) fmr'
@@ -691,7 +690,7 @@ Section HPSIM.
       + econs; eauto. i. eapply H; eauto.
         { eapply imod_trans; eauto.
           iIntros "H". iDestruct "H" as "[X H]".
-          iSplitL "X"; eauto. iStopProof; eauto. }
+          iSplitL "X"; eauto. iApply CUR. eauto. }
         destruct DUMMY1; subst; eauto.
     - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
       + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
@@ -710,12 +709,12 @@ Section HPSIM.
     eapply hpsim_dummyC_src_mon, PR; eauto with paco.
   Qed.
 
-  Variant hpsim_dummyC_tgt (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
-    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  Variant hpsim_dummyC_tgt (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> iProp -> Prop
   :=
   | hpsim_dummyC_tgt_intro R RR ps pt st_src i_src st_tgt i_tgt i_tgt' fmr fmr'
       (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
-      (RELr: Own fmr' ⊢ #=> Own fmr)
+      (RELr: fmr' ⊢ #=> fmr)
       (DUMMY: itreeH_dummy R i_tgt i_tgt')
     :
     hpsim_dummyC_tgt r R RR ps pt (st_src, i_src) (st_tgt, i_tgt') fmr'
@@ -804,15 +803,15 @@ Section HPSIM.
         * econs; eauto. i. eapply H; eauto.
           eapply imod_trans; eauto.
           iIntros "H". iDestruct "H" as "[X H]".
-          iSplitL "X"; eauto. iStopProof; eauto.
+          iSplitL "X"; eauto. iApply CUR. eauto.
         * eapply hpsim_guarantee_tgt; eauto. econs; eauto.
           i. eapply H; eauto.
           iIntros "H". iPoseProof (NEW0 with "H") as "H". iMod "H".
-          iDestruct "H" as "[P [_ H]]". iSplitL "P"; eauto. iStopProof; eauto.
+          iDestruct "H" as "[P [_ H]]". iSplitL "P"; eauto. iApply CUR; eauto.
       + econs; eauto with imodL.
         i. eapply H; eauto.
         { iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H".
-          iDestruct "H" as "[P H]". iSplitL "P"; eauto. iStopProof; eauto. }
+          iDestruct "H" as "[P H]". iSplitL "P"; eauto. iApply CUR; eauto. }
         destruct DUMMY1; subst; eauto.
     - subst. econs; eauto. destruct DUMMY1; subst; econs; eauto.
   Qed.
@@ -845,7 +844,7 @@ Section HPSIM.
 
   Definition hpsim_fsem: relation (Any.t -> itree hAGEs Any.t) :=
     (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: I st_src st_tgt ε),
-                hpsim_body false false (st_src, itr_src) (st_tgt, itr_tgt) ε))%signature.
+                hpsim_body false false (st_src, itr_src) (st_tgt, itr_tgt) ⌜True⌝%I))%signature.
 
   Definition hpsim_fnsem: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq hpsim_fsem.
 
@@ -863,7 +862,7 @@ Hint Resolve cpn7_wcompat: paco.
 
 (**********)
 
-
+(* 
 Lemma hpsim_self {Σ: GRA.t}:
   forall st itr fl fmr,
     hpsim_body fl fl (fun src tgt => ⌜src = tgt⌝%I) false false (st, itr) (st, itr) fmr.
@@ -972,5 +971,5 @@ Section HPSIMMOD.
 
 End HPSIMMOD.
 End HModPair.
-
+ *)
 

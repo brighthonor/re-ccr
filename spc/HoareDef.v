@@ -418,8 +418,8 @@ Global Opaque _APC.
 
   Definition handle_Assume (P: iProp) : stateT (iProp) (itree Es) unit :=
     fun fP =>
-      mP <- mget;; 
-      assume(inhabited (P ** fP ** mP));;; 
+      (* mP <- mget;; 
+      assume(inhabited (P ** fP ** mP));;;  *)
       Ret (P ** fP, tt).
   
   Definition handle_Guarantee (P: iProp) : stateT (iProp) (itree Es) unit :=

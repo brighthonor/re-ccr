@@ -14,7 +14,8 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import Red IRed.
 Require Import ProofMode Invariant.
-Require Import HPTactics HPSim.
+Require Import HPSim.
+(* Require Import HPTactics HPSim. *)
 
 From stdpp Require Import coPset gmap.
 
@@ -90,17 +91,58 @@ Section SIM.
     }
   Qed.
 
-  Program Definition isim'
-          r g p_src p_tgt
+  Definition isim' 
+          r g 
           {R}
           (RR: Any.t * R-> Any.t * R -> iProp)
+          p_src p_tgt
+          (sti_src sti_tgt : Any.t * itree hAGEs R): Σ -> Prop 
+  := 
+    fun res => exists fmr, gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR p_src p_tgt sti_src sti_tgt fmr /\
+            fmr res.
+
+  Program Definition isim
+          r g 
+          {R}
+          (RR: Any.t * R-> Any.t * R -> iProp)
+          p_src p_tgt
           (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR p_src p_tgt sti_src sti_tgt) _.
+    iProp_intro (isim' r g RR p_src p_tgt sti_src sti_tgt) _.
   Next Obligation.
-    guclo hpsim_extendC_spec. econs; et.
+    unfold isim'. i. des. exists fmr.
+    esplits; et. eapply iProp_mono; eauto.  
   Qed.
-    (* i. ss. eapply H. eapply URA.wf_extends; eauto. eapply URA.extends_add; eauto.
-  Qed. *)
+
+  Lemma isim_assume_src
+        r g ps pt {R} RR iP st_src st_tgt k_src i_tgt
+        (* (K: (iP ** fmr) ⊢ @isim r g true pt R RR (st_src, k_src tt) (st_tgt, i_tgt)) *)
+  :
+   (iP -* (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))) ⊢ isim r g RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt).
+  Proof.
+    uiprop. r. i. 
+    exists (iP -* @isim r g R RR true pt (st_src, k_src ()) (st_tgt, i_tgt)). esplits; cycle 1.
+     (* exists (@isim r g R RR ps pt (st_src, ` x : _ <- trigger (Assume iP);; k_src x)
+    (st_tgt, i_tgt)). esplits. *)
+    - unfold isim' in H.
+    - guclo hpsimC_spec. econs.
+        {instantiate (1:= iP -* @isim r g R RR true pt (st_src, k_src ()) (st_tgt, i_tgt)). admit. }
+      (* { instantiate (1:= isim r g RR ps pt (st_src, ` x : () <- trigger (Assume iP);; k_src x) (st_tgt, i_tgt) ). admit. } *)
+      i. unfold isim' in H.
+
+
+
+  | hpsim_assume_src
+  (HPSIM_ASSUME_SRC: True)
+  p_src p_tgt st_src st_tgt fmr
+  iP k_src i_tgt FMR
+  (* remove FMR *)
+  (CUR: fmr ⊢ #=> FMR)
+  (K: forall fmr0 (NEW: fmr0 ⊢ #=> (iP ** FMR)),
+      _hpsim hpsim true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
+:
+_hpsim hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
+
+
 
   (* Program Definition isim'
           r g f_src f_tgt
