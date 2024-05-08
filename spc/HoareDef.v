@@ -365,10 +365,61 @@ Global Opaque _APC.
          | SUpdate run => pupdate run
          end).
   
+
+  
+
+  Definition inhabited (P: iProp): Prop :=
+    exists r, URA.wf r /\ (Own r ⊢ P).
+
+  Lemma inhabited_sep P Q
+    (INH: inhabited (P ** Q))
+  :
+    inhabited P /\ inhabited Q.
+  Proof.
+    unfold inhabited in *. des.
+    uipropall. edestruct INH0; eauto; try reflexivity.
+    des. rewrite H in INH. eapply URA.wf_split in INH. des.
+    split; [exists x|exists b]; esplits; uipropall; eauto using iProp_mono.
+  Qed.
+
+  Lemma inhabited_upd P
+    (INH: inhabited P)
+  :
+    inhabited (#=> P).
+  Proof.
+    unfold inhabited in *. des.
+    exists r. splits; et.
+    uipropall. i. exists r0.
+    esplits; et.
+  Qed.
+
+  Lemma upd_inhabited P
+    (INH: inhabited (#=> P))
+  :
+    inhabited P.
+  Proof.
+    unfold inhabited in *. des.
+    uiprop in INH0.
+    edestruct (INH0 r INH); [refl|instantiate (1:=ε);r_solve;et|]; des.
+    exists x. revert H; r_solve. split; eauto.
+    uiprop. eauto using iProp_mono. 
+  Qed.
+
+  Lemma inhabited_impl P Q
+    (INH: inhabited P)
+    (IMPL: P ⊢ Q)
+  :
+    inhabited Q.
+  Proof.
+    unfold inhabited in *. des.
+    esplits; eauto. etrans; et.
+  Qed.
+
+
   Definition handle_Assume (P: iProp) : stateT (iProp) (itree Es) unit :=
     fun fP =>
-      (* mP <- mget;;  *)
-      (* assume( ⊢ P ** fP ** mP);;;  *)
+      mP <- mget;; 
+      assume(inhabited (P ** fP ** mP));;; 
       Ret (P ** fP, tt).
   
   Definition handle_Guarantee (P: iProp) : stateT (iProp) (itree Es) unit :=

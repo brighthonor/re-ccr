@@ -31,6 +31,10 @@ Ltac uipropall :=
   repeat (autounfold with iprop; autorewrite with iprop;
        all_once_fast ltac:(fun H => autounfold with iprop in H; autorewrite with iprop in H); ss).
 
+Tactic Notation "uiprop" := repeat (autounfold with iprop; autorewrite with iprop; s).
+Tactic Notation "uiprop" "in" hyp(H)  := repeat (autounfold with iprop in H; autorewrite with iprop in H; simpl in H).
+
+
 Section IPROP.
   Context {Σ: GRA.t}.
 

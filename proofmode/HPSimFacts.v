@@ -426,10 +426,9 @@ Section HPSIM.
 
 Variant interp_inv: iProp -> Any.t * Any.t -> Prop :=
 | interp_inv_intro
-    (ctx mr_src mr_tgt: iProp) st_src st_tgt mr
-    (SRC: ⊢ #=> mr_src)
-    (MRS: mr_src ⊢ #=> (ctx ** mr ** mr_tgt))
-    (MR: mr ⊢ #=> I st_src st_tgt)
+    (ctx mr_src mr_tgt: iProp) st_src st_tgt
+    (OWN: inhabited mr_src)
+    (MRS: mr_src ⊢ (ctx ** (I st_src st_tgt) ** mr_tgt))
   :
   interp_inv ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
 .
@@ -444,102 +443,29 @@ Variant interp_inv: iProp -> Any.t * Any.t -> Prop :=
   interp_inv ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
 . *)
 
-
-
-(* remove later *)
-Tactic Notation "uiprop" := repeat (autounfold with iprop; autorewrite with iprop; s).
-Tactic Notation "uiprop" "in" hyp(H)  := repeat (autounfold with iprop in H; autorewrite with iprop in H; simpl in H).
-
-Program Definition isim_body
-p_src p_tgt
-(sti_src sti_tgt : Any.t * itree hAGEs Any.t): iProp := 
-iProp_intro (hpsim_body fl_src fl_tgt I p_src p_tgt sti_src sti_tgt) _.
-Next Obligation.
-  Admitted.
-  (* guclo hpsim_extendC_spec. econs; et.
-Qed. *)
-
-
 Lemma hpsim_adequacy:
 forall
   (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
   (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
   (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
-  p_src p_tgt st_src st_tgt itr_src itr_tgt fmrP
-  (ctx mr_src mr_tgt fr_src fr_tgt: iProp)
-  (SIM: fmrP = isim_body p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt))
-  (SRC: ⊢ #=> (fr_src ** mr_src))
-  (FMR: fr_src ** mr_src ⊢ #=> (ctx ** fmrP ** (fr_tgt ** mr_tgt))),
-@sim_itree iProp interp_inv eq fl_src0 fl_tgt0 p_src p_tgt ctx
-  (Any.pair st_src mr_src↑, interp_hp_body itr_src fr_src)
-  (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt fr_tgt).
+  p_src p_tgt st_src st_tgt itr_src itr_tgt fmr 
+  (Ctx Mr_src Mr_tgt Fr_src Fr_tgt Fmr: iProp)
+  (SIM: hpsim_body fl_src fl_tgt I p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
+  (WF: URA.wf fmr)
+  (OWN: inhabited (Fr_src ** Mr_src))
+  (RES: Fr_src ** Mr_src ⊢ (Ctx ** Fmr ** (Fr_tgt ** Mr_tgt)))
+  (FMR: forall Fmr (FMR: Fr_src ** Mr_src ⊢ (Ctx ** Fmr ** (Fr_tgt ** Mr_tgt))),
+            Own fmr ⊢ Fmr),
+@sim_itree iProp interp_inv eq fl_src0 fl_tgt0 p_src p_tgt Ctx
+  (Any.pair st_src Mr_src↑, interp_hp_body itr_src Fr_src)
+  (Any.pair st_tgt Mr_tgt↑, interp_hp_body itr_tgt Fr_tgt).
 Proof.
 i. apply hpsim_add_dummy in SIM.
 revert_until I. ginit. gcofix CIH. i.
 remember (st_src, itr_src). remember (st_tgt, itr_tgt).
 move SIM before FLT. revert_until SIM.
 punfold SIM. induction SIM; i; clarify; cycle 1.
-- unfold interp_hp_body. 
-steps. unfold handle_Guarantee, guarantee, mget, mput. steps_safe.
-force_l. instantiate (1:= (⌜True⌝%I, ctx ** b ** b0 ** (I st_src0 st_tgt0) ** FR)). steps_safe.
-force_l.
-{
-  iIntros "H". iPoseProof (FMR0 with "H") as "H". iMod "H". iDestruct "H" as "[[H H0] H1]".
-  iPoseProof (x with "H1") as "H1". iMod "H1".
-  iPoseProof (INV with "H0") as "H0". iMod "H0".
-  iDestruct "H1" as "[[_ H1] H2]". iFrame. iFrame. et. 
-}
-steps_safe. 
-force_l; et.
-steps_safe. eapply safe_sim_sim; econs. esplits; i.
-{ econs; cycle 2. 
-  { instantiate (1:= I st_src0 st_tgt0). et. } 
-  { iIntros. iPoseProof SRC as "H".
-    iPoseProof (FMR0 with "H") as "H0".
-    admit. 
-  }
-  { instantiate (1:= ctx ** FR ** b). iIntros "[[[[H H0] H1] H2] H3]". iFrame. et. }
-}
-steps.
-inv WF0. eapply H. [eapply WF| |et|et|r_solve; et| |].
-{ eapply H0. }
-{  
-  eapply own_wf in MRS; et.
-  replace (ctx ⋅ fr ⋅ frt ⋅ mr0 ⋅ mr_tgt0) with (fr ⋅ mr0 ⋅ (ctx ⋅ frt ⋅ mr_tgt0)) in MRS; r_solve.
-  eapply URA.wf_mon; et.
-}
-{
-  iIntros "[H H0]". 
-  iPoseProof (H2 with "H") as "FR". iPoseProof (MR with "H0") as "INV". iMod "INV".  
-  iFrame. et.
-}
-{ r_solve. replace (ctx ⋅ fr ⋅ mr0 ⋅ frt ⋅ mr_tgt0) with (ctx ⋅ fr ⋅ frt ⋅ mr0 ⋅ mr_tgt0); et. r_solve. }
-
-
-
-
-
-Lemma hpsim_adequacy:
-forall
-  (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
-  (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
-  (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
-  p_src p_tgt st_src st_tgt itr_src itr_tgt fmr
-  (ctx mr_src mr_tgt fr_src fr_tgt: iProp)
-  (SIM: hpsim_body fl_src fl_tgt I p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
-  (WF: URA.wf fmr)
-  (SRC: ⊢ #=> (fr_src ** mr_src))
-  (FMR: fr_src ** mr_src ⊢ #=> (ctx ** (Own fmr) ** (fr_tgt ** mr_tgt))),
-@sim_itree iProp interp_inv eq fl_src0 fl_tgt0 p_src p_tgt ctx
-  (Any.pair st_src mr_src↑, interp_hp_body itr_src fr_src)
-  (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt fr_tgt).
-Proof.
-i. apply hpsim_add_dummy in SIM.
-revert_until I. ginit. gcofix CIH. i.
-remember (st_src, itr_src). remember (st_tgt, itr_tgt).
-move SIM before FLT. revert_until SIM.
-punfold SIM. induction SIM; i; clarify.
-- unfold interp_hp_body, hp_fun_tail, handle_Guarantee, guarantee, mget, mput.
+(* - unfold interp_hp_body, hp_fun_tail, handle_Guarantee, guarantee, mget, mput.
   steps. force_l. instantiate (1 := (b, ctx ** (Own fmr) ** b0)). steps.
   force_l.
   { iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H".
@@ -559,30 +485,49 @@ punfold SIM. induction SIM; i; clarify.
   {
     rr in RET. uiprop in RET. hexploit RET; [et|refl|instantiate (1:= ε); r_solve; et|].
     i. des. rr in H2. uipropall.
-  }
-- unfold interp_hp_body. hexploit INV. i.
+  } *)
+- unfold interp_hp_body. 
   steps. unfold handle_Guarantee, guarantee, mget, mput. steps_safe.
+  (* instantiate (1:= (c0, ε, ctx ⋅ fr ⋅ c1 ⋅ mr ⋅ c)). *)
   force_l. instantiate (1:= (⌜True⌝%I, ctx ** b ** b0 ** (I st_src0 st_tgt0) ** FR)). steps_safe.
   force_l.
   {
-    iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H". iDestruct "H" as "[[H H0] H1]".
+    iIntros "H". iPoseProof (FMR with "H") as "H". 
+    iDestruct "H" as "[[H H0] H1]".
     iPoseProof (x with "H1") as "H1". iMod "H1".
-    iPoseProof (H0 with "H0") as "H0". iMod "H0".
+    iPoseProof (INV with "H0") as "H0". iMod "H0".
     iDestruct "H1" as "[[_ H1] H2]". iFrame. iFrame. et. 
   }
-  steps_safe. 
-  force_l; et.
   steps_safe. eapply safe_sim_sim; econs. esplits; i.
-  { econs; cycle 2. 
-    { instantiate (1:= I st_src0 st_tgt0). et. } 
-    { iIntros. iPoseProof SRC as "H".
-      iPoseProof (FMR with "H") as "H0".
-      admit. 
+  { econs. 
+    { eapply upd_inhabited, inhabited_impl; et.
+      iIntros "H". iPoseProof (FMR with "H") as "H".
+      iDestruct "H" as "[[H H0] H1]".
+      iPoseProof (INV with "H0") as "H0". iMod "H0" as "[H2 H3]".
+      iPoseProof (x with "H1") as "H1". iMod "H1" as "[[_ H0] H1]".
+      iFrame. eauto.
     }
-    { instantiate (1:= ctx ** FR ** b). iIntros "[[[[H H0] H1] H2] H3]". iFrame. et. }
+    instantiate (1:= (ctx ** b ** FR)).
+    iIntros "[[[[CTX B] B0] INV] FR]". iFrame. 
   }
-  steps.
-  inv WF0. eapply H. [eapply WF| |et|et|r_solve; et| |].
+  steps. inv WF0. 
+  unfold inhabited in OWN0. des.
+  uiprop in MRS. uiprop in OWN1.
+  exploit (OWN1 r0); et; try refl. i.
+  edestruct (MRS r0); et. des. subst.
+  eapply H; cycle 6.
+  { instantiate (1:= )
+     uiprop. uiprop in MRS. i. des. 
+    exploit (MRS b1); et. 
+    { rewrite H0 in WF0. eapply URA.wf_split in WF0. des. et. }
+    i. des. subst. esplits; try eassumption; cycle 1; try reflexivity.
+    instantiate (1:= a ⋅ b3 ⋅ b4).
+
+  
+  }
+
+
+
   { eapply H0. }
   {  
     eapply own_wf in MRS; et.

@@ -769,8 +769,6 @@ Section OWN.
     esplits; et.
   Qed.
 
-  Tactic Notation "uiprop" := repeat (autounfold with iprop; autorewrite with iprop; s).
-  Tactic Notation "uiprop" "in" hyp(H)  := repeat (autounfold with iprop in H; autorewrite with iprop in H; simpl in H).
   
   (* Lemma iProp_sepconj_aux P Q r 
       (SAT: Own r ⊢ (P ** Q))
