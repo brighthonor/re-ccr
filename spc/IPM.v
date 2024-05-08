@@ -759,23 +759,22 @@ Section OWN.
       (WF: URA.wf (r0 ⋅ ctx))
     :
       exists a b: Σ, URA.wf (a ⋅ b ⋅ ctx) /\ P a /\ Q b
-      (* need r0 = a ⋅ b, URA.extends r0 (a ⋅ b), Own r0 ⊢ #=> a ⋅ b, .... *)
+      (* need r0 = a ⋅ b, URA.extends r0 (a ⋅ b), Own r0 ⊢ #=> Own (a ⋅ b), .... *)
   .
   Proof.
     uipropall. hexploit (SAT r0); et. 
     { eapply URA.wf_mon; et. }
     i. des. 
     rewrite H0 in H. 
-    assert (URA.extends r0 (a ⋅ b)).
-    { unfold URA.extends.
-      
-    }
     esplits; et.
   Qed.
 
-
-  (* Lemma iProp_sepconj_aux P Q r 
-      (SAT: Own r ⊢ #=> (P ** Q))
+  Tactic Notation "uiprop" := repeat (autounfold with iprop; autorewrite with iprop; s).
+  Tactic Notation "uiprop" "in" hyp(H)  := repeat (autounfold with iprop in H; autorewrite with iprop in H; simpl in H).
+  
+  Lemma iProp_sepconj_aux P Q r 
+      (SAT: Own r ⊢ (P ** Q))
+      (* (SAT: Own r ⊢ #=> (P ** Q)) *)
     :
       exists rp rq, (URA.updatable r (rp ⋅ rq)) /\ 
                     (Own rp ⊢ P) /\ 
@@ -786,6 +785,19 @@ Section OWN.
     {
       exists r, r. esplits; eauto using not_wf_sat.
       rr. i. eapply URA.wf_mon in H0. clarify. 
+    }
+
+    uiprop in SAT.
+    hexploit (SAT r); [et|refl|].
+    i. des. exists a, b. rewrite H0. esplits; [refl| |].
+    { 
+      destruct P. uipropall.
+      i. eapply iProp_mono; et.
+    }
+
+    {
+      destruct Q. uipropall.
+      i. eapply iProp_mono; et.
     }
 
 
@@ -802,7 +814,7 @@ Section OWN.
     { r_solve. }
     { instantiate (1:= ε). r_solve. et. }
     i. des.
-    esplits; uipropall; cycle 1.
+    esplits; uipropall.
     {
       instantiate (1:= b). instantiate (1:=a).
       unfold URA.updatable. subst. i. et. admit. 
@@ -830,6 +842,6 @@ Section OWN.
     eapply iProp_sepconj_aux in SAT; et. des.
     eapply Own_Upd in SAT.
     esplits; et. 	
-  Qed.	 *)
+  Qed.	
 
 End OWN.
