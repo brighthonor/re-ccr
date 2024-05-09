@@ -1,4 +1,4 @@
- Require Import Coqlib AList.
+Require Import Coqlib AList.
 Require Import STS.
 Require Import Behavior.
 Require Import ModSemFacts ModSem.
@@ -179,7 +179,7 @@ End PROOF. *)
 (* Definition map_fst A0 A1 B (f: A0 -> A1): (A0 * B) -> (A1 * B) := fun '(a, b) => (f a, b). *)
 (* Definition map_snd A B0 B1 (f: B0 -> B1): (A * B0) -> (A * B1) := fun '(a, b) => (a, f b). *)
 
-Section CANCEL.
+Section MAPPING.
 
 Context {Σ: GRA.t}.
 
@@ -341,69 +341,87 @@ Global Opaque _APC.
   .
 
 
-  Definition handle_sE_tgt: sE ~> itree Es :=
-      (fun _ e =>
-         match e with
-         | SUpdate run => pupdate run
-         end).
-(*   
-  Definition handle_Assume (P: iProp) : stateT (iProp) (itree Es) unit :=
-    fun ifr =>
-      imr <- mget;; 
-      assume( ⊢ P ** ifr ** imr);;; 
-      Ret ( (#=> (P ** ifr)), tt).
-  
-  Definition handle_Guarantee P: stateT (Σ) (itree Es) unit :=
-    fun ifr =>
-      imr <- mget;;
-      guarantee(Own (fr ⋅ mr) ⊢ #=> Own (r ⋅ fr' ⋅ mr'));;;
-      guarantee(Own r ⊢ P);;;
-      mput mr';;;
-      Ret (P -* ifr, tt).
- *)
 
-  Definition handle_Assume P: stateT (Σ) (itree Es) unit :=
-    fun fr =>
-      r <- trigger (Take Σ);;
+  (****
+     Mid -> Low
+   ***)
+
+
+  Definition take_iprop P: stateT (Σ*Σ*Σ) (itree Es) unit :=
+    fun '(fr,ctxi,ctxe) =>
+      '(r,ctxi') <- trigger (Take (Σ*Σ));;
       mr <- mget;; 
-      assume (URA.wf (r ⋅ fr ⋅ mr));;;
-      assume(Own r ⊢ P);;; 
-      Ret (r ⋅ fr, tt).
+      assume (URA.wf (r ⋅ fr ⋅ mr ⋅ ctxi' ⋅ ctxe));;;
+      assume(Own r ⊢ P);;;
+      Ret ((r ⋅ fr, ctxi', ctxe), tt).
   
-  Definition handle_Guarantee P: stateT (Σ) (itree Es) unit :=
-    fun fr =>
+  Definition give_iprop P: stateT (Σ*Σ*Σ) (itree Es) unit :=
+    fun '(fr,ctxi,ctxe) =>
       '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
       mr <- mget;;
-      guarantee(Own (fr ⋅ mr) ⊢ #=> Own (r ⋅ fr' ⋅ mr'));;;
+      guarantee(URA.wf (r ⋅ fr' ⋅ mr' ⋅ ctxi ⋅ ctxe));;;
       guarantee(Own r ⊢ P);;;
       mput mr';;;
-      Ret (fr', tt).
+      Ret ((fr', ctxi, ctxe), tt).
 
-  Definition handle_hAGE_tgt: hAGE ~> stateT (Σ) (itree Es) :=
-    fun _ e fr =>
+  Definition handle_Assume P: stateT (Σ*Σ*Σ) (itree Es) unit :=
+    fun res => '(res',_) <- take_iprop P res;; give_iprop True res'.
+
+  Definition handle_Guarantee P: stateT (Σ*Σ*Σ) (itree Es) unit :=
+    fun res => '(res',_) <- give_iprop P res;; take_iprop True res'.
+
+  Definition handle_hAGE: hAGE ~> stateT (Σ*Σ*Σ) (itree Es) :=
+    fun _ e =>
       match e with
-      | Assume P => handle_Assume P fr
-      | Guarantee P => handle_Guarantee P fr
-      end
+      | Assume P => handle_Assume P
+      | Guarantee P => handle_Guarantee P
+      end.
+
+  Definition handle_callE: callE ~> stateT (Σ*Σ*Σ) (itree Es) :=
+    (fun _ e res => '((fr,ctxi,ctxe), _) <- handle_Guarantee (True) res ;;
+                    x <- trigger e;;
+                    ctxe' <- trigger (Take Σ);;
+                    '(res',_) <- handle_Assume(True) (fr,ctxi,ctxe');;
+                    Ret (res', x)).
+
+  Definition handle_sE_itree: sE ~> itree Es :=
+    (fun T e =>
+       match e with
+       | SUpdate run => pupdate run
+       end).
+
+  Definition handle_sE: sE ~> stateT (Σ*Σ*Σ) (itree Es) :=
+    (fun T e res =>
+       match e with
+       | SUpdate run => x <- pupdate run;; Ret (res, x)
+       end).
+
+  Definition handle_eventE: eventE ~> stateT (Σ*Σ*Σ) (itree Es) :=
+    (fun T e res => x <- trigger e;; Ret (res, x)).
+
+  Definition interp_hp : itree hAGEs ~> stateT (Σ*Σ*Σ) (itree Es) :=
+      interp_state 
+        (case_ (bif:=sum1) (handle_hAGE)
+        (case_ (bif:=sum1) (handle_callE)
+        (case_ (bif:=sum1) (handle_sE)
+                           (handle_eventE))))
   .
 
-  Definition interp_hp : itree hAGEs ~> stateT Σ (itree Es) :=
-      interp_state 
-        (case_ (bif:=sum1) (handle_hAGE_tgt)
-        (case_ (bif:=sum1) ((fun T X fr => '(fr', _) <- (handle_Guarantee (True%I) fr);; x <- trigger X;; Ret (fr', x)): _ ~> stateT Σ (itree Es)) 
-        (case_ (bif:=sum1) ((fun T X fr => x <- handle_sE_tgt X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)) 
-                           ((fun T X fr => x <- trigger X;; Ret (fr, x)): _ ~> stateT Σ (itree Es)))))
-    .
-
-  Definition hp_fun_tail := (fun '(fr, x) => handle_Guarantee (True%I) fr ;;; Ret (x: Any.t)).
+  Definition hp_fun_tail :=
+    (fun '(res, x) => handle_Guarantee(True) res ;;; Ret (x: Any.t)).
     
-  Definition interp_hp_body (i: itree hAGEs Any.t) (fr: Σ) : itree Es Any.t :=
-    interp_hp i fr >>= hp_fun_tail.
+  Definition interp_hp_body (i: itree hAGEs Any.t) res : itree Es Any.t :=
+    interp_hp i res >>= hp_fun_tail.
+
+  Definition hp_fun_head :=
+    ctxe <- trigger (Take Σ);;
+    '(res,_) <- handle_Assume(True) (ε,ε,ctxe);;
+    Ret res.
 
   Definition interp_hp_fun (f: Any.t -> itree hAGEs Any.t) : Any.t -> itree Es Any.t :=
-    fun x => interp_hp_body (f x) ε.
+    fun x => hp_fun_head >>= interp_hp_body (f x).
   
-End CANCEL.
+End MAPPING.
 
 End PSEUDOTYPING.
 
@@ -1112,11 +1130,11 @@ Qed.
 Lemma interp_hp_call
       (R: Type)
       (i: callE R)
-      fr
+      res
   :
-    interp_hp (trigger i) fr
+    interp_hp (trigger i) res
     =
-    '(fr', _) <- handle_Guarantee (True%I:iProp) fr;; r <- trigger i;; tau;; Ret (fr', r).
+    resx <- handle_callE i res;; tau;; Ret resx.
 Proof.
   unfold interp_hp in *. grind.
 Qed.
@@ -1124,11 +1142,11 @@ Qed.
 Lemma interp_hp_triggerp
       (R: Type)
       (i: sE R)
-      fmr
+      res
   :
-    interp_hp (trigger i) fmr
+    interp_hp (trigger i) res
     =
-    r <- handle_sE_tgt i;; tau;; Ret (fmr, r).
+    resx <- handle_sE i res;; tau;; Ret resx.
 Proof.
   unfold interp_hp. rewrite interp_state_trigger. cbn. grind.
 Qed.
@@ -1136,35 +1154,37 @@ Qed.
 Lemma interp_hp_triggere
       (R: Type)
       (i: eventE R)
-      fmr
+      res
   :
-    interp_hp (trigger i) fmr
+    interp_hp (trigger i) res
     =
-    r <- trigger i;; tau;; Ret (fmr, r).
+    resx <- handle_eventE i res;; tau;; Ret resx.
 Proof.
   unfold interp_hp. rewrite interp_state_trigger. cbn. grind.
 Qed.
 
 Lemma interp_hp_triggerUB
       (R: Type)
-      fmr
+      res
   :
-    interp_hp (triggerUB) fmr
+    interp_hp (triggerUB) res
     =
-    triggerUB (A:=Σ*R).
+    triggerUB (A:=Σ*Σ*Σ*R).
 Proof.
-  unfold interp_hp, triggerUB in *. rewrite unfold_interp_state. cbn. grind.
+  unfold interp_hp, handle_eventE, triggerUB in *.
+  rewrite unfold_interp_state. cbn. grind.
 Qed.
 
 Lemma interp_hp_triggerNB
       (R: Type)
-      fmr
+      res
   :
-    interp_hp (triggerNB) fmr
+    interp_hp (triggerNB) res
     =
-    triggerNB (A:=Σ*R).
+    triggerNB (A:=Σ*Σ*Σ*R).
 Proof.
-  unfold interp_hp, triggerNB in *. rewrite unfold_interp_state. cbn. grind.
+  unfold interp_hp, handle_eventE, triggerNB in *.
+  rewrite unfold_interp_state. cbn. grind.
 Qed.
 
 Lemma interp_hp_unwrapU 
@@ -1176,7 +1196,7 @@ Lemma interp_hp_unwrapU
     =
     r <- (unwrapU i);; Ret (fmr, r).
 Proof.
-  unfold interp_hp, unwrapU in *. des_ifs.
+  unfold interp_hp, handle_hAGE, unwrapU in *. des_ifs.
   { etrans.
     { eapply interp_hp_ret. }
     { grind. }
@@ -1196,7 +1216,7 @@ Lemma interp_hp_unwrapN
     =
     r <- (unwrapN i);; Ret (fmr, r).
 Proof.
-  unfold interp_hp, unwrapN in *. des_ifs.
+  unfold interp_hp, handle_hAGE, unwrapN in *. des_ifs.
   { etrans.
     { eapply interp_hp_ret. }
     { grind. }
@@ -1209,24 +1229,22 @@ Qed.
 
 Lemma interp_hp_Assume
       P
-      fmr
+      res
   :
-    interp_hp (trigger (Assume P)) fmr
+    interp_hp (trigger (Assume P)) res
     =
-    x <- handle_Assume P fmr ;; tau;; Ret x
-.
+    resx <- handle_Assume P res ;; tau;; Ret resx.
 Proof.
   unfold interp_hp. rewrite interp_state_trigger. cbn. grind.
 Qed.
 
 Lemma interp_hp_Guarantee
       P
-      fmr
+      res
   :
-    interp_hp (trigger (Guarantee P)) fmr
+    interp_hp (trigger (Guarantee P)) res
     =
-    x <- handle_Guarantee P fmr ;; tau;; Ret x
-.
+    resx <- handle_Guarantee P res ;; tau;; Ret resx.
 Proof.
   unfold interp_hp. rewrite interp_state_trigger. cbn. grind.
 Qed.
@@ -1234,11 +1252,11 @@ Qed.
 Lemma interp_hp_ext
       R (itr0 itr1: itree _ R)
       (EQ: itr0 = itr1)
-      fmr
+      res
   :
-    interp_hp itr0 fmr
+    interp_hp itr0 res
     =
-    interp_hp itr1 fmr
+    interp_hp itr1 res
 .
 Proof. subst; et. Qed.
 

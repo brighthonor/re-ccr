@@ -89,6 +89,7 @@ Section HPSIM.
     exfalso. eapply FAIL. des; subst. eauto.
   Qed.
 
+(*  
   Lemma handle_Guarantee_reconf
     P str str' (fr fr' cr: Σ)
     (RELr: hp_reconf_equiv cr (str,fr) (str',fr'))
@@ -138,7 +139,8 @@ Section HPSIM.
     repeat (grind; gstep; econs; i).
     split; eauto. split; eauto.
   Qed.
-
+ *)
+  
   Lemma trigger_hAGE_simpl R (P: iProp) (e : hAGE R):
     (trigger (e|)%sum : itree hAGEs R) = trigger e.
   Proof. reflexivity. Qed.
@@ -151,7 +153,7 @@ Section HPSIM.
     (trigger (|e|)%sum : itree hAGEs R) = trigger e.
   Proof. reflexivity. Qed.
 
-  
+(*  
   Lemma interp_hp_reconf
     R itrH str str' (fr fr' cr: Σ)
     (RELr: hp_reconf_equiv cr (str,fr) (str',fr'))
@@ -213,7 +215,7 @@ Section HPSIM.
         repeat (grind; gstep; econs; i). eauto 10 with paco.
       + repeat (grind; gstep; econs; i). eauto 10 with paco.
   Qed.
-
+  
   Lemma hp_fun_tail_reconf
     str str' (fr fr' cr: Σ) x
     (RELr: hp_reconf_equiv cr (str,fr) (str',fr'))
@@ -309,6 +311,7 @@ Section HPSIM.
     i. gstep; econs. rr in REL1. des; subst.
     destruct v0, v0'. s in REL2; des; subst. eauto. 
   Qed.
+ *)
 
 
   (*** ****)
@@ -316,40 +319,108 @@ Section HPSIM.
 
   (*** ****)
 
-
-
+  
 Variant interp_inv: Σ -> Any.t * Any.t -> Prop :=
 | interp_inv_intro
-    (ctx mr_src mr_tgt: Σ) st_src st_tgt mr
-    (WF: URA.wf mr_src)
-    (MRS: Own mr_src ⊢ #=> Own (ctx ⋅ mr ⋅ mr_tgt))
-    (MR: Own mr ⊢ #=> I st_src st_tgt)
+     st_src st_tgt (ctxi mr mr_src mr_tgt: Σ)
+    (* (WF: URA.wf mr_src) *)
+    (MRS: mr_src = ctxi ⋅ mr ⋅ mr_tgt)
+    (MR: Own mr ⊢ I st_src st_tgt)
   :
-  interp_inv ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
+  interp_inv ctxi (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
 .
 
-
-
 Lemma hpsim_adequacy:
-forall
-  (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
-  (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
-  (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
-  p_src p_tgt st_src st_tgt itr_src itr_tgt
-  (ctx mr_src mr_tgt fr_src fr_tgt fmr: Σ)
-  (SIM: hpsim_body fl_src fl_tgt I p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
-  (WF: URA.wf (fr_src ⋅ mr_src))
-  (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)),
-@sim_itree Σ interp_inv eq fl_src0 fl_tgt0 p_src p_tgt ctx
-  (Any.pair st_src mr_src↑, interp_hp_body itr_src fr_src)
-  (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt fr_tgt).
-Proof. Admitted.
-(* i. apply hpsim_add_dummy in SIM.
-revert_until I. ginit. gcofix CIH. i.
-remember (st_src, itr_src). remember (st_tgt, itr_tgt).
-move SIM before FLT. revert_until SIM.
-punfold SIM. induction SIM; i; clarify.
-- unfold interp_hp_body, hp_fun_tail, handle_Guarantee, guarantee, mget, mput.
+  forall
+    (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
+    (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
+    (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
+    p_src p_tgt st_src st_tgt itr_src itr_tgt
+    (ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fmr: Σ)
+    (SIM: hpsim_body fl_src fl_tgt I p_src p_tgt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
+    (WF: URA.wf (fr_src ⋅ mr_src ⋅ ctxi_src ⋅ ctxe))
+    (FMR: fr_src ⋅ mr_src = fmr ⋅ fr_tgt ⋅ mr_tgt)
+    (CTXR: ctxi_tgt = ctxi_src ⋅ fmr),
+  @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 p_src p_tgt ctx
+    (Any.pair st_src mr_src↑, interp_hp_body itr_src (fr_src, ctxi_src, ctxe))
+    (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt (fr_tgt, ctxi_tgt, ctxe)).
+Proof.
+  (* i. apply hpsim_add_dummy in SIM. *)
+  i. revert_until I. ginit. gcofix CIH. i.
+  remember (st_src, itr_src). remember (st_tgt, itr_tgt).
+  move SIM before FLT. revert_until SIM.
+  punfold SIM. induction SIM; i; clarify; cycle 1.
+
+
+  - (* "Call Case" DONE!  *)
+
+    move INV at bottom. unfold interp_hp_body.
+    steps. unfold handle_callE, handle_Guarantee, give_iprop, take_iprop, guarantee, assume, mget, mput.
+    steps.
+    i. hexploit iProp_sepconj; [eauto|refl| |].
+    { instantiate (1:= c0 ⋅ c1 ⋅ c ⋅ ctxi_src ⋅ ctxe).
+      eapply eq_ind; eauto. r_solve.
+    }
+    i. des.
+    force_l. instantiate (1:= (ε, ε, c0 ⋅ c1 ⋅ c ⋅ a ⋅ b)).
+    steps_safe. force_l.
+    { eapply eq_ind; eauto. r_solve. }
+    force_l; eauto.
+    steps_safe. force_r. instantiate (1:= (ε, c2 ⋅ c0 ⋅ a ⋅ b ⋅ c3)).
+    steps_safe. force_r.
+    { eapply eq_ind; eauto. r_solve. }
+    steps_safe. force_r; eauto.
+    grind. eapply safe_sim_sim; econs.
+    esplits; i.
+    { econs; cycle 1.
+      { instantiate (1:= a).
+        uiprop. i. eapply iProp_mono; eauto. }
+      instantiate (1:= b ⋅ c0 ⋅ c1). r_solve.
+    }
+    inv WF0.
+    unfold handle_Assume, give_iprop, take_iprop, guarantee, assume, mget, mput.
+    steps. force_r. instantiate (1:= x3).
+    steps. force_r. instantiate (1:= (ε, c4 ⋅ c2 ⋅ b ⋅ c0 ⋅ mr ⋅ c5)).
+    steps. force_r.
+    { eapply eq_ind; eauto. r_solve. }
+    steps. force_r; eauto.
+    steps. force_l. instantiate (1:= (c7, b ⋅ c0 ⋅ c2 ⋅ c4 ⋅ c6 ⋅ c8, mr)).
+    steps. force_l.
+    { eapply eq_ind; eauto. r_solve. }
+    steps. force_l; eauto.
+    steps. eapply H; cycle 5.
+    { instantiate (1:= b ⋅ c0 ⋅ c2 ⋅ c4 ⋅ mr).
+      eapply eq_ind; eauto. r_solve. }
+    { eapply eq_ind; eauto. r_solve. }
+    { eapply URA.wf_mon in x6. rewrite (URA.add_comm (c7 ⋅ c8 ⋅ c6)) in x6.
+      do 2 eapply URA.wf_mon in x6. eapply eq_ind; eauto. r_solve. }
+    { eapply from_semantic. rewrite (URA.add_comm _ mr).
+      uiprop. esplits; eauto.
+      - uiprop in MR. eapply MR; try refl.
+        revert x6. r_solve. i. do 2 eapply URA.wf_mon in x6.
+        rewrite (URA.add_comm _ mr) in x6. repeat eapply URA.wf_mon in x6. eauto.
+      - eapply iProp_mono; eauto.
+        + eapply URA.wf_mon in x6. rewrite (URA.add_comm (c7 ⋅ c8 ⋅ c6)) in x6.
+          do 3 eapply URA.wf_mon in x6. eapply eq_ind; eauto. r_solve.
+        + rewrite <-!URA.add_assoc. rr; esplits; eauto.
+    }
+    { eauto. }
+    { eauto. }
+    { rewrite -!URA.add_assoc -URA.add_comm in x6. eapply URA.wf_mon in x6.
+      eapply eq_ind; eauto. r_solve. }
+  - 
+
+
+
+
+
+
+
+
+  
+
+  
+  - unfold interp_hp_body, hp_fun_tail, handle_Guarantee, guarantee, mget, mput.
   steps. force_l. instantiate (1 := (c0, c1, ctx ⋅ fmr ⋅ c)). steps.
   force_l.
   {
