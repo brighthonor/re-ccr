@@ -408,18 +408,8 @@ Proof.
     { eauto. }
     { rewrite -!URA.add_assoc -URA.add_comm in x6. eapply URA.wf_mon in x6.
       eapply eq_ind; eauto. r_solve. }
-  - 
 
-
-
-
-
-
-
-
-  
-
-  
+(*    
   - unfold interp_hp_body, hp_fun_tail, handle_Guarantee, guarantee, mget, mput.
   steps. force_l. instantiate (1 := (c0, c1, ctx ⋅ fmr ⋅ c)). steps.
   force_l.
@@ -617,6 +607,8 @@ Proof.
     rewrite <- URA.add_assoc. eapply own_ctx. et.
   }
 - pclearbot. gstep. econs. gfinal. left. eapply CIH; et.
-Qed. *)
+Qed.
+ *)
+Admitted.    
 
 End HPSIM.
