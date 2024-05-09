@@ -90,6 +90,222 @@ Section SIM.
     }
   Qed.
 
+
+
+
+  (* Definition isim' 
+          r g 
+          {R}
+          (RR: Any.t * R-> Any.t * R -> iProp)
+          ps pt
+          (sti_src sti_tgt : Any.t * itree hAGEs R): Σ -> Prop 
+  := 
+    fun res => exists fmr, gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR ps pt sti_src sti_tgt fmr /\
+            fmr res.
+
+  Program Definition isim
+          r g 
+          {R}
+          (RR: Any.t * R-> Any.t * R -> iProp)
+          ps pt
+          (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
+    iProp_intro (isim' r g RR ps pt sti_src sti_tgt) _.
+  Next Obligation.
+    unfold isim'. i. des. exists fmr.
+    esplits; et. eapply iProp_mono; eauto.  
+  Qed. *)
+
+
+  Program Definition isim
+          r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
+          (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
+    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR ps pt sti_src sti_tgt) _.
+  Next Obligation.
+    guclo hpsim_extendC_spec. econs; et.
+  Qed.
+
+
+
+  (* Definition stsim (E : coPset) 
+    r g {R} (RR: Any.t * R -> Any.t * R -> iProp) ps pt
+    (sti_src sti_tgt: Any.t * itree hAGEs R)
+  :=
+    
+
+  
+  
+  
+  
+  
+  
+  :=
+    fun r g R RR ps pt itr_src itr_tgt =>
+      (∀ st_src st_tgt,
+          (wsat ** OwnE E)
+          (* (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE E)) *)
+            -*
+            (isim
+               tid
+               I
+               (lift_rel r)
+               (lift_rel g)
+               (fun r_src r_tgt st_src st_tgt => (wsat ** OwnE ⊤) ** Q r_src r_tgt)
+               (* (fun r_src r_tgt ths im_src im_tgt st_src st_tgt => (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE ⊤)) ** Q r_src r_tgt) *)
+               ps pt itr_src itr_tgt
+               ths im_src im_tgt st_src st_tgt))%I
+  . *)
+
+  (* Variable state_src: Type.
+  Variable state_tgt: Type.
+
+  Variable ident_src: ID.
+  Variable ident_tgt: ID.
+
+  Variable wf_src: WF.
+
+  Let srcE := threadE ident_src state_src.
+  Let tgtE := threadE ident_tgt state_tgt.
+
+  Let shared_rel := TIdSet.t -> (@imap ident_src wf_src) -> (@imap (sum_tid ident_tgt) nat_wf) -> state_src -> state_tgt -> iProp.
+  Variable tid: thread_id.
+  Variable I: shared_rel.
+  Let rel := (forall R_src R_tgt (Q: R_src -> R_tgt -> shared_rel), bool -> bool -> itree srcE R_src -> itree tgtE R_tgt -> shared_rel). 
+  
+    Let lift_rel (rr: rel):
+    forall R_src R_tgt (QQ: R_src -> R_tgt -> shared_rel), bool -> bool -> itree srcE R_src -> itree tgtE R_tgt -> shared_rel :=
+        fun R_src R_tgt QQ ps pt itr_src itr_tgt ths im_src im_tgt st_src st_tgt =>
+          (∃ (Q: R_src -> R_tgt -> iProp)
+             (EQ: QQ = (fun r_src r_tgt ths im_src im_tgt st_src st_tgt =>
+                          (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE ⊤)) ** Q r_src r_tgt)),
+              rr R_src R_tgt Q ps pt itr_src itr_tgt ** (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE ⊤)))%I.
+
+  *)
+
+
+
+  (* isim -> gpaco *)
+
+  Lemma isim_gpaco 
+    r g ps pt {R} RR sti_src sti_tgt fmr
+    (SIM: @isim r g R RR ps pt sti_src sti_tgt fmr)
+    (* (SIM: fmr ⊢ @isim r g R RR ps pt sti_src sti_tgt) *)
+  :
+    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
+  Proof. Admitted.
+
+  (* P ⊢ #=> Q -> hpsim Q -> hpsim P *)
+  Lemma upd_hpsim
+    r g ps pt {R} RR sti_src sti_tgt fmr fmr'
+    (UPD: Own fmr ⊢ #=> Own fmr')
+    (SIM: gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr')
+  :
+    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
+  Proof. Admitted.
+    
+
+
+  (* isim lemmas *)
+
+  Lemma isim_ret
+    r g ps pt {R} RR st_src st_tgt v_src v_tgt
+  :
+    RR (st_src, v_src) (st_tgt, v_tgt)
+  ⊢ (@isim r g R RR ps pt (st_src, Ret v_src) (st_tgt, Ret v_tgt)).
+  Proof.
+    uiprop. r. i. esplits; et.
+    guclo hpsimC_spec. econs; et.
+  Qed.
+  
+  Lemma isim_call 
+    r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg fmr FR
+    (INV: fmr ⊢ #=> (I st_src st_tgt ** FR))
+    (K: forall st_src0 st_tgt0 vret,   
+              ((I st_src0 st_tgt0 ** FR) ⊢ @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+  :
+    fmr ⊢ isim r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt).
+  Proof.
+    uiprop. r. i. exists fmr. esplits; et.
+    guclo hpsimC_spec. econs; i; et.
+    eapply upd_hpsim, isim_gpaco; try refl.
+    specialize (K st_src0 st_tgt0 vret).
+    iIntros "H". iPoseProof (INV0 with "H") as "H". iMod "H".
+    iPoseProof (K with "H") as "H". et.
+  Qed.
+
+  Lemma isim_syscall
+    r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg rvs fmr
+    (K: forall vret, fmr ⊢ #=> (@isim r g R RR true true (st_src, k_src vret) (st_tgt, k_tgt vret)))
+  : 
+    fmr ⊢ isim r g RR ps pt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt).
+  Proof.
+    uiprop. r. i. exists fmr. esplits; et.
+    guclo hpsimC_spec. econs; i; et.
+    eapply upd_hpsim, isim_gpaco; try refl.
+    iIntros "H". iApply K. eauto.
+  Qed.
+
+
+  Lemma isim_assume_src
+    r g ps pt {R} RR iP st_src st_tgt k_src i_tgt fmr
+    (FMR: fmr ⊢ #=> (iP -* (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))))
+        (* (K: (iP ** fmr) ⊢ @isim r g true pt R RR (st_src, k_src tt) (st_tgt, i_tgt)) *)
+  :
+    fmr ⊢ isim r g RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt).
+  Proof.
+    uiprop. r. i. exists fmr. esplits; eauto.
+    guclo hpsimC_spec. econs; i.
+    { instantiate (1:= fmr). et. }
+    eapply upd_hpsim, isim_gpaco; try refl.
+    iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H" as "[IP FMR]".
+    iPoseProof (FMR with "FMR") as "FMR". iMod "FMR". iApply "FMR". et. 
+  Qed.
+
+  Lemma isim_assume_tgt
+    r g ps pt {R} RR iP st_src st_tgt i_src k_tgt fmr
+    (FMR: fmr ⊢ #=> (iP ** (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))))
+  :
+    fmr ⊢ isim r g RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt).
+  Proof.
+    uiprop. r. i. exists fmr. esplits; eauto. 
+    guclo hpsimC_spec. econs; i; eauto. 
+    eapply upd_hpsim, isim_gpaco; try refl.
+    iIntros "H". iApply NEW. eauto.
+  Qed.
+    
+  Lemma isim_guarantee_src
+    r g ps pt {R} RR iP st_src st_tgt k_src i_tgt fmr
+    (FMR: fmr ⊢ #=> (iP ** (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))) )
+  :
+    fmr ⊢ isim r g RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt).
+  Proof.
+    uiprop. r. i. exists fmr. esplits; eauto.
+    guclo hpsimC_spec. econs; i; eauto.
+    eapply upd_hpsim, isim_gpaco; try refl.
+    iIntros "H". iApply NEW. eauto.
+  Qed.    
+
+  Lemma isim_guarantee_tgt
+    r g ps pt {R} RR iP st_src st_tgt i_src k_tgt fmr
+    (FMR: fmr ⊢ #=> (iP -* (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))))
+  :
+    fmr ⊢ isim r g RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt).
+  Proof.
+    uiprop. r. i. exists fmr. esplits; eauto. 
+    guclo hpsimC_spec. econs; i; eauto.
+    eapply upd_hpsim, isim_gpaco; try refl.
+    iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H" as "[IP FMR]".
+    iApply "FMR". eauto.
+  Qed.
+
+
+
+
+
+
+
+
+
+
   Program Definition isim'
           r g p_src p_tgt
           {R}

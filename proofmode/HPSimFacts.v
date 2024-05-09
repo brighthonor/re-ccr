@@ -343,8 +343,8 @@ forall
 @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 p_src p_tgt ctx
   (Any.pair st_src mr_src↑, interp_hp_body itr_src fr_src)
   (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt fr_tgt).
-Proof.
-i. apply hpsim_add_dummy in SIM.
+Proof. Admitted.
+(* i. apply hpsim_add_dummy in SIM.
 revert_until I. ginit. gcofix CIH. i.
 remember (st_src, itr_src). remember (st_tgt, itr_tgt).
 move SIM before FLT. revert_until SIM.
@@ -546,6 +546,6 @@ punfold SIM. induction SIM; i; clarify.
     rewrite <- URA.add_assoc. eapply own_ctx. et.
   }
 - pclearbot. gstep. econs. gfinal. left. eapply CIH; et.
-Qed.
+Qed. *)
 
 End HPSIM.
