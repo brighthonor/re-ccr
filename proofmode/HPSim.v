@@ -735,9 +735,8 @@ Section HPSIM.
 
 
 
-(*  
   Definition itreeH_dummy_ktree Q R (k k': Q -> itree hAGEs R) :=
-    k' = k \/ k' = (fun x => trigger (Guarantee True);;; k x).
+    k' = k \/ k' = (fun x => trigger (Guarantee True);;; trigger (Assume True);;; k x).
   Hint Unfold itreeH_dummy_ktree.
   
   Definition itreeH_dummy R (itr itr': itree hAGEs R) :=
@@ -757,21 +756,21 @@ Section HPSIM.
   Hint Resolve itreeH_dummy_refl.
   
   Lemma itreeH_dummy_dummy Q R i (k: Q -> _):
-    itreeH_dummy R (i >>= k) (x <- i ;; trigger (Guarantee True);;; k x).
+    itreeH_dummy R (i >>= k) (x <- i ;; trigger (Guarantee True);;; trigger (Assume True);;; k x).
   Proof.
     r; esplits; last right; eauto.
   Qed.
   Hint Resolve itreeH_dummy_dummy.
 
-  Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
-    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> Σ -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Σ -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> Σ -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Σ -> Prop
   :=
-  | hpsim_dummyC_src_intro R RR ps pt st_src i_src i_src' st_tgt i_tgt fmr fmr'
-      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
+  | hpsim_dummyC_src_intro R RR ps pt st_src i_src i_src' st_tgt i_tgt ctx fmr ctx' fmr'
+      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr)
       (RELr: Own fmr' ⊢ #=> Own fmr)
       (DUMMY: itreeH_dummy R i_src i_src')
     :
-    hpsim_dummyC_src r R RR ps pt (st_src, i_src') (st_tgt, i_tgt) fmr'
+    hpsim_dummyC_src r R RR ps pt (st_src, i_src') (st_tgt, i_tgt) ctx' fmr'
   .
   
   Lemma hpsim_dummyC_src_mon
