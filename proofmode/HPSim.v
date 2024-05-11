@@ -169,7 +169,7 @@ Section HPSIM.
       (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
                  (NEW: Own fmr' ⊢ (iP ** FMR)),
-          _hpsim hpsim true pt (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
+          _hpsim hpsim ps true (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
     :
     _hpsim hpsim ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) ctx fmr
 
@@ -181,7 +181,7 @@ Section HPSIM.
       (CUR: Own fmr0 ⊢ (iP ** FMR))
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
                  (NEW: Own fmr' ⊢ FMR),
-          _hpsim hpsim ps true (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
+          _hpsim hpsim true pt (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
     :
     _hpsim hpsim ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) ctx fmr
 
@@ -469,7 +469,7 @@ Section HPSIM.
       (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
                  (NEW: Own fmr' ⊢ (iP ** FMR)),
-          hpsim R RR true pt (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
+          hpsim R RR ps true (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
     :
     hpsimC hpsim ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) ctx fmr
            
@@ -480,7 +480,7 @@ Section HPSIM.
       (CUR: Own fmr0 ⊢ (iP ** FMR))
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
                  (NEW: Own fmr' ⊢ FMR),
-          hpsim R RR ps true (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
+          hpsim R RR true pt (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
     :
     hpsimC hpsim ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) ctx fmr
 
@@ -618,7 +618,7 @@ Section HPSIM.
       (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
                  (NEW: Own fmr' ⊢ (iP ** FMR)),
-          hpsim R RR true pt (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
+          hpsim R RR ps true (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
     :
     safe_hpsim hpsim ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) ctx fmr
   .
