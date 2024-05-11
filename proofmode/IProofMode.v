@@ -14,7 +14,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import Red IRed.
 Require Import ProofMode Invariant.
-Require Import HPTactics HPSim HPSimFacts.
+Require Import HPTactics HPSim (* HPSimFacts *).
 
 From stdpp Require Import coPset gmap.
 Require Import FancyUpdate.
@@ -92,50 +92,34 @@ Section SIM.
   (* Variable stb_src: gname -> fspec.
   Variable stb_tgt: gname -> fspec. *)
 
-
   Program Definition isim
           r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
-          (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR ps pt sti_src sti_tgt) _.
+          (sti_src sti_tgt : Any.t * itree hAGEs R): iProp :=
+    iProp_intro (fun fmr => forall ctx (WF: URA.wf (fmr ⋅ ctx)),
+                            gpaco8 (_hpsim) (cpn8 _hpsim) r g R (RR ps pt sti_src sti_tgt ctx fmr) _.
   Next Obligation.
-    guclo hpsim_extendC_spec. econs; et.
+    s. i. guclo hpsim_extendC_spec. econs; et. eapply H.
+    eapply URA.wf_extends; eauto.
+    eapply URA.extends_add; eauto.
   Qed.
-
-  (* isim -> gpaco *)
-
-  Lemma isim_gpaco_hpsim 
-    r g ps pt {R} RR sti_src sti_tgt fmr
-    (SIM: @isim r g R RR ps pt sti_src sti_tgt fmr)
-    (* (SIM: fmr ⊢ @isim r g R RR ps pt sti_src sti_tgt) *)
-  :
-    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
-  Proof. Admitted.
-
-  (* P ⊢ #=> RR -> hpsim RR -> hpsim P *)
-  Lemma upd_hpsim
-    r g ps pt {R} RR sti_src sti_tgt fmr fmr'
-    (UPD: Own fmr ⊢ #=> Own fmr')
-    (SIM: gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr')
-  :
-    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
-  Proof. Admitted.
 
 (***** isim lemmas *****)
 
 
   Lemma isim_init
-      r g ps pt {R} RR st_src st_tgt i_src i_tgt iP fmr
+      r g ps pt {R} RR st_src st_tgt i_src i_tgt iP ctx fmr
       (ENTAIL: bi_entails
                 iP
                 (@isim r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt)))
       (CUR: Own fmr ⊢ #=> iP)
+      (WF: URA.wf (fmr ⋅ ctx))
     :
-      gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
+      gpaco8 _hpsim (cpn8 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr.
   Proof. Admitted.
 
   Lemma isim_final
       r g ps pt {R} RR st_src st_tgt i_src i_tgt iP fmr
-      (SIM: gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (SIM: forall ctx (WF: URA.wf (fmr ⋅ ctx)),  gpaco8 _hpsim (cpn8 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr)
     :
       bi_entails
         iP
@@ -143,19 +127,20 @@ Section SIM.
   Proof. Admitted.
 
   Lemma isim_current
-      r g ps pt {R} RR st_src st_tgt i_src i_tgt fmr
+      r g ps pt {R} RR st_src st_tgt i_src i_tgt fmr ctx
       (CUR: Own fmr ⊢ #=> @isim r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt))
+      (WF: URA.wf (fmr ⋅ ctx))
     :
-      gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
+      gpaco8 _hpsim (cpn8 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr.
   Proof. Admitted.
 
-  Lemma isim_upd
-      r g ps pt {R} RR sti_src sti_tgt
-    :
-      bi_entails
-        (#=> (@isim r g R (fun '(st_src, ret_src) '(st_tgt, ret_tgt) => #=> RR (st_src, ret_src) (st_tgt, ret_tgt)) ps pt sti_src sti_tgt))
-        (isim r g RR ps pt sti_src sti_tgt).
-  Proof. Admitted.
+  (* Lemma isim_upd *)
+  (*     r g ps pt {R} RR sti_src sti_tgt *)
+  (*   : *)
+  (*     bi_entails *)
+  (*       (#=> (@isim r g R (fun '(st_src, ret_src) '(st_tgt, ret_tgt) => #=> RR (st_src, ret_src) (st_tgt, ret_tgt)) ps pt sti_src sti_tgt)) *)
+  (*       (isim r g RR ps pt sti_src sti_tgt). *)
+  (* Proof. Admitted. *)
 
   Lemma isim_mono 
     r g ps pt {R} RR0 RR1 sti_src sti_tgt        
@@ -313,6 +298,20 @@ Section SIM.
   Proof.
     uiprop. i. guclo hpsimC_spec. econs; i.
     { iIntros "H". eauto. }
+    eapply iProp_sepconj in NEW; cycle 1; try refl.
+    { instantiate (1:=ε). r_solve. eauto. }
+    des. uiprop in NEW1. destruct NEW1. subst.
+    exploit (H a); eauto.
+    { revert NEW. r_solve. i. apply URA.wf_mon in NEW.
+      eapply eq_ind; eauto. r_solve. }
+    i. 
+
+    
+    
+    guclo hpsim_extendC_spec. econs. eapply H.
+
+    
+    
     uiprop in NEW. edestruct (NEW fmr0); eauto; try refl.
     { instantiate (1:= ε). r_solve. eauto. }
     des. subst. exploit H; eauto. { admit. }
@@ -498,7 +497,7 @@ Section SIM.
 
   Definition isim_fsem isim_RR: relation (Any.t -> itree hAGEs Any.t) :=
     (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε),
-                ⊢ @isim bot7 bot7 Any.t isim_RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
+                ⊢ @isim bot8 bot8 Any.t isim_RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
 
   Definition isim_fnsem isim_RR: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq (isim_fsem isim_RR).
 
@@ -973,7 +972,7 @@ End STSIM.
           {R}
           (RR: Any.t * R-> Any.t * R -> iProp)
           (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR p_src p_tgt sti_src sti_tgt) _.
+    iProp_intro (gpaco8 (_hpsim) (cpn8 _hpsim) r g _ RR p_src p_tgt sti_src sti_tgt) _.
   Next Obligation.
     guclo hpsim_extendC_spec. econs; et.
   Qed.
@@ -1013,7 +1012,7 @@ End STSIM.
         (CUR: Own fmr ⊢ P)
         (WF: URA.wf fmr)
     :
-      gpaco7 _hpsim (cpn7 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
+      gpaco8 _hpsim (cpn8 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
   Proof.
     assert (Own fmr ⊢ isim (r, g, p_src, p_tgt) RR (st_src, i_src) (st_tgt, i_tgt)).
     { etrans; et. }
@@ -1038,7 +1037,7 @@ End STSIM.
         R (RR: Any.t * R -> Any.t * R -> iProp)
         P r g p_src p_tgt st_src st_tgt i_src i_tgt
         (SIM: forall fmr (CUR: Own fmr ⊢ P) (WF: URA.wf fmr),
-            gpaco7 _hpsim (cpn7 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
+            gpaco8 _hpsim (cpn8 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
       bi_entails
         P
@@ -1070,7 +1069,7 @@ End STSIM.
         (CUR: Own fmr ⊢ isim (r, g, p_src, p_tgt) RR (st_src, i_src) (st_tgt, i_tgt))
         (WF: URA.wf fmr)
     :
-        gpaco7 _hpsim (cpn7 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
+        gpaco8 _hpsim (cpn8 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
   Proof.
     uipropall. eapply CUR; et. refl.
   Qed.

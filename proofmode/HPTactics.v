@@ -23,144 +23,35 @@ Require Import HPSim.
 Set Implicit Arguments.
 
 #[export] Hint Resolve _hpsim_mon: paco.
-#[export] Hint Resolve cpn7_wcompat: paco.
-
-Section SIM.
-  Context `{Σ: GRA.t}.
-
-  Variable fl_src: alist gname (Any.t -> itree hAGEs Any.t).
-  Variable fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
-  Variable I: Any.t -> Any.t -> iProp.
-
-  Variant _safe_hpsim
-    (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-    {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop := 
-  | safe_hpsim_ret
-      p_src p_tgt st_src st_tgt fmr
-      v_src v_tgt
-      (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
-      (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
-  | safe_hpsim_call
-      p_src p_tgt st_src st_tgt fmr
-      fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
-      (K: forall vret st_src0 st_tgt0 fmr0 
-          (WF: URA.wf fmr0)
-          (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
-          hpsim _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-  | safe_hpsim_syscall
-      p_src p_tgt st_src st_tgt fmr
-      fn varg rvs k_src k_tgt
-      (K: forall vret, 
-          hpsim _ RR true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
-
-  | safe_hpsim_tau_src
-      p_src p_tgt st_src st_tgt fmr
-      i_src i_tgt
-      (K: hpsim _ RR true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
-
-  | safe_hpsim_tau_tgt
-      p_src p_tgt st_src st_tgt fmr
-      i_src i_tgt
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
-
-  | safe_hpsim_choose_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X i_src k_tgt
-      (K: forall (x: X), hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
-
-  | safe_hpsim_take_src
-      p_src p_tgt st_src st_tgt fmr
-      X k_src i_tgt
-      (K: forall (x: X), hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | safe_hpsim_supdate_src
-      p_src p_tgt st_src st_tgt fmr
-      X x st_src0 k_src i_tgt
-      (run: Any.t -> Any.t * X)
-      (RUN: run st_src = (st_src0, x))
-      (K: hpsim _ RR true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | safe_hpsim_supdate_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X x st_tgt0 i_src k_tgt
-      (run: Any.t -> Any.t * X)
-      (RUN: run st_tgt = (st_tgt0, x))
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
-
-  | safe_hpsim_assume_src
-      p_src p_tgt st_src st_tgt fmr
-      iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
-    :
-      _safe_hpsim hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | safe_hpsim_guarantee_tgt
-      p_src p_tgt st_src st_tgt fmr
-      iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
-    :
-    _safe_hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
-  .
-
-
-  Lemma safe_hpsim_spec:
-    _safe_hpsim <8= gupaco7 (@_hpsim Σ fl_src fl_tgt I false) (cpn7 (@_hpsim Σ fl_src fl_tgt I false)).
-  Proof.
-    i. eapply hpsimC_spec. depdes PR; try by (econs; et).
-  Qed.
-
-End SIM.
+#[export] Hint Resolve cpn8_wcompat: paco.
 
 (* TACTICS *)
 
 Context `{Σ: GRA.t}.
 
 
-Ltac hp_ired_l := try (prw _red_gen 3 1 0).
-Ltac hp_ired_r := try (prw _red_gen 2 1 0).
+Ltac hp_ired_l := try (prw _red_gen 4 1 0).
+Ltac hp_ired_r := try (prw _red_gen 3 1 0).
 
 Ltac hprep := hp_ired_l; hp_ired_r.
 
 Ltac _hp_force_l :=
   hprep;
   match goal with
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, unwrapN ?ox >>= _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, unwrapN ?ox >>= _) (_, _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (unwrapN ox) as tvar eqn:thyp; unfold unwrapN in thyp; subst tvar;
     let name := fresh "_UNWRAPN" in
     destruct (ox) eqn:name; [|exfalso]; cycle 1
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (guarantee P) as tvar eqn:thyp; unfold guarantee in thyp; subst tvar;
     let name := fresh "_GUARANTEE" in
     destruct (classic P) as [name|name]; [hprep; guclo hpsimC_spec; eapply hpsimC_choose_src; [exists name]|contradict name]; cycle 1
 
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ITree.bind (interp _ guarantee ?P) _ (_, _)) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ITree.bind (interp _ guarantee ?P) _ (_, _)) (_, _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (guarantee P) as tvar eqn:thyp; unfold guarantee in thyp; subst tvar;
@@ -168,14 +59,14 @@ Ltac _hp_force_l :=
     destruct (classic P) as [name|name]; [hprep; guclo hpsimC_spec; eapply hpsimC_choose_src; [exists name]|contradict name]; cycle 1
 
    (* TODO: handle interp better and remove this case *)
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ITree.bind (interp _ (guarantee ?P )) _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ITree.bind (interp _ (guarantee ?P )) _) (_, _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (guarantee P) as tvar eqn:thyp; unfold guarantee in thyp; subst tvar;
     let name := fresh "_GUARANTEE" in
     destruct (classic P) as [name|name]; [hprep; guclo hpsimC_spec; eapply hpsimC_choose_src; [exists name]|contradict name]; cycle 1; clear name
 
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ?i_src) (_, ?i_tgt) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ?i_src) (_, ?i_tgt) _ _) ] =>
     seal i_tgt; guclo hpsimC_spec; econs; unseal i_tgt
   end
 .
@@ -183,20 +74,20 @@ Ltac _hp_force_l :=
 Ltac _hp_force_r :=
   hprep;
   match goal with
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, unwrapU ?ox >>= _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, unwrapU ?ox >>= _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (unwrapU ox) as tvar eqn:thyp; unfold unwrapU in thyp; subst tvar;
     let name := fresh "_UNWRAPU" in
     destruct (ox) eqn:name; [|exfalso]; cycle 1
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (assume P) as tvar eqn:thyp; unfold assume in thyp; subst tvar;
     let name := fresh "_ASSUME" in
     destruct (classic P) as [name|name]; [hprep; guclo hpsimC_spec; eapply hpsimC_take_tgt; [exists name]|contradict name]; cycle 1
 
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ?i_src) (_, ?i_tgt) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, ?i_src) (_, ?i_tgt) _ _) ] =>
     seal i_src; guclo hpsimC_spec; econs; unseal i_src
   end
 .
@@ -204,15 +95,15 @@ Ltac _hp_force_r :=
 Ltac _hp_step :=
   match goal with
   (*** blacklisting ***)
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, triggerUB >>= _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, triggerUB >>= _) (_, _) _ _) ] =>
     unfold triggerUB; hp_ired_l; _hp_step; done
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, unwrapU ?ox >>= _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, unwrapU ?ox >>= _) (_, _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (unwrapU ox) as tvar eqn:thyp; unfold unwrapU in thyp; subst tvar;
     let name := fresh "_UNWRAPU" in
     destruct (ox) eqn:name; [|unfold triggerUB; hprep; _hp_force_l; ss; fail]
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, assume ?P >>= _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, assume ?P >>= _) (_, _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (assume P) as tvar eqn:thyp; unfold assume in thyp; subst tvar;
@@ -220,15 +111,15 @@ Ltac _hp_step :=
     hprep; guclo hpsimC_spec; eapply hpsimC_take_src; intro name
 
   (*** blacklisting ***)
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, triggerNB >>= _) (_, _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, triggerNB >>= _) (_, _) _ _) ] =>
     unfold triggerNB; hp_ired_r; _hp_step; done
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, unwrapN ?ox >>= _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, unwrapN ?ox >>= _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (unwrapN ox) as tvar eqn:thyp; unfold unwrapN in thyp; subst tvar;
     let name := fresh "_UNWRAPN" in
     destruct (ox) eqn:name; [|unfold triggerNB; hprep; _hp_force_r; ss; fail]
-  | [ |- (gpaco7 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, guarantee ?P >>= _) _) ] =>
+  | [ |- (gpaco8 (_hpsim _ _ _) _ _ _ _ _ _ _ (_, _) (_, guarantee ?P >>= _) _ _) ] =>
     let tvar := fresh "tmp" in
     let thyp := fresh "TMP" in
     remember (guarantee P) as tvar eqn:thyp; unfold guarantee in thyp; subst tvar;
@@ -259,7 +150,7 @@ Section TEST.
   Context `{Σ: GRA.t}.
   Variable srcs0: Any.t.
   Variable tgts0: Any.t.
-  Variable I: Any.t -> Any.t -> iProp.
+  Variable Ist: Any.t -> Any.t -> iProp.
 
   (* Require Import HTactics. *)
 
@@ -267,14 +158,14 @@ Section TEST.
 
   Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
 
-  Goal gpaco7 (@_hpsim Σ fl_src fl_tgt I false) (cpn7 (@_hpsim Σ fl_src fl_tgt I false)) bot7 bot7 Any.t (fun _ _ => ⌜True⌝%I) false false
-       (srcs0, triggerUB >>= idK) (tgts0, triggerUB >>= idK) ε. 
-  Proof. 
+  Goal gpaco8 (@_hpsim Σ fl_src fl_tgt Ist false) (cpn8 (@_hpsim Σ fl_src fl_tgt Ist false)) bot8 bot8 Any.t (fun _ _ _ => ⌜True⌝%I) false false
+       (srcs0, triggerUB >>= idK) (tgts0, triggerUB >>= idK) ε ε. 
+  Proof.
     hsteps.
   Qed.
 
-  Goal gpaco7 (@_hpsim Σ fl_src fl_tgt I false) (cpn7 (@_hpsim Σ fl_src fl_tgt I false)) bot7 bot7 Any.t (fun _ _ => ⌜True⌝%I) false false
-       (srcs0, triggerNB >>= idK) (tgts0, triggerNB >>= idK) ε.
+  Goal gpaco8 (@_hpsim Σ fl_src fl_tgt Ist false) (cpn8 (@_hpsim Σ fl_src fl_tgt Ist false)) bot8 bot8 Any.t (fun _ _ _ => ⌜True⌝%I) false false
+       (srcs0, triggerNB >>= idK) (tgts0, triggerNB >>= idK) ε ε.
   Proof.
     hsteps.
   Qed.
@@ -283,11 +174,11 @@ Section TEST.
     Let fl_src0: alist gname (Any.t -> itree hAGEs Any.t) := [("f", (fun (_ :Any.t) => Ret tt↑))].
     Let fl_tgt0: alist gname (Any.t -> itree hAGEs Any.t) := [("g", (fun (_ :Any.t) => Ret tt↑))].
 
-    Goal gpaco7 (@_hpsim Σ fl_src0 fl_tgt0 I false) (cpn7 (@_hpsim Σ fl_src0 fl_tgt0 I false)) bot7 bot7 Any.t (fun _ _ => ⌜True⌝%I) false false
-         (srcs0, trigger (Call "f" tt↑) >>= idK) (tgts0, trigger (Call "g" tt↑) >>= idK) ε.
+    Goal gpaco8 (@_hpsim Σ fl_src0 fl_tgt0 Ist false) (cpn8 (@_hpsim Σ fl_src0 fl_tgt0 Ist false)) bot8 bot8 Any.t (fun _ _ _ => ⌜True⌝%I) false false
+         (srcs0, trigger (Call "f" tt↑) >>= idK) (tgts0, trigger (Call "g" tt↑) >>= idK) ε ε.
     Proof.
-      inline. hsteps. et.
-    (* inline_l. inline_r. hsteps. et.  *)
+      inline_l. inline_r. hsteps. iIntros "H". eauto.
+      (* inline. hsteps. iIntros "H". eauto. *)
     Qed.
   End INLINE.
   Section LINKING.
@@ -338,20 +229,23 @@ Section TEST.
     Goal HModPair.sim (HMod.add ms0 ms1) (HMod.add mt0 mt1).
     Proof.
       econs; ss.
-      ii. econs. 
+      ii. econs; cycle 1.
+      { instantiate (1:= (fun _ _ => True%I)). eauto. }
+
       econs.
       { econs; ss.
-        grind. ginit. hsteps. et.  
+        grind. ginit. hsteps.
+        iIntros "H". iSplitL; eauto.
       }
       econs.
       {
         econs; ss. 
-        grind. ginit. hsteps. et. 
+        grind. ginit. hsteps.
+        iIntros "H". iSplitL; eauto.
       }
       econs; et.
       econs; ss.
       grind. ginit. hprep. inline. hprep. inline. hsteps; et.
-      ss. uipropall. refl.
     Qed.
 
   End LINKING.
