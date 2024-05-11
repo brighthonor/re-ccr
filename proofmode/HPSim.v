@@ -6,7 +6,6 @@ Require Import Skeleton.
 Require Import PCM.
 Require Import Any.
 Require Import HoareDef OpenDef STB SimModSem.
-
 Require Import Relation_Definitions.
 
 Require Import Relation_Operators.
@@ -152,11 +151,10 @@ Section HPSIM.
   | hpsim_assume_src
       (HPSIM_ASSUME_SRC: True)
       ps pt st_src st_tgt ctx fmr fmr0
-      iP k_src i_tgt (FMR: iProp)
+      iP k_src i_tgt
       (UPD: URA.wf (fmr0 ⋅ ctx))
-      (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
-                 (NEW: Own fmr' ⊢ (iP ** FMR)),
+                 (NEW: Own fmr' ⊢ (iP ** Own fmr0)),
           _hpsim hpsim true pt (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
     :
     _hpsim hpsim ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) ctx fmr
@@ -164,11 +162,10 @@ Section HPSIM.
   | hpsim_guarantee_tgt
       (HPSIM_GUARANTEE_TGT: True)
       ps pt st_src st_tgt ctx fmr fmr0
-      iP i_src k_tgt (FMR: iProp)
+      iP i_src k_tgt
       (UPD: URA.wf (fmr0 ⋅ ctx))
-      (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
-                 (NEW: Own fmr' ⊢ (iP ** FMR)),
+                 (NEW: Own fmr' ⊢ (iP ** Own fmr0)),
           _hpsim hpsim ps true (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
     :
     _hpsim hpsim ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) ctx fmr
@@ -222,7 +219,8 @@ Section HPSIM.
 
   Definition hpsim_tail : Any.t*Any.t -> Any.t*Any.t -> Σ -> iProp :=
     fun '(st_src, v_src) '(st_tgt, v_tgt) ctx =>
-      Ist st_src st_tgt ** ⌜v_src = v_tgt⌝.
+      ⌜v_src = v_tgt /\
+       ∃ fmr0, URA.wf (fmr0 ⋅ ctx) /\ (Own fmr0 ⊢ Ist st_src st_tgt)⌝%I.
 
   Definition hpsim_body := @hpsim Any.t hpsim_tail.
 
@@ -453,22 +451,20 @@ Section HPSIM.
 
   | hpsimC_assume_src
       ps pt st_src st_tgt ctx fmr fmr0
-      iP k_src i_tgt (FMR: iProp)
+      iP k_src i_tgt
       (UPD: URA.wf (fmr0 ⋅ ctx))
-      (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
-                 (NEW: Own fmr' ⊢ (iP ** FMR)),
+                 (NEW: Own fmr' ⊢ (iP ** Own fmr0)),
           hpsim R RR true pt (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
     :
     hpsimC hpsim ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) ctx fmr
 
   | hpsimC_guarantee_tgt
       ps pt st_src st_tgt ctx fmr fmr0
-      iP i_src k_tgt (FMR: iProp)
+      iP i_src k_tgt
       (UPD: URA.wf (fmr0 ⋅ ctx))
-      (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
-                 (NEW: Own fmr' ⊢ (iP ** FMR)),
+                 (NEW: Own fmr' ⊢ (iP ** Own fmr0)),
           hpsim R RR ps true (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
     :
     hpsimC hpsim ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) ctx fmr
@@ -602,22 +598,20 @@ Section HPSIM.
 
     | safe_hpsim_assume_src
       ps pt st_src st_tgt ctx fmr fmr0
-      iP k_src i_tgt (FMR: iProp)
+      iP k_src i_tgt
       (UPD: URA.wf (fmr0 ⋅ ctx))
-      (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
-                 (NEW: Own fmr' ⊢ (iP ** FMR)),
+                 (NEW: Own fmr' ⊢ (iP ** Own fmr0)),
           hpsim R RR true pt (st_src, k_src tt) (st_tgt, i_tgt) ctx' fmr')
     :
     safe_hpsim hpsim ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) ctx fmr
 
     | safe_hpsim_guarantee_tgt
       ps pt st_src st_tgt ctx fmr fmr0
-      iP i_src k_tgt (FMR: iProp)
+      iP i_src k_tgt
       (UPD: URA.wf (fmr0 ⋅ ctx))
-      (CUR: Own fmr0 ⊢ FMR)
       (K: forall ctx' fmr' (WF: URA.wf (fmr' ⋅ ctx'))
-                 (NEW: Own fmr' ⊢ (iP ** FMR)),
+                 (NEW: Own fmr' ⊢ (iP ** Own fmr0)),
           hpsim R RR ps true (st_src, i_src) (st_tgt, k_tgt tt) ctx' fmr')
     :
     safe_hpsim hpsim ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) ctx fmr
@@ -693,7 +687,7 @@ Section HPSIM.
   | hpsim_extendC_intro
       ps pt R RR sti_src sti_tgt ctx fmr fmr'
       (SIM: r R RR ps pt sti_src sti_tgt ctx fmr)
-      (EXT: URA.extends fmr fmr')
+      (EXT: Own fmr' ⊢ Own fmr)
       (WF: URA.wf fmr')
      :
     hpsim_extendC r R RR ps pt sti_src sti_tgt ctx fmr'
@@ -716,8 +710,8 @@ Section HPSIM.
   Proof.
     econs; eauto using hpsim_extendC_mon.
     intros. destruct PR. move SIM before RR. revert_until SIM.
-    induction SIM; econs; eauto using hpsim_extendC, URA_extends_refl;
-      try (by etrans; cycle 1; eauto using Own_extends);
+    induction SIM; econs; eauto using hpsim_extendC;
+      try (by etrans; cycle 1; eauto);
       try (by i; eapply H; eauto; try refl; eapply URA.wf_mon in WF0; eauto).
   Qed.
 
@@ -735,19 +729,19 @@ Section HPSIM.
 
 
 
-  Definition itreeH_dummy_ktree Q R (k k': Q -> itree hAGEs R) :=
+  Definition itreeH_dummy_ktree R (k k': R -> itree hAGEs Any.t) :=
     k' = k \/ k' = (fun x => trigger (Guarantee True);;; trigger (Assume True);;; k x).
   Hint Unfold itreeH_dummy_ktree.
   
-  Definition itreeH_dummy R (itr itr': itree hAGEs R) :=
-    exists Q i k k',
+  Definition itreeH_dummy (itr itr': itree hAGEs Any.t) :=
+    exists R i k k',
       itr = (i >>= k) /\
       itr' = (i >>= k') /\
-      itreeH_dummy_ktree Q R k k'.
+      itreeH_dummy_ktree R k k'.
   Hint Unfold itreeH_dummy.
 
-  Lemma itreeH_dummy_refl R i:
-    itreeH_dummy R i i.
+  Lemma itreeH_dummy_refl i:
+    itreeH_dummy i i.
   Proof.
     replace i with (x <- Ret tt;; Ret tt;;; i); cycle 1.
     { rewrite !bind_ret_l. eauto. }
@@ -755,8 +749,8 @@ Section HPSIM.
   Qed.
   Hint Resolve itreeH_dummy_refl.
   
-  Lemma itreeH_dummy_dummy Q R i (k: Q -> _):
-    itreeH_dummy R (i >>= k) (x <- i ;; trigger (Guarantee True);;; trigger (Assume True);;; k x).
+  Lemma itreeH_dummy_dummy R i (k: R -> _):
+    itreeH_dummy (i >>= k) (x <- i ;; trigger (Guarantee True);;; trigger (Assume True);;; k x).
   Proof.
     r; esplits; last right; eauto.
   Qed.
@@ -765,12 +759,13 @@ Section HPSIM.
   Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> Σ -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Σ -> Prop):
     forall R (RR: Any.t * R -> Any.t * R -> Σ -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Σ -> Prop
   :=
-  | hpsim_dummyC_src_intro R RR ps pt st_src i_src i_src' st_tgt i_tgt ctx fmr ctx' fmr'
-      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr)
-      (RELr: Own fmr' ⊢ #=> Own fmr)
-      (DUMMY: itreeH_dummy R i_src i_src')
+  | hpsim_dummyC_src_intro ps pt st_src i_src i_src' st_tgt i_tgt ctx fmr fmr'
+      (SIM: r _ hpsim_tail ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr)
+      (RELr: Own fmr' ⊢ Own fmr)
+      (WF: URA.wf (fmr' ⋅ ctx))
+      (DUMMY: itreeH_dummy i_src i_src')
     :
-    hpsim_dummyC_src r R RR ps pt (st_src, i_src') (st_tgt, i_tgt) ctx' fmr'
+    hpsim_dummyC_src r _ hpsim_tail ps pt (st_src, i_src') (st_tgt, i_tgt) ctx fmr'
   .
   
   Lemma hpsim_dummyC_src_mon
@@ -787,12 +782,30 @@ Section HPSIM.
     econs; eauto using hpsim_dummyC_src_mon; i. depdes PR.
     remember (st_src, i_src) as sti_src.
     remember (st_tgt, i_tgt) as sti_tgt.
-    move SIM before RR. revert_until SIM.
+    move SIM before r. revert_until SIM.
     induction SIM; i; depdes Heqsti_src Heqsti_tgt;
-      grind; eauto 8 with paco imodL; r in DUMMY; des.
+      grind; eauto 8 with paco; r in DUMMY; des.
     - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      destruct DUMMY1; subst; rewrite <-x; econs; eauto with imodL.
+      destruct DUMMY1; subst; rewrite <-x; eauto.
+      + econs; eauto. etrans; eauto.
+      + econs; try (instantiate (1:=ε)); eauto.
+        { r_solve. rewrite URA.add_comm in WF. eapply URA.wf_mon; eauto. }
+        { instantiate (1:= Own ε). eauto. }
+        i. econs; eauto.
+        i. econs; eauto.
+        unfold hpsim_tail in *.
+        
+        iIntros "H". iPoseProof (NEW0 with "H") as "[_ H]".
+        
+        
+
+      
+        
+
+        
     - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
+
+      
       + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
         * econs; eauto with imodL.
         * eapply hpsim_guarantee_src; try econs; eauto with imodL.
