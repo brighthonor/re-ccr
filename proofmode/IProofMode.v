@@ -14,7 +14,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import Red IRed.
 Require Import ProofMode Invariant.
-Require Import HPTactics HPSim (* HPSimFacts *).
+Require Import HPSim HPTactics (* HPSimFacts *).
 
 From stdpp Require Import coPset gmap.
 Require Import FancyUpdate.
@@ -92,39 +92,53 @@ Section SIM.
   (* Variable stb_src: gname -> fspec.
   Variable stb_tgt: gname -> fspec. *)
 
-  Definition quantify_ctx (P: Σ -> Σ -> Prop) : Σ -> Prop:=
-    fun fmr => forall ctx (WF: URA.wf (fmr ⋅ ctx)), P ctx fmr.
-
-  Definition ignore_ctx {X} {Y} (P: X -> Y -> iProp) : X -> Y -> Σ -> iProp :=
-    fun x y _ => P x y.
 
   Program Definition isim
           r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
-          (sti_src sti_tgt : Any.t * itree hAGEs R): iProp :=
-    iProp_intro (quantify_ctx (gpaco8 (_hpsim) (cpn8 _hpsim) r g R (ignore_ctx RR) ps pt sti_src sti_tgt)) _.
+          (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
+    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR ps pt sti_src sti_tgt) _.
   Next Obligation.
-    unfold quantify_ctx. s. i. guclo hpsim_extendC_spec. econs; et. eapply H.
-    eapply URA.wf_extends; eauto.
-    eapply URA.extends_add; eauto.
+    guclo hpsim_extendC_spec. econs; et.
+  Qed.
+
+  (* isim -> gpaco *)
+
+  Lemma isim_gpaco_hpsim 
+    r g ps pt {R} RR sti_src sti_tgt fmr
+    (SIM: @isim r g R RR ps pt sti_src sti_tgt fmr)
+    (* (SIM: fmr ⊢ @isim r g R RR ps pt sti_src sti_tgt) *)
+  :
+    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
+  Proof. Admitted.
+
+  (* P ⊢ #=> RR -> hpsim RR -> hpsim P *)
+  Lemma upd_hpsim
+    r g ps pt {R} RR sti_src sti_tgt fmr fmr'
+    (UPD: Own fmr ⊢ #=> Own fmr')
+    (SIM: gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr')
+  :
+    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
+  Proof.
+    
+
   Qed.
 
 (***** isim lemmas *****)
 
 
   Lemma isim_init
-      r g ps pt {R} RR st_src st_tgt i_src i_tgt iP ctx fmr
+      r g ps pt {R} RR st_src st_tgt i_src i_tgt iP fmr
       (ENTAIL: bi_entails
                 iP
                 (@isim r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt)))
       (CUR: Own fmr ⊢ #=> iP)
-      (WF: URA.wf (fmr ⋅ ctx))
     :
-      gpaco8 _hpsim (cpn8 _hpsim) r g R (ignore_ctx RR) ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr.
+      gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
   Proof. Admitted.
 
   Lemma isim_final
       r g ps pt {R} RR st_src st_tgt i_src i_tgt iP fmr
-      (SIM: forall ctx (WF: URA.wf (fmr ⋅ ctx)),  gpaco8 _hpsim (cpn8 _hpsim) r g R (ignore_ctx RR) ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr)
+      (SIM: gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
       bi_entails
         iP
@@ -132,20 +146,19 @@ Section SIM.
   Proof. Admitted.
 
   Lemma isim_current
-      r g ps pt {R} RR st_src st_tgt i_src i_tgt fmr ctx
+      r g ps pt {R} RR st_src st_tgt i_src i_tgt fmr
       (CUR: Own fmr ⊢ #=> @isim r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt))
-      (WF: URA.wf (fmr ⋅ ctx))
     :
-      gpaco8 _hpsim (cpn8 _hpsim) r g R (ignore_ctx RR) ps pt (st_src, i_src) (st_tgt, i_tgt) ctx fmr.
+      gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
   Proof. Admitted.
 
-  (* Lemma isim_upd *)
-  (*     r g ps pt {R} RR sti_src sti_tgt *)
-  (*   : *)
-  (*     bi_entails *)
-  (*       (#=> (@isim r g R (fun '(st_src, ret_src) '(st_tgt, ret_tgt) => #=> RR (st_src, ret_src) (st_tgt, ret_tgt)) ps pt sti_src sti_tgt)) *)
-  (*       (isim r g RR ps pt sti_src sti_tgt). *)
-  (* Proof. Admitted. *)
+  Lemma isim_upd
+      r g ps pt {R} RR sti_src sti_tgt
+    :
+      bi_entails
+        (#=> (@isim r g R (fun '(st_src, ret_src) '(st_tgt, ret_tgt) => #=> RR (st_src, ret_src) (st_tgt, ret_tgt)) ps pt sti_src sti_tgt))
+        (isim r g RR ps pt sti_src sti_tgt).
+  Proof. Admitted.
 
   Lemma isim_mono 
     r g ps pt {R} RR0 RR1 sti_src sti_tgt        
@@ -187,36 +200,15 @@ Section SIM.
 
   Lemma isim_call 
     r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg
+    (* (INV: fmr ⊢ #=> (I st_src st_tgt ** FR))
+    (K: forall st_src0 st_tgt0 vret,   
+              ((I st_src0 st_tgt0 ** FR) ⊢ @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret))) *)
   :
   bi_entails
-    (#=> (Ist st_src st_tgt ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -* @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret))))
+    ((Ist st_src st_tgt) ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -* @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
     (isim r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt)).
-  Proof.
-    uipropall. unfold quantify_ctx. i.
-    edestruct (H _ WF0); des. subst. clear H.
-    guclo hpsimC_spec. econs; cycle 2.
-    { instantiate (1:= Own b). i.
-      assert (WFfmr': URA.wf fmr').
-      { eapply URA.wf_mon; eauto. }
-      uipropall. edestruct INV; try refl; eauto; des; subst.
-      guclo hpsim_extendC_spec. econs; eauto.
-      { rewrite (URA.add_comm x b0) in WF1.
-        rr in H3. uipropall. specialize (H3 st_src0).
-        rr in H3. uipropall. specialize (H3 st_tgt0).
-        rr in H3. uipropall. specialize (H3 vret).
-        uipropall. eapply H3; cycle 1.
-        { eapply H1. }
-        { eapply URA.wf_extends, WF1. repeat eapply URA.extends_add. eauto. }
-        { eapply URA.wf_mon in WF1.
-          eapply URA.wf_extends, WF1. repeat eapply URA.extends_add. eauto. }
-      }
-      { rewrite (URA.add_comm x b0). repeat eapply URA.extends_add. eauto. }
-    }
-    { apply H0. }
-    { uipropall. i. rr in H. des. subst.
-      exists a, (b ⋅ ctx0). esplits; r_solve; rr; eauto.
-    }
-  Qed.
+    (* fmr ⊢ isim r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt). *)
+  Proof. Admitted.
 
   Lemma isim_syscall
     r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg rvs
@@ -322,80 +314,14 @@ Section SIM.
     (iP -* (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
     (@isim r g R RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt)).
   Proof.
-    uiprop. unfold quantify_ctx. i. guclo hpsimC_spec. econs; i; eauto.
-    uiprop in NEW. edestruct (NEW fmr'); eauto 10; try refl.
-    { eapply URA.wf_mon; eauto. }
-    des. subst. exploit (H x); eauto; cycle 2.
-    { i. guclo hpsim_extendC_spec. econs; eauto.
-      { rewrite (URA.add_comm x b). eapply URA.extends_add; eauto. }
-      eapply URA.wf_mon. eauto.
-    }
-    { eapply URA.wf_extends, WF1. rewrite (URA.add_comm x b).
-      etrans.
-      - eapply URA.extends_add; eauto.
-      - rr; eauto.
-    }
-    { eapply URA.wf_extends, WF1.
-      rewrite (URA.add_comm x b).
-      repeat eapply URA.extends_add. eauto.
-    }
-  Qed.
+    uiprop. i. guclo hpsimC_spec. econs; i.
+    { iIntros "H". eauto. }
+    uiprop in NEW. edestruct (NEW fmr0); eauto; try refl.
+    { instantiate (1:= ε). r_solve. eauto. }
+    des. subst. exploit H; eauto. { admit. }
+    i.
+  Admitted.
 
-  Lemma isim_guarantee_src
-    r g ps pt {R} RR iP st_src st_tgt k_src i_tgt 
-  :
-  bi_entails
-    (#=> (iP ** (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))))
-    (@isim r g R RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt)).
-  Proof.
-    uiprop. unfold quantify_ctx. i.
-    edestruct (H _ WF0); des. subst.
-    guclo hpsimC_spec. econs; cycle 2.
-    { instantiate (1:= Own b). i.
-      assert (WFfmr': URA.wf fmr').
-      { eapply URA.wf_mon; eauto. }
-      assert (EXT: URA.extends b fmr').
-      { uiprop in NEW. eapply NEW; try refl; eauto. }
-      guclo hpsim_extendC_spec. econs; eauto.
-      eapply H3. eapply URA.wf_extends, WF1.
-      eapply URA.extends_add; eauto.
-    }
-    { eauto. }
-    { uiprop. i. rr in H1. des.
-      exists a, (b ⋅ ctx0). subst. r_solve.
-      esplits; eauto. rr; eauto.
-    }
-  Qed.
-
-  
-  Lemma isim_guarantee_src
-    r g ps pt {R} RR iP st_src st_tgt k_src i_tgt 
-  :
-  bi_entails
-    ((#=>iP) ** (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
-    (@isim r g R RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt)).
-  Proof.
-    uiprop. unfold quantify_ctx. i. des. subst.
-    edestruct (H0 (b ⋅ ctx)); des.
-    { r_solve. eauto. }
-    guclo hpsimC_spec. econs; cycle 2.
-    { instantiate (1:= Own b). i.
-      assert (WFfmr': URA.wf fmr').
-      { eapply URA.wf_mon; eauto. }
-      assert (EXT: URA.extends b fmr').
-      { uiprop in NEW. eapply NEW; try refl; eauto. }
-      guclo hpsim_extendC_spec. econs; eauto.
-      eapply H1. eapply URA.wf_extends, WF1.
-      eapply URA.extends_add; eauto.
-    }
-    { revert H. r_solve. eauto. }
-    { uiprop. i. rr in H3. des.
-      exists x, (b ⋅ ctx0). subst. r_solve.
-      esplits; eauto. rr; eauto.
-    }
-  Qed.
-
-  
   Lemma isim_assume_tgt
     r g ps pt {R} RR iP st_src st_tgt i_src k_tgt 
   :
@@ -404,6 +330,13 @@ Section SIM.
     (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt)).
   Proof. Admitted.
     
+  Lemma isim_guarantee_src
+    r g ps pt {R} RR iP st_src st_tgt k_src i_tgt 
+  :
+  bi_entails
+    (iP ** (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
+    (@isim r g R RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt)).
+  Proof. Admitted.
 
   Lemma isim_guarantee_tgt
     r g ps pt {R} RR iP st_src st_tgt i_src k_tgt 
@@ -568,7 +501,7 @@ Section SIM.
 
   Definition isim_fsem isim_RR: relation (Any.t -> itree hAGEs Any.t) :=
     (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε),
-                ⊢ @isim bot8 bot8 Any.t isim_RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
+                ⊢ @isim bot7 bot7 Any.t isim_RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
 
   Definition isim_fnsem isim_RR: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq (isim_fsem isim_RR).
 
@@ -1043,7 +976,7 @@ End STSIM.
           {R}
           (RR: Any.t * R-> Any.t * R -> iProp)
           (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco8 (_hpsim) (cpn8 _hpsim) r g _ RR p_src p_tgt sti_src sti_tgt) _.
+    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR p_src p_tgt sti_src sti_tgt) _.
   Next Obligation.
     guclo hpsim_extendC_spec. econs; et.
   Qed.
@@ -1083,7 +1016,7 @@ End STSIM.
         (CUR: Own fmr ⊢ P)
         (WF: URA.wf fmr)
     :
-      gpaco8 _hpsim (cpn8 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
+      gpaco7 _hpsim (cpn7 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
   Proof.
     assert (Own fmr ⊢ isim (r, g, p_src, p_tgt) RR (st_src, i_src) (st_tgt, i_tgt)).
     { etrans; et. }
@@ -1108,7 +1041,7 @@ End STSIM.
         R (RR: Any.t * R -> Any.t * R -> iProp)
         P r g p_src p_tgt st_src st_tgt i_src i_tgt
         (SIM: forall fmr (CUR: Own fmr ⊢ P) (WF: URA.wf fmr),
-            gpaco8 _hpsim (cpn8 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
+            gpaco7 _hpsim (cpn7 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
       bi_entails
         P
@@ -1140,7 +1073,7 @@ End STSIM.
         (CUR: Own fmr ⊢ isim (r, g, p_src, p_tgt) RR (st_src, i_src) (st_tgt, i_tgt))
         (WF: URA.wf fmr)
     :
-        gpaco8 _hpsim (cpn8 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
+        gpaco7 _hpsim (cpn7 _hpsim) r g _ RR p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr.
   Proof.
     uipropall. eapply CUR; et. refl.
   Qed.

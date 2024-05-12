@@ -208,7 +208,7 @@ Section HPSIM.
   .
   Arguments __hpsim with_dummy safe_only hpsimc hpsimi R RR.
 
-  Inductive _hpsim with_dummy hpsim R RR ps pt sti_src sti_tgt fmr : Prop
+  Inductive _hpsim {with_dummy} hpsim R RR ps pt sti_src sti_tgt fmr : Prop
     :=
   | hpsimF_intro (IN: @__hpsim with_dummy false hpsim (@_hpsim with_dummy hpsim) R RR ps pt sti_src sti_tgt fmr) 
   .
@@ -218,7 +218,7 @@ Section HPSIM.
   Lemma _hpsim_tarski with_dummy hpsim rel
     (FIX: @__hpsim with_dummy false hpsim rel <7= rel)
     :
-    _hpsim with_dummy hpsim <7= rel.
+    @_hpsim with_dummy hpsim <7= rel.
   Proof.
     fix self 8. i.
     destruct PR. apply FIX. destruct IN; econs; ss; eauto;
@@ -463,15 +463,31 @@ Section HPSIM.
 
 
   
+  Lemma URA_wf_extends_add (r r' c: Σ)
+    (EXT : URA.extends r r')
+    (WF : URA.wf (r' ⋅ c))
+    :
+    URA.wf (r ⋅ c).
+  Proof.
+    eapply URA.wf_extends; eauto.
+    eapply URA.extends_add. eauto.
+  Qed.
+
+  Lemma URA_extends_refl (r: Σ):
+    URA.extends r r.
+  Proof. refl. Qed.
 
 
+
+
+  
   Variant hpsim_extendC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
     forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
   :=
   | hpsim_extendC_intro
       ps pt R RR sti_src sti_tgt fmr fmr'
       (SIM: r R RR ps pt sti_src sti_tgt fmr)
-      (EXT: Own fmr' ⊢ Own fmr)
+      (EXT: URA.extends fmr fmr')
      :
     hpsim_extendC r R RR ps pt sti_src sti_tgt fmr'
   .
@@ -484,18 +500,6 @@ Section HPSIM.
   .
   Proof. ii. destruct PR; econs; et. Qed.
 
-  Lemma wf_own_extends fmr fmr' ctx
-    (EXT : Own fmr ⊢ Own fmr')
-    (WF : URA.wf (fmr ⋅ ctx))
-    :
-    URA.wf (fmr' ⋅ ctx).
-  Proof.
-    eapply URA.wf_extends; eauto.
-    eapply URA.extends_add.
-    uiprop in EXT. eapply EXT; try refl.
-    eapply URA.wf_mon; eauto.
-  Qed.
-  
   Lemma hpsim_extendC_compatible:
     compatible7 (@_hpsim false) hpsim_extendC.
   Proof.
@@ -503,10 +507,9 @@ Section HPSIM.
     intros. destruct PR. move SIM before r. revert_until SIM.
     pattern R, RR, ps, pt, sti_src, sti_tgt, fmr.
     eapply _hpsim_tarski, SIM. econs.
-
     destruct PR; econs; eauto using hpsim_extendC;
-      try by i; exploit K; eauto; i; des; esplits; eauto using wf_own_extends.
-    etrans; eauto.
+      try by i; exploit K; eauto using URA_wf_extends_add; i; des; esplits; eauto using URA_extends_refl.
+    etrans; try eassumption. eapply Own_extends; eauto.
   Qed.
   
   Lemma hpsim_extendC_spec:
@@ -515,6 +518,59 @@ Section HPSIM.
     intros. gclo. econs; eauto using hpsim_extendC_compatible.
     eapply hpsim_extendC_mon, PR; eauto with paco.
   Qed.
+
+
+
+
+
+  Variant hpsim_updateC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  :=
+  | hpsim_updateC_intro
+      ps pt R RR sti_src sti_tgt fmr (WF: URA.wf fmr)
+      (EXT: forall ctx (WF: URA.wf (fmr ⋅ ctx)),
+            exists fmr0, r R RR ps pt sti_src sti_tgt fmr0)
+     :
+    hpsim_updateC r R RR ps pt sti_src sti_tgt fmr
+  .
+
+  Lemma hpsim_updateC_mon
+        r1 r2
+        (LEr: r1 <7= r2)
+    :
+    hpsim_updateC r1 <7= hpsim_updateC r2
+  .
+  Proof.
+    ii. destruct PR. econs; eauto. i. exploit EXT; i; des; eauto.
+  Qed.
+
+  Lemma hpsim_updateC_compatible:
+    compatible7 (@_hpsim false) hpsim_updateC.
+  Proof.
+    econs; eauto using hpsim_updateC_mon.
+    intros. destruct PR. exploit (EXT ε).
+    { r_solve. eauto. }
+    i. destruct x0 as [fmr0 SIM].
+    move SIM before r. revert_until SIM.
+    pattern R, RR, ps, pt, sti_src, sti_tgt, fmr0.
+    eapply _hpsim_tarski, SIM. econs.
+    destruct PR; econs; eauto using hpsim_updateC.
+Focus 2.
+  i; exploit K; eauto.
+
+    
+      try by i; exploit K; eauto using URA_wf_extends_add; i; des; esplits; eauto using URA_extends_refl.
+    etrans; try eassumption. eapply Own_extends; eauto.
+  Qed.
+  
+  Lemma hpsim_updateC_spec:
+    hpsim_updateC <8= gupaco7 (@_hpsim false) (cpn7 (@_hpsim false)).
+  Proof.
+    intros. gclo. econs; eauto using hpsim_updateC_compatible.
+    eapply hpsim_updateC_mon, PR; eauto with paco.
+  Qed.
+  
+
 
 
 
