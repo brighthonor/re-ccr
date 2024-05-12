@@ -600,6 +600,48 @@ Section HPSIM.
 
 
 
+
+  Variant hpsim_wfC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+    forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
+  :=
+  | hpsim_wfC_intro
+      ps pt R RR sti_src sti_tgt fmr
+      (EXT: URA.wf fmr -> r R RR ps pt sti_src sti_tgt fmr)
+     :
+    hpsim_wfC r R RR ps pt sti_src sti_tgt fmr
+  .
+
+  Lemma hpsim_wfC_mon
+        r1 r2
+        (LEr: r1 <7= r2)
+    :
+    hpsim_wfC r1 <7= hpsim_wfC r2
+  .
+  Proof.
+    ii. destruct PR. econs; eauto.
+  Qed.
+
+  Lemma hpsim_wfC_compatible:
+    compatible7 (@_hpsim false) hpsim_wfC.
+  Proof.
+    econs; eauto using hpsim_wfC_mon.
+    i. destruct PR. econs. ii.
+    exploit EXT.
+    { eapply URA.wf_mon; eauto. }
+    i. destruct x0. eapply _hpsim'_mon in IN; eauto.
+    - eauto using hpsim_wfC.
+    - i. eapply _hpsim_mon; eauto using hpsim_wfC.
+  Qed.
+  
+  Lemma hpsim_wfC_spec:
+    hpsim_wfC <8= gupaco7 (@_hpsim false) (cpn7 (@_hpsim false)).
+  Proof.
+    intros. gclo. econs; eauto using hpsim_wfC_compatible.
+    eapply hpsim_wfC_mon, PR; eauto with paco.
+  Qed.
+
+
+  
 (*
   Definition itreeH_dummy_ktree R (k k': R -> itree hAGEs Any.t) :=
     k' = k \/ k' = (fun x => trigger (Guarantee True);;; trigger (Assume True);;; k x).
@@ -914,8 +956,7 @@ Lemma hpsim_refl {Σ: GRA.t} fl:
   hpsim_body fl fl (fun src tgt => ⌜src = tgt⌝%I) false false src tgt fmr.
 Proof.
   ginit. gcofix CIH. i.
-  destruct (classic (URA.wf fmr)); cycle 1.
-  { gstep. econs. econs. exfalso. apply H. eapply URA.wf_mon; eauto. }
+  guclo hpsim_wfC_spec. econs; i.
   assert (src = tgt); subst.
   { rr in EQST. uiprop in EQST. rr in EQST. uiprop in EQST.
     eapply EQST; eauto; refl. }
@@ -935,7 +976,6 @@ Proof.
   - depdes s; destruct (run st) eqn: EQ.
     repeat (econs; eauto with paco).
   - depdes e; repeat (econs; eauto with paco).
-Unshelve. eauto.
 Qed.
 
 (**********)

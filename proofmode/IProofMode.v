@@ -14,7 +14,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import Red IRed.
 Require Import ProofMode Invariant.
-Require Import HPSim HPTactics (* HPSimFacts *).
+Require Import HPSim (* HPTactics *) (* HPSimFacts *).
 
 From stdpp Require Import coPset gmap.
 Require Import FancyUpdate.
@@ -111,17 +111,6 @@ Section SIM.
     gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
   Proof. Admitted.
 
-  (* P ⊢ #=> RR -> hpsim RR -> hpsim P *)
-  Lemma upd_hpsim
-    r g ps pt {R} RR sti_src sti_tgt fmr fmr'
-    (UPD: Own fmr ⊢ #=> Own fmr')
-    (SIM: gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr')
-  :
-    gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr.
-  Proof.
-    
-
-  Qed.
 
 (***** isim lemmas *****)
 
@@ -156,9 +145,11 @@ Section SIM.
       r g ps pt {R} RR sti_src sti_tgt
     :
       bi_entails
-        (#=> (@isim r g R (fun '(st_src, ret_src) '(st_tgt, ret_tgt) => #=> RR (st_src, ret_src) (st_tgt, ret_tgt)) ps pt sti_src sti_tgt))
+        (#=> (@isim r g R RR ps pt sti_src sti_tgt))
         (isim r g RR ps pt sti_src sti_tgt).
-  Proof. Admitted.
+  Proof.
+    uiprop. i. guclo hpsim_updateC_spec. econs. eauto.
+  Qed.
 
   Lemma isim_mono 
     r g ps pt {R} RR0 RR1 sti_src sti_tgt        
@@ -314,12 +305,15 @@ Section SIM.
     (iP -* (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
     (@isim r g R RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt)).
   Proof.
-    uiprop. i. guclo hpsimC_spec. econs; i.
-    { iIntros "H". eauto. }
-    uiprop in NEW. edestruct (NEW fmr0); eauto; try refl.
-    { instantiate (1:= ε). r_solve. eauto. }
-    des. subst. exploit H; eauto. { admit. }
-    i.
+    uiprop. i. guclo hpsimC_spec. econs; esplits; i; eauto.
+    econs; eauto. i.
+    guclo hpsim_wfC_spec. econs; i.
+    rr in NEW. uiprop in NEW. edestruct NEW; eauto; try refl.
+    des. subst. exploit (H x); eauto.
+    { eapply URA.wf_extends; eauto.
+      rewrite (URA.add_comm x b). eapply URA.extends_add; eauto. }
+    i. guclo hpsim_extendC_spec. econs. eauto.
+    rewrite (URA.add_comm x b). eapply URA.extends_add; eauto.
   Admitted.
 
   Lemma isim_assume_tgt
