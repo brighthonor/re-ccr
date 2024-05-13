@@ -22,223 +22,279 @@ Require Import ProofMode Invariant.
 
 Require Import HTactics.
 
+
+
+
+
+  Lemma URA_wf_extends_add `{Σ: GRA.t} (r r' c: Σ)
+    (EXT : URA.extends r r')
+    (WF : URA.wf (r' ⋅ c))
+    :
+    URA.wf (r ⋅ c).
+  Proof.
+    eapply URA.wf_extends; eauto.
+    eapply URA.extends_add. eauto.
+  Qed.
+
+  Lemma URA_extends_refl `{Σ: GRA.t} (r: Σ):
+    URA.extends r r.
+  Proof. refl. Qed.
+
+
+
+
+  
+
+
 Section HPSIM.
 
   Context `{Σ: GRA.t}.
 
   Variable fl_src: alist gname (Any.t -> itree hAGEs Any.t).
   Variable fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
-  Variable I: Any.t -> Any.t -> iProp.
+  Variable Ist: Any.t -> Any.t -> iProp.
 
-  Inductive _hpsim {with_dummy: bool}
-    (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-    {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
+  Definition hsupd (P: Σ -> Prop) : Σ -> Prop :=
+    fun fmr => exists fmr0, P fmr0 /\
+               forall ctx (WF: URA.wf (fmr ⋅ ctx)), URA.wf (fmr0 ⋅ ctx).
+    
+  Variant _hpsim' {with_dummy: bool}
+    (hpsimc: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
+    {R} {RR: Any.t * R -> Any.t * R -> iProp} (hpsimi: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
+    : bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
   | hpsim_ret
+      (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)      
       (HPSIM_RET: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       v_src v_tgt
-      (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
-      (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
+      (RET: Own fmr ⊢ RR (st_src,v_src) (st_tgt,v_tgt))
     :
-    _hpsim hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
   | hpsim_call
       (HPSIM_CALL: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
+      (INV: Own fmr ⊢ (Ist st_src st_tgt ** FR))
       (K: forall vret st_src0 st_tgt0 fmr0 
-     (WF: URA.wf fmr0)
-                 (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
-    _hpsim hpsim true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
+                 (WF: URA.wf fmr0)
+                 (INV: Own fmr0 ⊢ (Ist st_src0 st_tgt0 ** FR)),
+          hpsimi true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
   | hpsim_syscall
       (HPSIM_SYSCALL: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       fn varg rvs k_src k_tgt
       (K: forall vret, 
-    _hpsim hpsim true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
+    hpsimi true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
 
   | hpsim_inline_src
       (HPSIM_INLINE_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       fn f varg k_src i_tgt
       (FUN: alist_find fn fl_src = Some f)
-      (K: _hpsim hpsim true p_tgt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
+      (K: hpsimi true pt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_inline_tgt
       (HPSIM_INLINE_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       fn f varg i_src k_tgt
       (FUN: alist_find fn fl_tgt = Some f)
-      (K: _hpsim hpsim p_src true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
+      (K: hpsimi ps true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
 
   | hpsim_tau_src
       (HPSIM_TAU_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       i_src i_tgt
-      (K: _hpsim hpsim true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (K: hpsimi true pt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
 
   | hpsim_tau_tgt
       (HPSIM_TAU_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       i_src i_tgt
-      (K: _hpsim hpsim p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
+      (K: hpsimi ps true (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
-
-  | hpsim_choose_src
-      (HPSIM_CHOOSE_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
-      X x k_src i_tgt
-      (K: _hpsim hpsim true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
-    :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_choose_tgt
-      (HPSIM_CHOOSE_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
-      X i_src k_tgt
-      (K: forall (x: X), _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
-    :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
 
   | hpsim_take_src
       (HPSIM_TAKE_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       X k_src i_tgt
-      (K: forall (x: X), _hpsim hpsim true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
+      (K: forall (x: X), hpsimi true pt (st_src, k_src x) (st_tgt, i_tgt) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
+            
+  | hpsim_choose_tgt
+      (HPSIM_CHOOSE_TGT: True)
+      ps pt st_src st_tgt fmr
+      X i_src k_tgt
+      (K: forall (x: X), hpsimi ps true (st_src, i_src) (st_tgt, k_tgt x) fmr)
+    :
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
+
+  | hpsim_choose_src
+      (HPSIM_CHOOSE_SRC: True)
+      ps pt st_src st_tgt fmr
+      X x k_src i_tgt
+      (K: hpsimi true pt (st_src, k_src x) (st_tgt, i_tgt) fmr)
+    :
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_take_tgt
       (HPSIM_TAKE_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       X x i_src k_tgt
-      (K: _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
+      (K: hpsimi ps true (st_src, i_src) (st_tgt, k_tgt x) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
 
   | hpsim_supdate_src
       (HPSIM_SUPDATE_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       X x st_src0 k_src i_tgt
       (run: Any.t -> Any.t * X)
       (RUN: run st_src = (st_src0, x))
-      (K: _hpsim hpsim true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
+      (K: hpsimi true pt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_supdate_tgt
       (HPSIM_SUPDATE_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       X x st_tgt0 i_src k_tgt
       (run: Any.t -> Any.t * X)
       (RUN: run st_tgt = (st_tgt0, x))
-      (K: _hpsim hpsim p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
+      (K: hpsimi ps true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
     :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
 
   | hpsim_assume_src
       (HPSIM_ASSUME_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          _hpsim hpsim true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
+      (CUR: Own fmr ⊢ FMR)
+      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ (iP ** FMR)),
+          hpsimi true pt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsim_assume_tgt
-      (HPSIM_ASSUME_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
-      iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
-    :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
-
-  | hpsim_guarantee_src
-      (HPSIM_GUARANTEE_SRC: True)
-      p_src p_tgt st_src st_tgt fmr
-      iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          _hpsim hpsim true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
-    :
-    _hpsim hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
 
   | hpsim_guarantee_tgt
       (HPSIM_GUARANTEE_TGT: True)
-      p_src p_tgt st_src st_tgt fmr
+      ps pt st_src st_tgt fmr
       iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          _hpsim hpsim p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
+      (CUR: Own fmr ⊢ FMR)
+      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ (iP ** FMR)),
+          hpsimi ps true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
-    _hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
+            
+  | hpsim_guarantee_src
+      (HPSIM_GUARANTEE_SRC: True)
+      ps pt st_src st_tgt fmr
+      iP k_src i_tgt FMR
+      (CUR: Own fmr ⊢ (iP ** FMR))
+      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ FMR),
+          hpsimi true pt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
+    :
+    _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
+
+  | hpsim_assume_tgt
+      (HPSIM_ASSUME_TGT: True)
+      ps pt st_src st_tgt fmr
+      iP i_src k_tgt FMR
+      (CUR: Own fmr ⊢ (iP ** FMR))
+      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ FMR),
+          hpsimi ps true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
+    :
+    _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
 
   | hpsim_progress
       (HPSIM_PROGRESS: True)
-      st_src st_tgt fmr
-      i_src i_tgt
-      (SIM: hpsim R RR false false (st_src, i_src) (st_tgt, i_tgt) fmr)
+      sti_src sti_tgt fmr
+      (SIM: hpsimc R RR false false sti_src sti_tgt fmr)
     :
-    _hpsim hpsim true true (st_src, i_src) (st_tgt, i_tgt) fmr
+    _hpsim' hpsimc hpsimi true true sti_src sti_tgt fmr
   .
-  Arguments _hpsim {with_dummy} hpsim {R} RR.
+  Arguments _hpsim' {with_dummy} hpsimc {R} RR hpsimi.
+
+  Inductive _hpsim {with_dummy} hpsim R RR ps pt sti_src sti_tgt fmr : Prop
+    :=
+  | hpsim_intro (IN: hsupd (@_hpsim' with_dummy hpsim R RR (@_hpsim with_dummy hpsim R RR) ps pt sti_src sti_tgt) fmr) 
+  .
 
   Definition hpsim {R} RR := paco7 (@_hpsim false) bot7 R RR.
 
-  Lemma _hpsim_mon with_dummy: monotone7 (@_hpsim with_dummy).
-  Proof. 
-    ii. induction IN;
-      try (econs; et; ii; exploit K; i; des; et).
+  Lemma _hpsim_tarski with_dummy hpsim R RR rel
+    (FIX: forall ps pt sti_src sti_tgt fmr
+            (IN: hsupd (@_hpsim' with_dummy hpsim R RR rel ps pt sti_src sti_tgt) fmr),
+          rel ps pt sti_src sti_tgt fmr)
+    :
+    @_hpsim with_dummy hpsim R RR <5= rel.
+  Proof.
+    fix self 6. i.
+    destruct PR. apply FIX.
+    rr in IN. des. r.
+    destruct IN; try by esplits; eauto using @_hpsim' with paco.
   Qed.
 
-  Hint Constructors _hpsim.
+  Lemma hsupd_mon P Q r
+    (IN: hsupd P r)             
+    (LE: P <1= Q)
+    :
+    hsupd Q r.
+  Proof.
+    unfold hsupd in *; i.
+    des. esplits; eauto.
+  Qed.
+
+  Lemma _hpsim'_mon with_dummy r r' R RR s s'
+    ps pt sti_src sti_tgt fmr
+    (REL: @_hpsim' with_dummy r R RR s ps pt sti_src sti_tgt fmr)
+    (LEr: r <7= r')
+    (LEs: s <5= s')
+    :
+    @_hpsim' with_dummy r' R RR s' ps pt sti_src sti_tgt fmr.
+  Proof.
+    ii. destruct REL; des; esplits; eauto; econs; esplits; eauto.
+  Qed.
+  
+  Lemma _hpsim_mon with_dummy: monotone7 (@_hpsim with_dummy).
+  Proof.
+    ii. eapply _hpsim_tarski, IN.
+    i. econs. eauto using hsupd_mon, _hpsim'_mon.
+  Qed.
+
+  Lemma _hpsim_mon_auto with_dummy r r' R RR
+    ps pt sti_src sti_tgt fmr
+    (REL: @_hpsim with_dummy r R RR ps pt sti_src sti_tgt fmr)
+    (LEr: r <7= r')
+    :
+    @_hpsim with_dummy r' R RR ps pt sti_src sti_tgt fmr.
+  Proof. eapply _hpsim_mon; eauto. Qed.
+
+  Hint Constructors _hpsim' _hpsim.
   Hint Unfold hpsim.
   Hint Resolve _hpsim_mon: paco.
+  Hint Resolve hsupd_mon _hpsim'_mon _hpsim_mon_auto: paco.
   Hint Resolve cpn7_wcompat: paco.
 
-  Definition hpsim_end : Any.t*Any.t -> Any.t*Any.t -> iProp :=
-    fun '(st_src, v_src) '(st_tgt, v_tgt) => I st_src st_tgt ** ⌜v_src = v_tgt⌝.
+  Definition hpsim_tail : Any.t*Any.t -> Any.t*Any.t -> iProp :=
+    fun '(st_src, v_src) '(st_tgt, v_tgt) => Ist st_src st_tgt ** ⌜v_src = v_tgt⌝.
 
-  Definition hpsim_body := @hpsim Any.t hpsim_end.
-  
-  Lemma _hpsim_mon_progress r R RR (p_src p_tgt p_src' p_tgt': bool) st_src st_tgt fmr
-    (SIM: @_hpsim false r R RR p_src p_tgt st_src st_tgt fmr)
-    (LES: p_src -> p_src')
-    (LET: p_tgt -> p_tgt')
-    :
-    @_hpsim false r R RR p_src' p_tgt' st_src st_tgt fmr.
-  Proof.
-    move SIM before RR. revert_until SIM.
-    induction SIM; i; eauto with paco.
-    pclearbot. hexploit LES; eauto; i. hexploit LET; eauto; i.
-    destruct p_src', p_tgt'; clarify. eauto with paco.
-  Qed.
+  Definition hpsim_body := @hpsim Any.t hpsim_tail.
 
-  Lemma hpsim_mon_progress R RR (p_src p_tgt p_src' p_tgt': bool) st_src st_tgt fmr
-    (SIM: @hpsim R RR p_src p_tgt st_src st_tgt fmr)
-    (LES: p_src -> p_src')
-    (LET: p_tgt -> p_tgt')
-    :
-    hpsim RR p_src' p_tgt' st_src st_tgt fmr.
-  Proof.
-    move SIM before RR. revert_until SIM. pcofix CIH. i.
-    pstep. eapply _hpsim_mon_progress; eauto.
-    eapply paco7_mon_bot in SIM; eauto. punfold SIM.
-  Qed.
+  Definition hpsim_fun (i_src: itree hAGEs Any.t) (i_tgt: itree hAGEs Any.t):  Prop :=
+    forall st_src st_tgt fmr (WF: URA.wf fmr)
+           (INV: Own fmr ⊢ Ist st_src st_tgt),
+      hpsim_body false false (st_src, i_src) (st_tgt, i_tgt) fmr.
 
   Lemma case_itrH R (itrH: itree hAGEs R) :
     (exists v, itrH = Ret v) \/
@@ -264,164 +320,66 @@ Section HPSIM.
       repeat f_equal. extensionality x. rewrite bind_ret_l. eauto.
   Qed.  
 
+  Lemma hsupd_incl P
+    :
+    P <1= hsupd P.
+  Proof.
+    unfold hsupd; i. esplits; eauto.
+  Qed.
+  
+  Lemma hsupd_merge P r
+    (REL: hsupd (hsupd P) r)
+    :
+    hsupd P r.
+  Proof.
+    unfold hsupd in *. des. esplits; eauto.
+  Qed.
+
+  Lemma _hpsim_flag_mon r R RR (ps pt ps' pt': bool) st_src st_tgt fmr
+    (SIM: @_hpsim false r R RR ps pt st_src st_tgt fmr)
+    (LES: ps -> ps')
+    (LET: pt -> pt')
+    :
+    @_hpsim false r R RR ps' pt' st_src st_tgt fmr.
+  Proof.
+    move SIM before r. revert_until SIM.
+    pattern ps, pt, st_src, st_tgt, fmr.
+    eapply _hpsim_tarski, SIM. i. econs.
+    rr. r in IN. des. destruct IN;
+      try by esplits; eauto; try by econs; esplits; eauto.
+    hexploit LES; eauto; i. hexploit LET; eauto; i.
+    destruct ps', pt'; try discriminate. 
+    econs; esplits; eauto.
+  Qed.
+
+  Lemma hpsim_flag_mon R RR (ps pt ps' pt': bool) st_src st_tgt fmr
+    (SIM: @hpsim R RR ps pt st_src st_tgt fmr)
+    (LES: ps -> ps')
+    (LET: pt -> pt')
+    :
+    hpsim RR ps' pt' st_src st_tgt fmr.
+  Proof.
+    move SIM before RR. revert_until SIM. pcofix CIH. i.
+    pstep. eapply _hpsim_flag_mon; eauto.
+    eapply paco7_mon_bot in SIM; eauto. punfold SIM.
+  Qed.
+
+  Lemma hpsim_progress_flag with_dummy R RR r g st_src st_tgt fmr
+    (SIM: gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) g g R RR false false st_src st_tgt fmr)
+    :
+    gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g R RR true true st_src st_tgt fmr.
+  Proof.
+    gstep. econs. r; esplits; eauto.
+  Qed.
 
 
   
-  
-  Variant hpsimC {with_dummy: bool}
-  (hpsim: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-  {R} {RR: Any.t * R -> Any.t * R -> iProp}: bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
-  | hpsimC_ret
-      p_src p_tgt st_src st_tgt fmr
-      v_src v_tgt
-      (* Note: (INV: Own fmr ⊢ #=> I st_src st_tgt) is required only for the funtion end. *)
-      (RET: Own fmr ⊢ #=> RR (st_src,v_src) (st_tgt,v_tgt))
-    :
-      hpsimC hpsim p_src p_tgt (st_src, Ret v_src) (st_tgt, Ret v_tgt) fmr
-  | hpsimC_call
-      p_src p_tgt st_src st_tgt fmr
-      fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
-      (K: forall vret st_src0 st_tgt0 fmr0 
-          (WF: URA.wf fmr0)
-          (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
-          hpsim _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-  | hpsimC_syscall
-      p_src p_tgt st_src st_tgt fmr
-      fn varg rvs k_src k_tgt
-      (K: forall vret, 
-          hpsim _ RR true true (st_src, k_src vret) (st_tgt, k_tgt vret) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt) fmr
-
-  | hpsimC_inline_src
-      p_src p_tgt st_src st_tgt fmr
-      fn f varg k_src i_tgt
-      (FUN: alist_find fn fl_src = Some f)
-      (K: hpsim _ RR true p_tgt (st_src, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_src x) else k_src)) (st_tgt, i_tgt) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_inline_tgt
-      p_src p_tgt st_src st_tgt fmr
-      fn f varg i_src k_tgt
-      (FUN: alist_find fn fl_tgt = Some f)
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, f varg >>= (if with_dummy then (fun x => trigger (Guarantee True) ;;; k_tgt x) else k_tgt)) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
-
-  | hpsimC_tau_src
-      p_src p_tgt st_src st_tgt fmr
-      i_src i_tgt
-      (K: hpsim _ RR true p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, tau;; i_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_tau_tgt
-      p_src p_tgt st_src st_tgt fmr
-      i_src i_tgt
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, tau;; i_tgt) fmr
-
-  | hpsimC_choose_src
-      p_src p_tgt st_src st_tgt fmr
-      X x k_src i_tgt
-      (K: hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
-    :
-       hpsimC hpsim p_src p_tgt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_choose_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X i_src k_tgt
-      (K: forall (x: X), hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt) fmr
-
-  | hpsimC_take_src
-      p_src p_tgt st_src st_tgt fmr
-      X k_src i_tgt
-      (K: forall (x: X), hpsim _ RR true p_tgt (st_src, k_src x) (st_tgt, i_tgt) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_take_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X x i_src k_tgt
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt x) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt) fmr
-
-  | hpsimC_supdate_src
-      p_src p_tgt st_src st_tgt fmr
-      X x st_src0 k_src i_tgt
-      (run: Any.t -> Any.t * X)
-      (RUN: run st_src = (st_src0, x))
-      (K: hpsim _ RR true p_tgt (st_src0, k_src x) (st_tgt, i_tgt) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_supdate_tgt
-      p_src p_tgt st_src st_tgt fmr
-      X x st_tgt0 i_src k_tgt
-      (run: Any.t -> Any.t * X)
-      (RUN: run st_tgt = (st_tgt0, x))
-      (K: hpsim _ RR p_src true (st_src, i_src) (st_tgt0, k_tgt x) fmr)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt) fmr
-
-  | hpsimC_assume_src
-      p_src p_tgt st_src st_tgt fmr
-      iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_assume_tgt
-      p_src p_tgt st_src st_tgt fmr
-      iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt) fmr
-
-  | hpsimC_guarantee_src
-      p_src p_tgt st_src st_tgt fmr
-      iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> FMR),
-          hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
-    :
-      hpsimC hpsim p_src p_tgt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt) fmr
-
-  | hpsimC_guarantee_tgt
-      p_src p_tgt st_src st_tgt fmr
-      iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
-          hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
-    :
-    hpsimC hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
-
-  | hpsimC_progress
-      st_src st_tgt fmr
-      i_src i_tgt
-      (SIM: hpsim R RR false false (st_src, i_src) (st_tgt, i_tgt) fmr)
-    :
-    hpsimC hpsim true true (st_src, i_src) (st_tgt, i_tgt) fmr
-  .
-  Arguments _hpsim {with_dummy} hpsim {R} RR.
-                
-  Hint Constructors hpsimC: paco.
+  Definition hpsimC with_dummy hpsim R RR ps pt sti_src sti_tgt fmr :=
+    hsupd (@_hpsim' with_dummy hpsim R RR (hpsim R RR) ps pt sti_src sti_tgt) fmr.
   
   Lemma hpsimC_mon with_dummy : monotone7 (@hpsimC with_dummy).
   Proof.
-    ii. inv IN; try (by des; econs; ss; et).
+    ii. rr in IN. des. destruct IN; econs; esplits; eauto; try by esplits; eauto.
   Qed.
 
   Lemma hpsimC_spec with_dummy:
@@ -429,82 +387,70 @@ Section HPSIM.
   Proof.
     eapply wrespect7_uclo; eauto with paco.
     econs; eauto using hpsimC_mon; i.
-    inv PR; econs; et; try (i; eapply _hpsim_mon; eauto using rclo7).
-    econs. eauto.
+    rr in PR. des. econs. rr.
+    destruct PR; esplits; eauto;
+      try by econs; esplits; eauto; i; try eapply _hpsim_mon; eauto using rclo7.
   Qed.
+
   
-  Lemma hpsim_progress_flag with_dummy R RR r g st_src st_tgt fmr
-        (SIM: gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) g g R RR false false st_src st_tgt fmr)
-      :
-        gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g R RR true true st_src st_tgt fmr.
-  Proof.
-    gstep. destruct st_src, st_tgt. econs; et.
-  Qed.
-
-  Lemma hpsim_flag_mon with_dummy
-        (hpsim: forall (R: Type) (RR: Any.t * R -> Any.t * R -> iProp),  bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-        R (RR: Any.t * R -> Any.t * R -> iProp)
-        p_src0 p_tgt0 p_src1 p_tgt1 st_src st_tgt fmr
-        (SIM: (@_hpsim with_dummy) hpsim _ RR p_src0 p_tgt0 st_src st_tgt fmr)
-        (SRC: p_src0 = true -> p_src1 = true)
-        (TGT: p_tgt0 = true -> p_tgt1 = true)
-    :
-        (@_hpsim with_dummy) hpsim _ RR p_src1 p_tgt1 st_src st_tgt fmr.
-  Proof.
-    revert p_src1 p_tgt1 SRC TGT.
-    induction SIM; i; clarify; et.
-    exploit SRC; et. exploit TGT; et. i. clarify. econs; et.
-  Qed.              
-
   Variant hpsim_flagC 
     (r: forall (R: Type) (RR: Any.t * R -> Any.t * R -> iProp),  bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop)
-    {R} (RR: Any.t * R -> Any.t * R -> iProp): bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop := 
+    R RR ps1 pt1 st_src st_tgt fmr : Prop :=
   | hpsim_flagC_intro
-    p_src0 p_tgt0 p_src1 p_tgt1 st_src st_tgt fmr
-    (SIM: r _ RR p_src0 p_tgt0 st_src st_tgt fmr)
-    (SRC: p_src0 = true -> p_src1 = true)
-    (TGT: p_tgt0 = true -> p_tgt1 = true)
-  :
-    hpsim_flagC r RR p_src1 p_tgt1 st_src st_tgt fmr
-  .   
+    ps0 pt0
+    (SIM: r R RR ps0 pt0 st_src st_tgt fmr)
+    (SRC: ps0 = true -> ps1 = true)
+    (TGT: pt0 = true -> pt1 = true)
+  .
 
-  Lemma hpsim_flagC_mon r1 r2 (LE: r1 <7= r2) : @hpsim_flagC r1 <7= @hpsim_flagC r2.
+  Lemma hpsim_flagC_mon r1 r2 (LE: r1 <7= r2) :
+    @hpsim_flagC r1 <7= @hpsim_flagC r2.
   Proof. ii. destruct PR; econs; et. Qed.
 
   Hint Resolve hpsim_flagC_mon: paco.
   
-  Lemma hpsim_flagC_spec with_dummy: hpsim_flagC <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
+  Lemma hpsim_flagC_spec with_dummy:
+    hpsim_flagC <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
   Proof.
     eapply wrespect7_uclo; eauto with paco.
     econs; eauto with paco. i. inv PR.
     eapply GF in SIM.
-    revert x2 x3 SRC TGT. induction SIM; i; clarify; et.
-    exploit SRC; et. exploit TGT; et. i. clarify. econs; et.
-    eapply rclo7_base; et.
+    move SIM before GF. revert_until SIM. pattern ps0, pt0, x4, x5, x6.
+    eapply _hpsim_tarski, SIM. econs.
+    rr. rr in IN. des. destruct IN; des; esplits; eauto; try by econs; esplits; eauto.
+    exploit SRC; et. exploit TGT; et. i; clarify.
+    econs; esplits; eauto using rclo7.
   Qed.
 
-  Lemma hpsim_flag_down with_dummy R RR r g p_src p_tgt st_src st_tgt fmr
-        (SIM: gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g R RR false false st_src st_tgt fmr)
-      :
-        gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g R RR p_src p_tgt st_src st_tgt fmr.
+  Lemma hpsim_flag_down with_dummy R RR r g ps pt st_src st_tgt fmr
+    (SIM: gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g R RR false false st_src st_tgt fmr)
+    :
+    gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r g R RR ps pt st_src st_tgt fmr.
   Proof. 
     guclo hpsim_flagC_spec. econs; et. 
   Qed.
+
+
+
+
+
+  
+  
 
 
   Variant hpsim_bindC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
     forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
   :=
   | hpsim_bindC_intro
-      p_src p_tgt Q QQ st_src st_tgt i_src i_tgt fmr
-      (SIM: r Q QQ p_src p_tgt (st_src, i_src) (st_tgt, i_tgt) fmr)
+      ps pt Q QQ st_src st_tgt i_src i_tgt fmr
+      (SIM: r Q QQ ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
 
       R RR k_src k_tgt
       (SIMK: forall st_src0 st_tgt0 vret_src vret_tgt fmr0
-               (RET: Own fmr0 ⊢ #=> QQ (st_src0, vret_src) (st_tgt0, vret_tgt)),
+               (RET: Own fmr0 ⊢ QQ (st_src0, vret_src) (st_tgt0, vret_tgt)),
              r R RR false false (st_src0, k_src vret_src) (st_tgt0, k_tgt vret_tgt) fmr0)
     :
-    hpsim_bindC r R RR p_src p_tgt (st_src, i_src >>= k_src) (st_tgt, i_tgt >>= k_tgt) fmr
+    hpsim_bindC r R RR ps pt (st_src, i_src >>= k_src) (st_tgt, i_tgt >>= k_tgt) fmr
   .
 
   Lemma hpsim_bindC_mon
@@ -522,14 +468,20 @@ Section HPSIM.
     destruct PR. apply GF in SIM.
     remember (st_src, i_src) as sti_src. remember (st_tgt, i_tgt) as sti_tgt.
     move SIM before GF. revert_until SIM.
-    induction SIM; i; depdes Heqsti_src Heqsti_tgt; grind; eauto with paco.
-    - hexploit SIMK; eauto. i.
-      apply GF in H. eapply _hpsim_mon; cycle 1.
-      { i. econs. apply PR. }
-      eapply _hpsim_mon_progress; eauto; clarify.
-    - econs; eauto. rewrite <-!bind_bind. eapply IHSIM; eauto.
-    - econs; eauto. rewrite <-!bind_bind. eapply IHSIM; eauto.
-    - econs; eauto. eauto 10 using rclo7, hpsim_bindC.
+    pattern ps, pt, sti_src, sti_tgt, fmr.
+    eapply _hpsim_tarski, SIM. econs. apply hsupd_merge.
+    rr in IN. des. destruct IN; rr; depdes Heqsti_src Heqsti_tgt; grind; esplits;
+      try by rr; esplits; eauto with paco.
+    - hexploit SIMK; eauto. i. apply GF in H.
+      eapply _hpsim_flag_mon in H; [|instantiate (1:=ps0)|instantiate (1:=pt0)]; try by i; clarify.
+      destruct H. rr in IN. des.
+      eexists fmr2; eauto 10 using _hpsim'_mon, _hpsim_mon_auto, rclo7.
+    - do 2 (econs; esplits; eauto).
+      rewrite <-!bind_bind. eapply K; eauto.
+    - do 2 (econs; esplits; eauto).
+      rewrite <-!bind_bind. eapply K; eauto.
+    - do 2 (econs; esplits; eauto).
+      eauto 10 using rclo7, hpsim_bindC.
   Qed.
 
   Lemma hpsim_bindC_spec:
@@ -539,278 +491,99 @@ Section HPSIM.
     apply hpsim_bindC_wrespectful.
   Qed.
 
-  Definition itreeH_dummy_ktree Q R (k k': Q -> itree hAGEs R) :=
-    k' = k \/ k' = (fun x => trigger (Guarantee True);;; k x).
-  Hint Unfold itreeH_dummy_ktree.
-  
-  Definition itreeH_dummy R (itr itr': itree hAGEs R) :=
-    exists Q i k k',
-      itr = (i >>= k) /\
-      itr' = (i >>= k') /\
-      itreeH_dummy_ktree Q R k k'.
-  Hint Unfold itreeH_dummy.
 
-  Lemma itreeH_dummy_refl R i:
-    itreeH_dummy R i i.
-  Proof.
-    replace i with (x <- Ret tt;; Ret tt;;; i); cycle 1.
-    { rewrite !bind_ret_l. eauto. }
-    r; esplits; last left; eauto; grind.
-  Qed.
-  Hint Resolve itreeH_dummy_refl.
-  
-  Lemma itreeH_dummy_dummy Q R i (k: Q -> _):
-    itreeH_dummy R (i >>= k) (x <- i ;; trigger (Guarantee True);;; k x).
-  Proof.
-    r; esplits; last right; eauto.
-  Qed.
-  Hint Resolve itreeH_dummy_dummy.
 
-  Variant hpsim_dummyC_src (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+
+
+
+
+  Variant hpsim_extendC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
     forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
   :=
-  | hpsim_dummyC_src_intro R RR ps pt st_src i_src i_src' st_tgt i_tgt fmr fmr'
-      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
-      (RELr: Own fmr' ⊢ #=> Own fmr)
-      (DUMMY: itreeH_dummy R i_src i_src')
-    :
-    hpsim_dummyC_src r R RR ps pt (st_src, i_src') (st_tgt, i_tgt) fmr'
+  | hpsim_extendC_intro
+      ps pt R RR sti_src sti_tgt fmr fmr'
+      (SIM: r R RR ps pt sti_src sti_tgt fmr)
+      (EXT: URA.extends fmr fmr')
+     :
+    hpsim_extendC r R RR ps pt sti_src sti_tgt fmr'
   .
-  
-  Lemma hpsim_dummyC_src_mon
+
+  Lemma hpsim_extendC_mon
         r1 r2
         (LEr: r1 <7= r2)
     :
-    hpsim_dummyC_src r1 <7= hpsim_dummyC_src r2
+    hpsim_extendC r1 <7= hpsim_extendC r2
   .
-  Proof. i. destruct PR; econs; eauto. Qed.
+  Proof. ii. destruct PR; econs; et. Qed.
 
-  Lemma hpsim_dummyC_src_compatible with_dummy:
-    compatible7 (@_hpsim with_dummy) hpsim_dummyC_src.
+
+  
+  Lemma hpsim_extendC_compatible:
+    compatible7 (@_hpsim false) hpsim_extendC.
   Proof.
-    econs; eauto using hpsim_dummyC_src_mon; i. depdes PR.
-    remember (st_src, i_src) as sti_src.
-    remember (st_tgt, i_tgt) as sti_tgt.
-    move SIM before RR. revert_until SIM.
-    induction SIM; i; depdes Heqsti_src Heqsti_tgt;
-      grind; eauto 7 with paco imodL; r in DUMMY; des.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      destruct DUMMY1; subst; rewrite <-x; econs; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto with imodL.
-        * eapply hpsim_guarantee_src; try econs; eauto with imodL.
-      + replace c with (Call fn varg).
-        econs; eauto with imodL.
-        i. destruct DUMMY1; subst; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_src; try econs; eauto with imodL.
-      + replace e with (Syscall fn varg rvs).
-        econs; eauto with imodL.
-        i. destruct DUMMY1; subst; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_src; try econs; eauto with imodL.
-      + replace c with (Call fn varg).
-        econs; eauto with imodL.
-        destruct DUMMY1; subst; destruct with_dummy; eauto.
-        * eapply IHSIM; eauto.
-          eexists _, (x<-f varg;; trigger (Guarantee True);;; ktrH' x), k, _.
-          esplits; eauto; grind.
-        * eapply IHSIM; eauto.
-          eexists _, (f varg >>= ktrH'), k, _.
-          esplits; eauto; grind.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x; eauto.
-        eapply hpsim_guarantee_src; eauto with imodL.
-      + econs; eauto with imodL.
-        destruct DUMMY1; subst; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_src; eauto with imodL.
-          econs; eauto with imodL.
-      + replace e with (Choose R0); econs; eauto.
-        i. destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_src; eauto with imodL.
-          econs; eauto with imodL.
-      + replace e with (Take R0); econs; eauto.
-        i. destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_src; eauto with imodL.
-          econs; eauto.
-      + replace s with (SUpdate run); econs; eauto.
-        i. destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; try instantiate (1:=FMR); eauto with imodL.
-        * eapply hpsim_guarantee_src; eauto with imodL.
-          econs; try instantiate (1:=FMR); eauto with imodL.
-      + econs; eauto. i. eapply H; eauto.
-        { eapply imod_trans; eauto.
-          iIntros "H". iDestruct "H" as "[X H]".
-          iSplitL "X"; eauto. iStopProof; eauto. }
-        destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_src) -bind_vis.
-        * econs; eauto with imodL.
-        * eapply hpsim_guarantee_src; eauto with imodL.
-          econs; eauto with imodL.
-      + econs; eauto with imodL.
-        i. eapply H; eauto. destruct DUMMY1; subst; eauto.
-    - subst. econs; eauto. destruct DUMMY1; subst; econs; eauto.
+    econs; eauto using hpsim_extendC_mon.
+    intros. destruct PR. move SIM before r. revert_until SIM.
+    pattern ps, pt, sti_src, sti_tgt, fmr.
+    eapply _hpsim_tarski, SIM. econs.
+    rr in IN. des. destruct IN; des; rr; grind; esplits; eauto using hpsim_extendC, URA_extends_refl, URA_wf_extends_add;
+      rr; esplits; i; eauto;
+      try by try eapply K; try eapply K0; eauto; try refl.
+  Qed.
+  
+  Lemma hpsim_extendC_spec:
+    hpsim_extendC <8= gupaco7 (@_hpsim false) (cpn7 (@_hpsim false)).
+  Proof.
+    intros. gclo. econs; eauto using hpsim_extendC_compatible.
+    eapply hpsim_extendC_mon, PR; eauto with paco.
   Qed.
 
-  Lemma hpsim_dummyC_src_spec (with_dummy:bool) :
-    hpsim_dummyC_src <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
-  Proof.
-    intros. gclo. econs; eauto using hpsim_dummyC_src_compatible.
-    eapply hpsim_dummyC_src_mon, PR; eauto with paco.
-  Qed.
 
-  Variant hpsim_dummyC_tgt (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
+
+
+
+  Variant hpsim_updateC (r: forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop):
     forall R (RR: Any.t * R -> Any.t * R -> iProp), bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop
   :=
-  | hpsim_dummyC_tgt_intro R RR ps pt st_src i_src st_tgt i_tgt i_tgt' fmr fmr'
-      (SIM: r R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
-      (RELr: Own fmr' ⊢ #=> Own fmr)
-      (DUMMY: itreeH_dummy R i_tgt i_tgt')
-    :
-    hpsim_dummyC_tgt r R RR ps pt (st_src, i_src) (st_tgt, i_tgt') fmr'
+  | hpsim_updateC_intro
+      ps pt R RR sti_src sti_tgt fmr
+      (EXT: hsupd (r R RR ps pt sti_src sti_tgt) fmr)
+     :
+    hpsim_updateC r R RR ps pt sti_src sti_tgt fmr
   .
-  
-  Lemma hpsim_dummyC_tgt_mon
+
+  Lemma hpsim_updateC_mon
         r1 r2
         (LEr: r1 <7= r2)
     :
-    hpsim_dummyC_tgt r1 <7= hpsim_dummyC_tgt r2
+    hpsim_updateC r1 <7= hpsim_updateC r2
   .
-  Proof. i. destruct PR; econs; eauto. Qed.
-
-  Lemma hpsim_dummyC_tgt_compatible with_dummy:
-    compatible7 (@_hpsim with_dummy) hpsim_dummyC_tgt.
   Proof.
-    econs; eauto using hpsim_dummyC_tgt_mon; i. depdes PR.
-    remember (st_src, i_src) as sti_src.
-    remember (st_tgt, i_tgt) as sti_tgt.
-    move SIM before RR. revert_until SIM.
-    induction SIM; i; depdes Heqsti_src Heqsti_tgt;
-      grind; eauto 7 with paco imodL; r in DUMMY; des.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      destruct DUMMY1; subst; rewrite <-x; econs; eauto; imodIntroL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto with imodL.
-        * eapply hpsim_guarantee_tgt; try econs; eauto; imodIntroL.
-      + replace c with (Call fn varg).
-        econs; eauto with imodL.
-        i. destruct DUMMY1; subst; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_tgt; try econs; eauto; imodIntroL.
-      + replace e with (Syscall fn varg rvs).
-        econs; eauto with imodL.
-        i. destruct DUMMY1; subst; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_tgt; try econs; eauto; imodIntroL.
-      + replace c with (Call fn varg).
-        econs; eauto with imodL.
-        destruct DUMMY1; subst; destruct with_dummy; eauto.
-        * eapply IHSIM; eauto.
-          eexists _, (x<-f varg;; trigger (Guarantee True);;; ktrH' x), k, _.
-          esplits; eauto; grind.
-        * eapply IHSIM; eauto.
-          eexists _, (f varg >>= ktrH'), k, _.
-          esplits; eauto; grind.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x; eauto.
-        eapply hpsim_guarantee_tgt; eauto; imodIntroL.
-      + econs; eauto with imodL.
-        destruct DUMMY1; subst; eauto with imodL.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_tgt; eauto with imodL.
-          econs; eauto; imodIntroL.
-      + replace e with (Choose R0); econs; eauto.
-        i. destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_tgt; eauto with imodL.
-          econs; eauto; imodIntroL.
-      + replace e with (Take R0); econs; eauto.
-        i. destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto.
-        * eapply hpsim_guarantee_tgt; eauto with imodL.
-          econs; eauto; imodIntroL.
-      + replace s with (SUpdate run); econs; eauto.
-        i. destruct DUMMY1; subst; eauto.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; try instantiate (1:=FMR); eauto with imodL.
-        * eapply hpsim_guarantee_tgt; eauto with imodL.
-          econs; try instantiate (1:=FMR); eauto; imodIntroL.
-      + econs; eauto; imodIntroL. eapply H; eauto 10.
-    - assert (CASE:= case_itrH _ i); des; subst; itree_clarify DUMMY.
-      + destruct DUMMY1; subst; rewrite -x -(bind_ret_l_eta _ k_tgt) -bind_vis.
-        * econs; eauto. i. eapply H; eauto.
-          eapply imod_trans; eauto.
-          iIntros "H". iDestruct "H" as "[X H]".
-          iSplitL "X"; eauto. iStopProof; eauto.
-        * eapply hpsim_guarantee_tgt; eauto. econs; eauto.
-          i. eapply H; eauto.
-          iIntros "H". iPoseProof (NEW0 with "H") as "H". iMod "H".
-          iDestruct "H" as "[P [_ H]]". iSplitL "P"; eauto. iStopProof; eauto.
-      + econs; eauto with imodL.
-        i. eapply H; eauto.
-        { iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H".
-          iDestruct "H" as "[P H]". iSplitL "P"; eauto. iStopProof; eauto. }
-        destruct DUMMY1; subst; eauto.
-    - subst. econs; eauto. destruct DUMMY1; subst; econs; eauto.
+    ii. destruct PR. econs; eauto using hsupd_mon.
   Qed.
 
-  Lemma hpsim_dummyC_tgt_spec (with_dummy:bool) :
-    hpsim_dummyC_tgt <8= gupaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)).
+  Lemma hpsim_updateC_compatible:
+    compatible7 (@_hpsim false) hpsim_updateC.
   Proof.
-    intros. gclo. econs; eauto using hpsim_dummyC_tgt_compatible.
-    eapply hpsim_dummyC_tgt_mon, PR; eauto with paco.
+    econs; eauto using hpsim_updateC_mon.
+    i. destruct PR. econs. eapply hsupd_merge.
+    eapply hsupd_mon; eauto.
+    i. destruct PR.
+    eauto 10 using hpsim_updateC, hsupd_incl with paco.
   Qed.
   
-  Lemma hpsim_le_gpaco with_dummy r r':
-    @hpsim <7= gpaco7 (@_hpsim with_dummy) (cpn7 (@_hpsim with_dummy)) r r'.
+  Lemma hpsim_updateC_spec:
+    hpsim_updateC <8= gupaco7 (@_hpsim false) (cpn7 (@_hpsim false)).
   Proof.
-    gcofix CIH. i. punfold PR.
-    induction PR; pclearbot; eauto with paco;
-      guclo hpsimC_spec; eauto with paco.
-    - econs; eauto. destruct with_dummy; eauto.
-      guclo hpsim_dummyC_src_spec. econs; eauto.
-    - econs; eauto. destruct with_dummy; eauto.
-      guclo hpsim_dummyC_tgt_spec. econs; eauto.
+    intros. gclo. econs; eauto using hpsim_updateC_compatible.
+    eapply hpsim_updateC_mon, PR; eauto with paco.
   Qed.
   
-  Hint Resolve hpsim_le_gpaco: paco.
 
-  Corollary hpsim_add_dummy:
-    @hpsim <7= paco7 (@_hpsim true) bot7.
-  Proof. ginit. eauto with paco. Qed.
+  
 
 
   Definition hpsim_fsem: relation (Any.t -> itree hAGEs Any.t) :=
-    (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: I st_src st_tgt ε),
+    (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε),
                 hpsim_body false false (st_src, itr_src) (st_tgt, itr_tgt) ε))%signature.
 
   Definition hpsim_fnsem: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq hpsim_fsem.
@@ -819,7 +592,7 @@ Section HPSIM.
 
   Definition hpsim {R} RR := paco7 (@_hpsim false) bot7 R RR.
 
-  Definition hpsim_end : Any.t*Any.t -> Any.t*Any.t -> iProp :=
+  Definition hpsim_tail : Any.t*Any.t -> Any.t*Any.t -> iProp :=
     fun '(st_src, v_src) '(st_tgt, v_tgt) => I st_src st_tgt ** ⌜v_src = v_tgt⌝. *)
 
 End HPSIM.
@@ -829,60 +602,41 @@ Hint Resolve cpn7_wcompat: paco.
 
 (**********)
 
+(* TODO: move *)
+Tactic Notation "uiprop" := repeat (autounfold with iprop; autorewrite with iprop; s).
+Tactic Notation "uiprop" "in" hyp(H)  := repeat (autounfold with iprop in H; autorewrite with iprop in H; simpl in H).
 
-Lemma hpsim_self {Σ: GRA.t}:
-  forall st itr fl fmr,
-    hpsim_body fl fl (fun src tgt => ⌜src = tgt⌝%I) false false (st, itr) (st, itr) fmr.
+
+
+Lemma hpsim_refl {Σ: GRA.t} fl:
+  forall src tgt fmr (WF: URA.wf fmr) (EQST: Own fmr ⊢ ⌜src = tgt⌝%I),
+  hpsim_body fl fl (fun src tgt => ⌜src = tgt⌝%I) false false src tgt fmr.
 Proof.
-  ginit. gcofix CIH. i. ides itr.
-  { gstep. eapply hpsim_ret; ss.
-    iIntros "H". et.
-  }
-  { guclo hpsimC_spec. econs. 
-    guclo hpsimC_spec. econs. 
-    eapply hpsim_progress_flag. gbase. auto.
-  }
-  destruct e.
-  { dependent destruction h; rewrite <-! bind_trigger; resub.
-    - guclo hpsimC_spec. econs. { instantiate (1:= ⌜True⌝%I). et. }
-      guclo hpsimC_spec. econs; et.
-      ii. eapply hpsim_progress_flag. gbase. et.
-    - guclo hpsimC_spec. econs 17. { instantiate (1:= ⌜True⌝%I). et. }
-      guclo hpsimC_spec. econs; et.
-      ii. eapply hpsim_progress_flag. gbase. et.
-  }
-  destruct e.
-  { dependent destruction c. rewrite <- ! bind_trigger. resub.
-    gstep.
-    eapply hpsim_call; ss. { instantiate (1:= ⌜True⌝%I). et. }
-    ii. econs; et.
-    eapply iProp_sepconj in INV; et. des.
-    eapply own_wf in INV; et. eapply URA.wf_split in INV; des.
-    eapply own_pure in INV0; et. clarify.
-    gbase. auto.
-  }
-  destruct s.
-  { rewrite <- ! bind_trigger. resub. dependent destruction s.
-    destruct (run st) eqn:RUN.
-    guclo hpsimC_spec. econs; et. 
-    guclo hpsimC_spec. econs; et. 
+  ginit. gcofix CIH. i.
+  assert (src = tgt); subst.
+  { rr in EQST. uiprop in EQST. rr in EQST. uiprop in EQST.
+    eapply EQST; try refl; eauto. }
 
-      eapply hpsim_progress_flag. gbase. et.
-  }
-  { rewrite <- ! bind_trigger. resub. dependent destruction e.
-    { guclo hpsimC_spec. econs 9. i.
-      guclo hpsimC_spec. econs.
-      eapply hpsim_progress_flag. gbase. eauto.
+  destruct tgt as [st itr].
+  gstep. econs. econs. assert (CASE := case_itrH _ itr); des; subst;
+    try by repeat (econs; eauto with paco).
+  - esplits; eauto. destruct c; econs; eauto.
+    { instantiate (1:= Own fmr). eauto. }
+    i. do 2 econs; esplits; eauto.
+    assert (st_src0 = st_tgt0); subst.
+    { uipropall. exploit INV; i; des; try refl; eauto.
+      rr in x1. uipropall.
     }
-    { guclo hpsimC_spec. econs 10. i.
-      guclo hpsimC_spec. econs.
-      eapply hpsim_progress_flag. gbase. eauto.
-    }
-    { guclo hpsimC_spec. econs. i.
-      eapply hpsim_progress_flag. gbase. eauto.
-    }
-  }
+    econs; eauto with paco.
+  - depdes s; destruct (run st) eqn: EQ.
+    repeat (econs; eauto with paco).
+  - depdes e; repeat (econs; eauto with paco).
 Qed.
+
+
+
+
+
 
 
 
@@ -916,7 +670,8 @@ Proof.
     induction a; ii; ss.
     econs; et. econs; ss. ii; clarify.
     rr in INV. uipropall. clarify.
-    eapply hpsim_self.
+    eapply hpsim_refl; eauto.
+    apply URA.wf_unit.
   - rr. uipropall.
 Qed.
 
