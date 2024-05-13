@@ -622,18 +622,44 @@ Variant interp_inv: Σ -> Any.t * Any.t -> Prop :=
   interp_inv fr_ctx (Any.pair st_src mr_src↑, Any.pair st_tgt mr_tgt↑)
 .
 
+
 Lemma hpsim_adequacy:
   forall
     (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
     (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
     (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
     ps pt st_src st_tgt itr_src itr_tgt
-    fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fmr fmr'
-    (SIM: hpsim_body fl_src fl_tgt Ist ps pt (st_src, itr_src) (st_tgt, itr_tgt) fmr')
-    (WFfmr': URA.wf (fmr' ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
+    fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fr mr fmr
+    (SIM: hpsim_body fl_src fl_tgt Ist ps pt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
+    (WFfrmr: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
+    (WFfmr: (* URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe) *)
+        forall x (WF: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ x ⋅ ctxe),
+                 URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ x ⋅ ctxe)))
+    
+    (FR: fr_src = fr ⋅ fr_tgt)
+    (MR: mr_src = mr ⋅ mr_tgt)
+    (CTXI: ctxi_tgt = ctxi_src ⋅ fr ⋅ mr),
+  @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 ps pt fr_ctx
+    (Any.pair st_src mr_src↑, interp_hp_body itr_src (fr_src, ctxi_src, ctxe))
+    (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt (fr_tgt, ctxi_tgt, ctxe)).
+Proof.
+
+
+  
+
+Lemma hpsim_adequacy:
+  forall
+    (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
+    (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
+    (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
+    ps pt st_src st_tgt itr_src itr_tgt
+    fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fr mr fmr
+    (SIM: hpsim_body fl_src fl_tgt Ist ps pt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
     (WFfmr: URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
-    (FMR: fr_src ⋅ mr_src = fmr ⋅ fr_tgt ⋅ mr_tgt)
-    (CTXR: ctxi_tgt = ctxi_src ⋅ fmr),
+    (WFfrmr: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
+    (FR: fr_src = fr ⋅ fr_tgt)
+    (MR: mr_src = mr ⋅ mr_tgt)
+    (CTXI: ctxi_tgt = ctxi_src ⋅ fr ⋅ mr),
   @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 ps pt fr_ctx
     (Any.pair st_src mr_src↑, interp_hp_body itr_src (fr_src, ctxi_src, ctxe))
     (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt (fr_tgt, ctxi_tgt, ctxe)).
@@ -642,35 +668,38 @@ Proof.
   i. revert_until Ist. ginit. gcofix CIH. i. punfold SIM.
   remember (st_src, itr_src). remember (st_tgt, itr_tgt).
   move SIM before FLT. revert_until SIM.
-  pattern ps, pt, p, p0, fmr'. eapply _hpsim_tarski, SIM; i.
+  pattern ps, pt, p, p0, fmr. eapply _hpsim_tarski, SIM; i.
+  
   edestruct (IN (fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe)).
   { r_solve. eauto. }
-  clear IN; des.
-  destruct H0; i; des; clarify; cycle 1.
+  des. destruct H0; i; des; clarify; cycle 1.
 
-
-
-    
-
-  
   - (* "Call Case" DONE!  *)
+    move K at bottom.
+    uiprop in K. hexploit (K fmr1); try refl.
+    { eapply URA.wf_mon. eauto. }
+    i; des. subst. move H at bottom.
     
     unfold interp_hp_body.
-    steps. unfold handle_callE, handle_Guarantee, give_iprop, take_iprop, guarantee, assume, mget, mput.
-    hexploit iProp_sepconj; [|refl| |].
-    { eapply own_mod. eauto. }
-    { eauto. }
-    i. des.
-    steps. force_l. instantiate (1:= (ε, b, c0 ⋅ c1 ⋅ c ⋅ b)).
-    force_l. instantiate (1:= (ε, ε, c0 ⋅ c1 ⋅ c ⋅ a ⋅ b)).
+    steps_safe.
+    unfold handle_callE, handle_Guarantee, guarantee, assume, mget, mput.
+    steps_safe.
+    force_r. instantiate (1:= a ⋅ b ⋅ x).
+    steps_safe. force_r. { eapply eq_ind; eauto.  r_solve. }
+    steps_safe. force_r; eauto.
+    steps_safe. force_l. instantiate (1:= (c2, c3, a ⋅ b ⋅ c1)).
     steps_safe. force_l.
-    { eapply eq_ind; eauto. r_solve. }
-    force_l; eauto.
-    steps_safe. force_r. instantiate (1:= (ε, c2 ⋅ c0 ⋅ a ⋅ b ⋅ c3)).
+    { 
+      
+
+
+      eapply eq_ind. eauto. r_solve. }
+    steps. force_l; eauto.
+    steps_safe. force_r. instantiate (1:=(ε, c0 ⋅ c2 ⋅ c3 ⋅ fmr0)).
     steps_safe. force_r.
     { eapply eq_ind; eauto. r_solve. }
     steps_safe. force_r; eauto.
-    grind. eapply safe_sim_sim; econs.
+    steps_safe. eapply safe_sim_sim; econs.
     esplits; i.
     { econs; cycle 1.
       { instantiate (1:= a).

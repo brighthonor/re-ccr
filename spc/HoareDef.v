@@ -346,29 +346,50 @@ Global Opaque _APC.
      Mid -> Low
    ***)
 
-
-  Definition take_iprop P: stateT (Σ*Σ*Σ) (itree Es) unit :=
+  Definition handle_Guarantee P: stateT (Σ*Σ*Σ) (itree Es) unit :=
     fun '(fr,ctxi,ctxe) =>
-      '(r,ctxi') <- trigger (Take (Σ*Σ));;
-      mr <- mget;; 
-      assume (URA.wf (r ⋅ fr ⋅ mr ⋅ ctxi' ⋅ ctxe));;;
-      assume(Own r ⊢ P);;;
-      Ret ((r ⋅ fr, ctxi', ctxe), tt).
-  
-  Definition give_iprop P: stateT (Σ*Σ*Σ) (itree Es) unit :=
-    fun '(fr,ctxi,ctxe) =>
+      mr <- mget;;      
+      ctxi' <- trigger (Take Σ);;
+      assume(URA.wf (fr ⋅ mr ⋅ ctxi' ⋅ ctxe));;;
       '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));;
-      mr <- mget;;
-      guarantee(URA.wf (r ⋅ fr' ⋅ mr' ⋅ ctxi ⋅ ctxe));;;
+      guarantee(URA.wf (r ⋅ fr' ⋅ mr' ⋅ ctxi' ⋅ ctxe));;;
       guarantee(Own r ⊢ P);;;
       mput mr';;;
-      Ret ((fr', ctxi, ctxe), tt).
+      Ret ((fr', ctxi', ctxe), tt).
 
   Definition handle_Assume P: stateT (Σ*Σ*Σ) (itree Es) unit :=
-    fun res => '(res',_) <- take_iprop P res;; give_iprop True res'.
+    fun '(fr,ctxi,ctxe) =>
+      mr <- mget;;
+      '(fr',mr') <- trigger (Choose (Σ * Σ));;
+      guarantee(URA.wf (fr' ⋅ mr' ⋅ ctxi ⋅ ctxe));;;
+      '(r,ctxi') <- trigger (Take (Σ * Σ));;
+      assume (URA.wf (r ⋅ fr' ⋅ mr' ⋅ ctxi' ⋅ ctxe));;;
+      assume(Own r ⊢ P);;;
+      mput mr';;;
+      Ret ((r ⋅ fr', ctxi', ctxe), tt).
+  
+  (* Definition take_iprop P: stateT (Σ*Σ*Σ) (itree Es) unit := *)
+  (*   fun '(fr,ctxi,ctxe) => *)
+  (*     '(r,ctxi') <- trigger (Take (Σ*Σ));; *)
+  (*     mr <- mget;;  *)
+  (*     assume (URA.wf (r ⋅ fr ⋅ mr ⋅ ctxi' ⋅ ctxe));;; *)
+  (*     assume(Own r ⊢ P);;; *)
+  (*     Ret ((r ⋅ fr, ctxi', ctxe), tt). *)
+  
+  (* Definition give_iprop P: stateT (Σ*Σ*Σ) (itree Es) unit := *)
+  (*   fun '(fr,ctxi,ctxe) => *)
+  (*     '(r, fr', mr') <- trigger (Choose (Σ * Σ * Σ));; *)
+  (*     mr <- mget;; *)
+  (*     guarantee(URA.wf (r ⋅ fr' ⋅ mr' ⋅ ctxi ⋅ ctxe));;; *)
+  (*     guarantee(Own r ⊢ P);;; *)
+  (*     mput mr';;; *)
+  (*     Ret ((fr', ctxi, ctxe), tt). *)
 
-  Definition handle_Guarantee P: stateT (Σ*Σ*Σ) (itree Es) unit :=
-    fun res => '(res',_) <- give_iprop P res;; take_iprop True res'.
+  (* Definition handle_Assume P: stateT (Σ*Σ*Σ) (itree Es) unit := *)
+  (*   fun res => '(res',_) <- take_iprop P res;; give_iprop True res'. *)
+
+  (* Definition handle_Guarantee P: stateT (Σ*Σ*Σ) (itree Es) unit := *)
+  (*   fun res => '(res',_) <- take_iprop True res;; give_iprop P res'. *)
 
   Definition handle_hAGE: hAGE ~> stateT (Σ*Σ*Σ) (itree Es) :=
     fun _ e =>
