@@ -326,60 +326,60 @@ Section HPSIM.
 *)
 
   
-  Definition hp_reconf_eq cr : relation (Any.t * Σ) :=
-    fun '(str,fr) '(str',fr') =>
-      <<RELr: Own fr ⊢ #=> Own (fr' ⋅ cr)>> /\      
-      <<STR: str' = str>>.
+  (* Definition hp_reconf_eq cr : relation (Any.t * Σ) := *)
+  (*   fun '(str,fr) '(str',fr') => *)
+  (*     <<RELr: Own fr ⊢ #=> Own (fr' ⋅ cr)>> /\       *)
+  (*     <<STR: str' = str>>. *)
   
-  Definition hp_reconf_equiv cr : relation (Any.t * Σ) :=
-    fun '(str,fr) '(str',fr') =>
-      hp_reconf_eq cr (str,fr) (str',fr')
-      \/
-      (exists st (mr mr': Σ),
-       <<RELr: Own (fr ⋅ mr) ⊢ #=> Own (fr' ⋅ mr' ⋅ cr)>> /\
-       <<STR: str = Any.pair st mr↑>> /\
-       <<STR': str' = Any.pair st mr'↑>>).
+  (* Definition hp_reconf_equiv cr : relation (Any.t * Σ) := *)
+  (*   fun '(str,fr) '(str',fr') => *)
+  (*     hp_reconf_eq cr (str,fr) (str',fr') *)
+  (*     \/ *)
+  (*     (exists st (mr mr': Σ), *)
+  (*      <<RELr: Own (fr ⋅ mr) ⊢ #=> Own (fr' ⋅ mr' ⋅ cr)>> /\ *)
+  (*      <<STR: str = Any.pair st mr↑>> /\ *)
+  (*      <<STR': str' = Any.pair st mr'↑>>). *)
 
-  Definition hp_reconf_rel R (eqv: Σ -> _) cr : relation (Any.t * (Σ * R)) :=
-    fun '(str,(fr,x)) '(str',(fr',x')) =>
-      eqv cr (str,fr) (str',fr') /\ x = x'.
+  (* Definition hp_reconf_rel R (eqv: Σ -> _) cr : relation (Any.t * (Σ * R)) := *)
+  (*   fun '(str,(fr,x)) '(str',(fr',x')) => *)
+  (*     eqv cr (str,fr) (str',fr') /\ x = x'. *)
 
-  Lemma hp_reconf_equiv_strong
-    cr str str' (fr fr': Σ)
-    (EQV: hp_reconf_equiv cr (str,fr) (str',fr'))
-    :
-    (hp_reconf_eq cr (str,fr) (str',fr') /\
-     <<FAIL: ~ exists st (mr:Σ), str = Any.pair st mr↑>>)
-    \/
-    (exists st (mr mr': Σ),
-     <<RELr: Own (fr ⋅ mr) ⊢ #=> Own (fr' ⋅ mr' ⋅ cr)>> /\
-     <<STR: str = Any.pair st mr↑>> /\
-     <<STR': str' = Any.pair st mr'↑>>).
-  Proof.
-    ss. des; subst; [|right]; esplits; eauto.
-    destruct (classic (exists stx (mrx:Σ), str = Any.pair stx mrx↑)); eauto.
-    des. subst. right. esplits; eauto.
-    eapply own_ctx with (ctx := mrx) in RELr. revert RELr. r_solve. i.
-    rewrite-> URA.add_comm, (URA.add_comm fr' mrx). eauto.
-  Qed.
+  (* Lemma hp_reconf_equiv_strong *)
+  (*   cr str str' (fr fr': Σ) *)
+  (*   (EQV: hp_reconf_equiv cr (str,fr) (str',fr')) *)
+  (*   : *)
+  (*   (hp_reconf_eq cr (str,fr) (str',fr') /\ *)
+  (*    <<FAIL: ~ exists st (mr:Σ), str = Any.pair st mr↑>>) *)
+  (*   \/ *)
+  (*   (exists st (mr mr': Σ), *)
+  (*    <<RELr: Own (fr ⋅ mr) ⊢ #=> Own (fr' ⋅ mr' ⋅ cr)>> /\ *)
+  (*    <<STR: str = Any.pair st mr↑>> /\ *)
+  (*    <<STR': str' = Any.pair st mr'↑>>). *)
+  (* Proof. *)
+  (*   ss. des; subst; [|right]; esplits; eauto. *)
+  (*   destruct (classic (exists stx (mrx:Σ), str = Any.pair stx mrx↑)); eauto. *)
+  (*   des. subst. right. esplits; eauto. *)
+  (*   eapply own_ctx with (ctx := mrx) in RELr. revert RELr. r_solve. i. *)
+  (*   rewrite-> URA.add_comm, (URA.add_comm fr' mrx). eauto. *)
+  (* Qed. *)
   
-  Lemma hp_reconf_fail
-    r R RR str i i'
-    (FAIL: ~ exists st (mr:Σ), str = Any.pair st mr↑)
-    :
-    paco4 _sim_strict r R RR
-      (str, p <- unwrapU (Any.split str);;
-            mr <- (let '(st,_mr) := p in unwrapU (@Any.downcast Σ _mr));; i mr)
-      (str, p <- unwrapU (Any.split str);;
-            mr <- (let '(st,_mr) := p in unwrapU (@Any.downcast Σ _mr));; i' mr).
-  Proof.
-    destruct (Any.split str) eqn:STR; cycle 1.
-    { ss. unfold triggerUB. grind. pstep. econs. i. inv x. }
-    grind. destruct (Any.downcast t0) eqn:T0; cycle 1.
-    { ss. unfold triggerUB. grind. pstep. econs. i. inv x. }
-    apply Any.split_pair in STR. apply Any.downcast_upcast in T0.
-    exfalso. eapply FAIL. des; subst. eauto.
-  Qed.
+  (* Lemma hp_reconf_fail *)
+  (*   r R RR str i i' *)
+  (*   (FAIL: ~ exists st (mr:Σ), str = Any.pair st mr↑) *)
+  (*   : *)
+  (*   paco4 _sim_strict r R RR *)
+  (*     (str, p <- unwrapU (Any.split str);; *)
+  (*           mr <- (let '(st,_mr) := p in unwrapU (@Any.downcast Σ _mr));; i mr) *)
+  (*     (str, p <- unwrapU (Any.split str);; *)
+  (*           mr <- (let '(st,_mr) := p in unwrapU (@Any.downcast Σ _mr));; i' mr). *)
+  (* Proof. *)
+  (*   destruct (Any.split str) eqn:STR; cycle 1. *)
+  (*   { ss. unfold triggerUB. grind. pstep. econs. i. inv x. } *)
+  (*   grind. destruct (Any.downcast t0) eqn:T0; cycle 1. *)
+  (*   { ss. unfold triggerUB. grind. pstep. econs. i. inv x. } *)
+  (*   apply Any.split_pair in STR. apply Any.downcast_upcast in T0. *)
+  (*   exfalso. eapply FAIL. des; subst. eauto. *)
+  (* Qed. *)
 
 (*  
   Lemma handle_Guarantee_reconf
@@ -623,26 +623,26 @@ Variant interp_inv: Σ -> Any.t * Any.t -> Prop :=
 .
 
 
-Lemma hpsim_adequacy:
-  forall
-    (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t)) 
-    (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
-    (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
-    ps pt st_src st_tgt itr_src itr_tgt
-    fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fr mr fmr
-    (SIM: hpsim_body fl_src fl_tgt Ist ps pt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
-    (WFfrmr: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
-    (WFfmr: (* URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe) *)
-        forall x (WF: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ x ⋅ ctxe),
-                 URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ x ⋅ ctxe)))
+(* Lemma hpsim_adequacy: *)
+(*   forall *)
+(*     (fl_src0 fl_tgt0: alist string (Any.t -> itree Es Any.t))  *)
+(*     (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src) *)
+(*     (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt) *)
+(*     ps pt st_src st_tgt itr_src itr_tgt *)
+(*     fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fr mr *)
+(*     (SIM: hpsim_body fl_src fl_tgt Ist ps pt (st_src, itr_src) (st_tgt, itr_tgt) (fr ⋅ mr)) *)
+(*     (WFfrmr: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe)) *)
+(*     (* (WFfmr: URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe) *) *)
+(*     (*     forall x (WF: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ x ⋅ ctxe), *) *)
+(*     (*              URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ x ⋅ ctxe))) *) *)
     
-    (FR: fr_src = fr ⋅ fr_tgt)
-    (MR: mr_src = mr ⋅ mr_tgt)
-    (CTXI: ctxi_tgt = ctxi_src ⋅ fr ⋅ mr),
-  @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 ps pt fr_ctx
-    (Any.pair st_src mr_src↑, interp_hp_body itr_src (fr_src, ctxi_src, ctxe))
-    (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt (fr_tgt, ctxi_tgt, ctxe)).
-Proof.
+(*     (FR: fr_src = fr ⋅ fr_tgt) *)
+(*     (MR: mr_src = mr ⋅ mr_tgt) *)
+(*     (CTXI: ctxi_tgt = ctxi_src ⋅ fr ⋅ mr), *)
+(*   @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 ps pt fr_ctx *)
+(*     (Any.pair st_src mr_src↑, interp_hp_body itr_src (fr_src, ctxi_src, ctxe)) *)
+(*     (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt (fr_tgt, ctxi_tgt, ctxe)). *)
+(* Proof. *)
 
 
   
@@ -653,13 +653,14 @@ Lemma hpsim_adequacy:
     (FLS: fl_src0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_src)
     (FLT: fl_tgt0 = List.map (fun '(s, f) => (s, interp_hp_fun f)) fl_tgt)
     ps pt st_src st_tgt itr_src itr_tgt
-    fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fr mr fmr
+    fr_ctx mr_src mr_tgt fr_src fr_tgt ctxi_src ctxi_tgt ctxe fmr
     (SIM: hpsim_body fl_src fl_tgt Ist ps pt (st_src, itr_src) (st_tgt, itr_tgt) fmr)
     (WFfmr: URA.wf (fmr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
-    (WFfrmr: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe))
-    (FR: fr_src = fr ⋅ fr_tgt)
-    (MR: mr_src = mr ⋅ mr_tgt)
-    (CTXI: ctxi_tgt = ctxi_src ⋅ fr ⋅ mr),
+    (* (WFfrmr: URA.wf (fr ⋅ mr ⋅ fr_tgt ⋅ mr_tgt ⋅ ctxi_src ⋅ ctxe)) *)
+    (* (FR: fr_src = fr ⋅ fr_tgt) *)
+    (* (MR: mr_src = mr ⋅ mr_tgt) *)
+    (FMR: fr_src ⋅ mr_src = fmr ⋅ fr_tgt ⋅ mr_tgt)
+    (CTXI: ctxi_tgt = ctxi_src ⋅ fmr),
   @sim_itree Σ interp_inv eq fl_src0 fl_tgt0 ps pt fr_ctx
     (Any.pair st_src mr_src↑, interp_hp_body itr_src (fr_src, ctxi_src, ctxe))
     (Any.pair st_tgt mr_tgt↑, interp_hp_body itr_tgt (fr_tgt, ctxi_tgt, ctxe)).
@@ -675,22 +676,16 @@ Proof.
   des. destruct H0; i; des; clarify; cycle 1.
 
   - (* "Call Case" DONE!  *)
-    move K at bottom.
-    uiprop in K. hexploit (K fmr1); try refl.
-    { eapply URA.wf_mon. eauto. }
-    i; des. subst. move H at bottom.
-    
     unfold interp_hp_body.
     steps_safe.
-    unfold handle_callE, handle_Guarantee, guarantee, assume, mget, mput.
-    steps_safe.
-    force_r. instantiate (1:= a ⋅ b ⋅ x).
-    steps_safe. force_r. { eapply eq_ind; eauto.  r_solve. }
-    steps_safe. force_r; eauto.
-    steps_safe. force_l. instantiate (1:= (c2, c3, a ⋅ b ⋅ c1)).
+    unfold handle_callE, handle_Assume, handle_Guarantee, take_iprop, give_iprop, assume, guarantee, mget, mput.
+    steps_safe. force_l. instantiate (1:= (c0, ε, a ⋅ b ⋅ c1)).
     steps_safe. force_l.
     { 
       
+    uiprop in K. hexploit (K fmr1); try refl.
+    { eapply URA.wf_mon. eauto. }
+    i; des. subst. move H at bottom.
 
 
       eapply eq_ind. eauto. r_solve. }
