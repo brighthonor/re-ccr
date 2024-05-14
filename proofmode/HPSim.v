@@ -603,8 +603,7 @@ Hint Resolve cpn7_wcompat: paco.
 (**********)
 
 (* TODO: move *)
-Tactic Notation "uiprop" := repeat (autounfold with iprop; autorewrite with iprop; s).
-Tactic Notation "uiprop" "in" hyp(H)  := repeat (autounfold with iprop in H; autorewrite with iprop in H; simpl in H).
+
 
 
 
