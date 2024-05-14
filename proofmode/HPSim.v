@@ -282,7 +282,7 @@ Section HPSIM.
 
   Definition hpsim_tail : Any.t*Any.t -> Any.t*Any.t -> iProp :=
     fun '(st_src, v_src) '(st_tgt, v_tgt) =>
-      ⌜v_src = v_tgt⌝ ** (#=> Ist st_src st_tgt).
+      ⌜v_src = v_tgt⌝ ** Ist st_src st_tgt.
 
   Definition hpsim_body := @hpsim Any.t hpsim_tail.
 
