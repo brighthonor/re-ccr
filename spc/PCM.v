@@ -1127,6 +1127,19 @@ Module GRA.
     eapply UPD. ss.
   Qed.
 
+  Lemma embed_core M Σ `{@GRA.inG M Σ} (r : M) : GRA.embed (URA.core r) = URA.core (GRA.embed r).
+  Proof.
+    unfold URA.core at 2; unfold to_URA; ss.
+    extensionalities i. unfold embed. des_ifs.
+    - ss. destruct inG_prf. ss.
+    - symmetry. apply URA.unit_core.
+  Qed.
+
+  Lemma embed_unit M Σ `{@GRA.inG M Σ} : GRA.embed ε = ε.
+  Proof.
+    unfold embed. extensionalities n. des_ifs. ss. destruct inG_prf. ss.
+  Qed.
+
   Section GETSET.
     Variable ra: URA.t.
     Variable gra: t.
@@ -1253,58 +1266,6 @@ Goal forall X Y (k: X -> Y),
 .
 Abort.
 ***)
-
-
-Module CoPset.
-  From stdpp Require coPset.
-  Import coPset.
-
-  Definition add (x y : option coPset) : option coPset :=
-    match x, y with
-    | Some x, Some y => if decide (x ## y) then Some (x ∪ y) else None
-    | _, _ => None
-    end.
-
-  Program Instance t : URA.t :=
-    {|
-      URA.car := option coPset;
-      URA.unit := Some ∅;
-      URA._wf := fun x => match x with Some _ => True | None => False end;
-      URA._add := add;
-      URA.core := fun x => Some ∅;
-    |}.
-  Next Obligation.
-    intros [] []; ss. des_ifs. f_equal. set_solver.
-  Qed.
-  Next Obligation.
-    unfold add. intros [] [] []; des_ifs.
-    { f_equal. set_solver. }
-    all: set_solver.
-  Qed.
-  Next Obligation.
-    unseal "ra". unfold add. intros []; des_ifs.
-    - f_equal. set_solver.
-    - set_solver.
-  Qed.
-  Next Obligation.
-    unseal "ra". ss.
-  Qed.
-  Next Obligation.
-    unseal "ra". intros [] []; ss.
-  Qed.
-  Next Obligation.
-    unseal "ra". unfold add. intros []; des_ifs.
-    - f_equal. set_solver.
-    - set_solver.
-  Qed.
-  Next Obligation.
-    intros []; ss.
-  Qed.
-  Next Obligation.
-    unseal "ra". i. exists (Some ∅). ss. f_equal. set_solver.
-  Qed.
-
-End CoPset.
 
 Declare Scope ra_scope.
 Delimit Scope ra_scope with ra.

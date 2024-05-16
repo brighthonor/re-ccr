@@ -193,12 +193,28 @@ Section IPM.
     exists a. rewrite H. r_solve.
   Qed.
 
+  Global Instance iProp_affine (P: iProp): Affine P.
+  Proof.
+    rr. uipropall. i. rr. uipropall.
+  Qed.
+
   Global Instance iProp_pure_forall: BiPureForall iProp.
   Proof.
     ii. rr. uipropall. i. rr. rr in H. uipropall.
     i. specialize (H a). rr in H. uipropall.
   Qed.
+
+  Global Instance iProp_bi_affine : BiAffine (iProp) | 0.
+  Proof. exact iProp_affine. Qed.
+
+  Global Instance iProp_bi_persistently_forall : BiPersistentlyForall iProp.
+  Proof.
+    ii. rr. uipropall. i. rr. rr in H. uipropall.
+    i. rr. uipropall. i. specialize (H x). rr in H. uipropall.
+  Qed.
+  
 End IPM.
+Global Hint Immediate iProp_bi_affine : core.
 Arguments OwnM: simpl never.
 
 Section TEST.
@@ -221,6 +237,65 @@ Infix "⊢" := (@bi_entails iProp).
 Infix "**" := bi_sep (at level 99).
 Infix "-*" := bi_wand (at level 99, right associativity).
 Notation "#=> P" := ((@bupd (bi_car (@iProp _)) (@bi_bupd_bupd (@iProp _) (@iProp_bi_bupd _))) P) (at level 99).
+
+
+
+
+Section IUPD.
+  Context {Σ: GRA.t}.
+
+  Definition IUpd (I: iProp): iProp -> iProp :=
+    fun P => (I -∗ #=> (I ∗ P))%I.
+
+  Lemma IUpd_intro I: forall P, P ⊢ IUpd I P.
+  Proof.
+    ii. iIntros "H INV". iModIntro. iFrame.
+  Qed.
+
+  Lemma IUpd_mono I: forall P Q, (P ⊢ Q) -> (IUpd I P ⊢ IUpd I Q).
+  Proof.
+    ii. unfold IUpd. iIntros "H INV".
+    iPoseProof ("H" with "INV") as "> [H0 H1]". iModIntro.
+    iFrame. iApply H. auto.
+  Qed.
+
+  Lemma IUpd_trans I: forall P, (IUpd I (IUpd I P)) ⊢ (IUpd I P).
+  Proof.
+    ii. unfold IUpd. iIntros "H INV".
+    iPoseProof ("H" with "INV") as "> [H0 H1]".
+    iApply "H1". auto.
+  Qed.
+
+  Lemma IUpd_frame_r I: forall P R, ((IUpd I P) ∗ R) ⊢ (IUpd I (P ∗ R)).
+  Proof.
+    ii. unfold IUpd. iIntros "[H0 H1] INV".
+    iPoseProof ("H0" with "INV") as "> [H0 H2]".
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma Upd_IUpd I: forall P, #=> P ⊢ (IUpd I P).
+  Proof.
+    ii. unfold IUpd. iIntros "H INV". iFrame.
+  Qed.
+
+  Lemma iProp_bupd_mixin_IUpd I: BiBUpdMixin iProp (IUpd I).
+  Proof.
+    econs.
+    - ii. unfold bupd. unfold IUpd. rewrite H. auto.
+    - apply IUpd_intro.
+    - apply IUpd_mono.
+    - apply IUpd_trans.
+    - apply IUpd_frame_r.
+  Qed.
+  Global Instance iProp_bi_bupd_IUpd I: BiBUpd iProp := {| bi_bupd_mixin := iProp_bupd_mixin_IUpd I |}.
+End IUPD.
+Notation "#=( Q )=> P" := ((@bupd (bi_car (@iProp _)) (@bi_bupd_bupd (@iProp _) (@iProp_bi_bupd_IUpd _ Q))) P) (at level 99).
+Notation "P =( I ) =∗ Q" := (P ⊢ #=( I )=> Q) (only parsing, at level 99) : stdpp_scope.
+Notation "P =( I )=∗ Q" := (P -∗ #=( I )=> Q)%I (at level 99): bi_scope.
+
+
+
+
 
 Class IsOp {A : URA.t} (a b1 b2 : A) := is_op : a = b1 ⋅ b2.
 Global Arguments is_op {_} _ _ _ {_}.
@@ -377,6 +452,24 @@ Section ILEMMAS.
     red. uipropall. ii. etrans; et.
   Qed.
 
+  Lemma Own_persistently (r : Σ) : Own r ⊢ <pers> Own (URA.core r).
+  Proof.
+    uipropall. i. rr; uipropall. apply URA.extends_core. ss.
+  Qed.
+
+  Lemma OwnM_persistently {M : URA.t} `{@GRA.inG M Σ} (r : M) : OwnM r ⊢ <pers> OwnM (URA.core r).
+  Proof.
+    unfold OwnM. rewrite GRA.embed_core. apply Own_persistently.
+  Qed.
+
+  Lemma OwnM_unit {M : URA.t} `{@GRA.inG M Σ} : ⊢ OwnM ε.
+  Proof.
+    Local Transparent GRA.to_URA.
+    rr; uipropall. i. rr; uipropall. rr. exists r.
+    rewrite GRA.embed_unit. rewrite URA.unit_idl. ss.
+  Qed.
+
+  
   (*** this is deprecated in 1.1 ***)
   (* Lemma OwnM_Upd_set (M: URA.t) `{@GRA.inG M Σ} *)
   (*       (r1: M) B *)
@@ -442,7 +535,111 @@ Section ILEMMAS.
     rewrite <- URA.add_assoc. et.
   Qed.
 
+  Lemma IUpd_unfold I P
+    :
+    #=(I)=> P ⊢ (I -∗ #=> (I ∗ P)).
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma IUpd_fold I P
+    :
+    (I -∗ #=> (I ∗ P)) ⊢ #=(I)=> P.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Definition SubIProp P Q: iProp :=
+    Q -∗ #=> (P ∗ (P -∗ #=> Q)).
+
+  Lemma SubIProp_refl P
+    :
+    ⊢ SubIProp P P.
+  Proof.
+    iIntros "H". iFrame. auto.
+  Qed.
+
+  Lemma SubIProp_trans P Q R
+    :
+    (SubIProp P Q)
+      -∗
+      (SubIProp Q R)
+      -∗
+      (SubIProp P R).
+  Proof.
+    iIntros "H0 H1 H2".
+    iPoseProof ("H1" with "H2") as "> [H1 H2]".
+    iPoseProof ("H0" with "H1") as "> [H0 H1]".
+    iFrame. iModIntro. iIntros "H".
+    iPoseProof ("H1" with "H") as "> H".
+    iPoseProof ("H2" with "H") as "H". auto.
+  Qed.
+
+  Lemma SubIProp_sep_l P Q
+    :
+    ⊢ (SubIProp P (P ∗ Q)).
+  Proof.
+    iIntros "[H0 H1]". iFrame. auto.
+  Qed.
+
+  Lemma SubIProp_sep_r P Q
+    :
+    ⊢ (SubIProp Q (P ∗ Q)).
+  Proof.
+    iIntros "[H0 H1]". iFrame. auto.
+  Qed.
+
+  Lemma IUpd_sub_mon P Q R
+    :
+    (SubIProp P Q)
+      -∗
+      (#=(P)=> R)
+      -∗
+      (#=(Q)=> R).
+  Proof.
+    iIntros "H0 H1 H2".
+    iPoseProof (IUpd_unfold with "H1") as "H1".
+    iPoseProof ("H0" with "H2") as "> [H0 H2]".
+    iPoseProof ("H1" with "H0") as "> [H0 H1]".
+    iPoseProof ("H2" with "H0") as "H0". iFrame. auto.
+  Qed.
+  
 End ILEMMAS.
+
+Global Instance upd_elim_iupd `{GRA.t} I P Q
+       `{ElimModal _ True false false (#=(I)=> P) P Q R}
+  :
+  ElimModal True false false (#=> P) P Q R.
+Proof.
+  unfold ElimModal. i. iIntros "[H0 H1]".
+  iPoseProof (Upd_IUpd with "H0") as "> H0". iApply "H1". auto.
+Qed.
+
+Global Instance iupd_elim_upd `{GRA.t} I P Q b
+  :
+  ElimModal True b false (#=> P) P (#=(I)=> Q) (#=(I)=> Q).
+Proof.
+  unfold ElimModal. i. iIntros "[H0 H1]".
+  iPoseProof (Upd_IUpd with "H0") as "H0".
+  iIntros "H". iPoseProof ("H0" with "H") as "> [H0 H2]".
+  destruct b; ss.
+  { iPoseProof ("H2") as "# > H2". iPoseProof ("H1" with "H2") as "H".
+    iApply ("H" with "H0").
+  }
+  { iPoseProof ("H2") as "> H2". iPoseProof ("H1" with "H2") as "H".
+    iApply ("H" with "H0").
+  }
+Qed.
+
+Global Instance subiprop_elim_upd `{GRA.t} I J P Q b
+  :
+  ElimModal True b false ((SubIProp I J) ∗ #=(I)=> P) P (#=(J)=> Q) (#=(J)=> Q).
+Proof.
+  rewrite /ElimModal bi.intuitionistically_if_elim.
+  iIntros (_) "[[SUB P] K] J".
+  iMod ("SUB" with "J") as "[I IJ]". iMod ("P" with "I") as "[I P]".
+  iMod ("IJ" with "I") as "J". iPoseProof ("K" with "P J") as "K". iFrame.
+Qed.
 
 Ltac iOwnWf' H :=
   iPoseProof (OwnM_valid with H) as "%".
