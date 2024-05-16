@@ -578,17 +578,26 @@ Section HPSIM_ADEQUACY.
 
 
 (******* Move ******)
+  Lemma own_ctx_r a b
+      (OWN: Own a ⊢ #=> Own b)
+    :
+      forall ctx, Own (a ⋅ ctx) ⊢ #=> Own (b ⋅ ctx)
+  .
+  Proof.
+    i. iIntros "[H H0]".
+    iPoseProof (OWN with "H") as "H".
+    iSplitL "H"; et.
+  Qed.
 
-
+  (*** Used only in hpsim_adequacy. ***)
   Lemma own_upd_in_middle fr_src mr_src fr_tgt mr_tgt ctx fmr fmr0
-    (FMR: Own (fr_src ⋅ mr_src) ⊢ #=> Own (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt))
-    (IN0: ∀ ctx : Σ, URA.wf (fmr ⋅ ctx) → URA.wf (fmr0 ⋅ ctx))
-    (WF: URA.wf (fr_src ⋅ mr_src))
+    (UPD: Own (fr_src ⋅ mr_src) ⊢ #=> Own (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt))
+    (FMR: Own fmr ⊢ #=> Own fmr0)
   :
     Own (fr_src ⋅ mr_src) ⊢ #=> Own (ctx ⋅ fmr0 ⋅ fr_tgt ⋅ mr_tgt).
   Proof.
-    eapply own_trans; eauto. eapply Own_Upd in IN0; eauto.
-    iIntros "[[[CTX FMR] FRT] MRT]". iPoseProof (IN0 with "FMR") as "FMR". iMod "FMR".
+    eapply own_trans; eauto. 
+    iIntros "[[[CTX FMR] FRT] MRT]". iPoseProof (FMR with "FMR") as "FMR". iMod "FMR".
     iModIntro. iSplitR "MRT"; eauto. iSplitR "FRT"; eauto. iSplitR "FMR"; eauto.
   Qed. 
 
@@ -690,32 +699,12 @@ Section HPSIM_ADEQUACY.
 
 
       (*** Revised up to this point ***)
-
-
-      
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      
     - unfold interp_hp_body. steps. eapply K; et.
       eapply own_upd_in_middle; eauto. 
-
-
-
       (***** TODO: inline cases *****)
-    - exploit IHSIM; eauto. i.
-      rewrite-> interp_hp_body_bind, interp_hp_call.
+    - exploit K; eauto; i.
+      { eapply own_upd_in_middle; eauto. }
+      steps. rewrite-> interp_hp_body_bind, interp_hp_call.
       unfold handle_Guarantee, mget, mput, guarantee. 
       steps. force_l. instantiate (1:= (ε, ε, fr_src ⋅ mr_src)).
       steps. force_l. { r_solve; et. }
@@ -723,26 +712,27 @@ Section HPSIM_ADEQUACY.
       {	instantiate (1:= interp_hp_fun f).
       rewrite alist_find_map. rewrite FUN. et. }
       guclo sim_strictC_spec. econs; eauto.
-      + apply interp_strict_inline_src.
+      + unfold interp_hp_fun. grind.
+        pattern (` r0 : Any.t <- f varg;; ` x : Any.t <- (trigger (Guarantee True);;; Ret r0);; k_src x).
+        replace (` r0 : Any.t <- f varg;; ` x : Any.t <- (trigger (Guarantee True);;; Ret r0);; k_src x)
+           with (` x: Any.t <- f varg;; trigger (Guarantee True);;; k_src x); grind.
+        apply interp_strict_inline_src.
       + apply sim_strict_refl.
-    - exploit IHSIM; eauto. i.
-      rewrite-> interp_hp_body_bind, interp_hp_call.
-      unfold handle_Guarantee, mget, mput, guarantee.
-      steps.
+    - exploit K; eauto; i.
+      { eapply own_upd_in_middle; eauto. }
+      steps. rewrite-> interp_hp_body_bind, interp_hp_call.
+      unfold handle_Guarantee, mget, mput, guarantee. 
+      steps. 
       {	instantiate (1:= interp_hp_fun f).
       rewrite alist_find_map. rewrite FUN. et. }
       guclo sim_strictC_spec. econs; eauto.
-      + apply sim_strict_refl.      
-      + apply interp_strict_inline_tgt.
-        { iIntros "H". iPoseProof (x with "H") as "H". iMod "H".
-          iDestruct "H" as "[[X Y] Z]". iModIntro. iSplitL "Y"; eauto. }
-
-
-
-
-
-    (* - admit.
-    - admit. *)
+      + apply sim_strict_refl.
+      + unfold interp_hp_fun. grind.
+        pattern (` r0 : Any.t <- f varg;; ` x3 : Any.t <- (trigger (Guarantee True);;; Ret r0);; k_tgt x3).
+        replace (` r0 : Any.t <- f varg;; ` x3 : Any.t <- (trigger (Guarantee True);;; Ret r0);; k_tgt x3)
+           with (` x: Any.t <- f varg;; trigger (Guarantee True);;; k_tgt x); grind.
+        apply interp_strict_inline_tgt. eapply own_trans; eauto.
+        iIntros "[[C0 C1] C]". iModIntro. iSplitR "C"; eauto.
     - unfold interp_hp_body. steps. eapply K; et. eapply own_upd_in_middle; eauto.
     - unfold interp_hp_body. steps. eapply K; et. eapply own_upd_in_middle; eauto.
     - unfold interp_hp_body. steps. eapply K; et. eapply own_upd_in_middle; eauto.
@@ -754,95 +744,67 @@ Section HPSIM_ADEQUACY.
     - unfold interp_hp_body. steps. rewrite interp_hp_Assume. unfold handle_Assume, mget, mput.
       steps. eapply K with (fmr0 := x ⋅ fmr0); et.
       {
-        rewrite URA.add_comm. eapply IN0. 
-        eapply own_ctx with (ctx := x) in FMR. revert FMR; r_solve; i.
-        eapply own_wf in FMR; et. replace (x ⋅ ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (fmr ⋅ x ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) in FMR; r_solve.
-        eapply URA.wf_mon. et.
-      }
-      { 
-        iIntros "[H H0]".
-        iPoseProof (_ASSUME0 with "H") as "H". iPoseProof (CUR with "H0") as "H0".
-        iFrame.
+        iIntros "[X FMR]". iPoseProof (_ASSUME0 with "X") as "iP". 
+        iPoseProof (CUR with "FMR") as "FMR". iMod "FMR". 
+        iModIntro. iFrame.
       }  
-      {
-        eapply own_ctx with (ctx := x) in FMR; et. rewrite URA.add_assoc in FMR.
-        replace (x ⋅ (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ x ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) in FMR; r_solve.
-        eapply own_upd_in_middle; eauto.
-      }
+      eapply own_ctx with (ctx := x) in FMR; et. rewrite URA.add_assoc in FMR.
+      replace (x ⋅ (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ x ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) in FMR; r_solve.
+      eapply own_upd_in_middle; eauto.
     - unfold interp_hp_body. steps.
       rewrite interp_hp_Guarantee. unfold handle_Guarantee, guarantee, mget, mput.
       steps. eapply K with (fmr0 := c0 ⋅ fmr0); et.
-      {
-        eapply own_wf in FMR; et. rewrite <- URA.add_assoc in FMR.
-        eapply own_ctx in x. eapply own_wf in x; et.
-        replace (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c)) with (fmr ⋅ c0 ⋅ (ctx ⋅ c1 ⋅ c)) in x; r_solve.
-        eapply URA.wf_mon in x; et. rewrite URA.add_comm. eapply IN0; eauto. 
-      }
-      { iIntros "[P FMR]". iPoseProof (x0 with "P") as "P". iPoseProof (CUR with "FMR") as "FMR". iFrame. }
-      {
-        eapply own_trans; et.
-        replace (ctx ⋅ (c0 ⋅ fmr0) ⋅ c1 ⋅ c) with (ctx ⋅ fmr0 ⋅ (c0 ⋅ c1 ⋅ c)); [|r_solve].
-        rewrite <- URA.add_assoc. eapply own_trans with (b:= (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c))).
-        { eapply own_ctx. et. }
-        eapply Own_Upd in IN0. 
-        iIntros "[[CTX FMR] C]". iPoseProof (IN0 with "FMR") as "FMR". iMod "FMR". 
-        iModIntro. iSplitR "C"; eauto. iSplitR "FMR"; eauto. 
-      }
+      { iIntros "[P FMR]". iPoseProof (x0 with "P") as "P". iPoseProof (CUR with "FMR") as "FMR". iFrame. eauto. }
+      eapply own_trans; et.
+      replace (ctx ⋅ (c0 ⋅ fmr0) ⋅ c1 ⋅ c) with (ctx ⋅ fmr0 ⋅ (c0 ⋅ c1 ⋅ c)); [|r_solve].
+      rewrite <- URA.add_assoc. eapply own_trans with (b:= (ctx ⋅ fmr ⋅ (c0 ⋅ c1 ⋅ c))).
+      { eapply own_ctx. et. }
+      iIntros "[[CTX FMR] C]". iPoseProof (x1 with "FMR") as "FMR". iMod "FMR". 
+      iModIntro. iSplitR "C"; eauto. iSplitR "FMR"; eauto. 
     - unfold interp_hp_body. steps.
-      rewrite interp_hp_Guarantee. assert (H := CUR).
-      assert (WF0: URA.wf fmr0).
-      { eapply own_wf in FMR; eauto.
-        replace (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) in FMR; r_solve.
-        eapply URA.wf_mon, IN0; eauto.
-      }
-      eapply iProp_sepconj in H; eauto. des. rename q into fmr1.
+      rewrite interp_hp_Guarantee. assert (H1 := CUR).
+      eapply iProp_sepconj_upd in H1; eauto. des. rename rq into fmr1.
       unfold handle_Guarantee, guarantee, mget, mput.
-      steps. force_l. instantiate (1:= (p1, fmr1 ⋅ fr_tgt, ctx ⋅ mr_tgt)).
+      steps. force_l. instantiate (1:= (rp, fmr1 ⋅ fr_tgt, ctx ⋅ mr_tgt)).
       steps. force_l. 
       {
-        replace (p1 ⋅ (fmr1 ⋅ fr_tgt) ⋅ (ctx ⋅ mr_tgt)) with (ctx ⋅ p1 ⋅ fmr1 ⋅ fr_tgt ⋅ mr_tgt); r_solve. 
+        replace (rp ⋅ (fmr1 ⋅ fr_tgt) ⋅ (ctx ⋅ mr_tgt)) with (ctx ⋅ rp ⋅ fmr1 ⋅ fr_tgt ⋅ mr_tgt); r_solve. 
         iIntros "H". iPoseProof (FMR with "H") as "H". iMod "H".
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
         rewrite <- URA.add_assoc. 
         iDestruct "H" as "[H H0]". iSplitL "H"; et.
-        iStopProof. eapply Own_Upd; et.
+        iStopProof. eapply own_trans; eauto. 
       }
       steps. force_l; eauto using iProp_Own.
       steps. eapply K with (fmr0 := fmr1); et.
-      { rewrite URA.add_comm in WF0. eapply URA.wf_mon; eauto. }
-      { eapply iProp_Own; eauto. }
+      { iIntros "H". iApply H3; eauto. }
       {
         eapply own_wf in FMR; et.
         replace (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) in FMR; r_solve.
-        eapply IN0 in FMR. replace (p1 ⋅ fmr1 ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) with (fmr1 ⋅ fr_tgt ⋅ ctx ⋅ mr_tgt ⋅ p1) in FMR; r_solve.
+        eapply own_ctx_r in x1, H1. eapply own_wf in x1, H1; eauto.
+        replace (rp ⋅ fmr1 ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) with (fmr1 ⋅ fr_tgt ⋅ ctx ⋅ mr_tgt ⋅ rp) in H1; r_solve.
         eapply URA.wf_mon; eauto.
       }
-      { replace (fmr1 ⋅ fr_tgt ⋅ (ctx ⋅ mr_tgt)) with (ctx ⋅ fmr1 ⋅ fr_tgt ⋅ mr_tgt); r_solve; eauto. }
-    - unfold interp_hp_body. steps. rewrite interp_hp_Assume. assert (H := CUR). 
-      assert (WF0: URA.wf fmr0).
-      { eapply own_wf in FMR; eauto.
-        replace (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)) in FMR; r_solve.
-        eapply URA.wf_mon, IN0; eauto.
-      }
-      eapply iProp_sepconj in H; eauto. des. rename q into fmr1.
+      replace (fmr1 ⋅ fr_tgt ⋅ (ctx ⋅ mr_tgt)) with (ctx ⋅ fmr1 ⋅ fr_tgt ⋅ mr_tgt); r_solve; eauto.
+    - unfold interp_hp_body. steps. rewrite interp_hp_Assume. assert (H1 := CUR). 
+      eapply iProp_sepconj_upd in H1; eauto. des. rename rq into fmr1.
       unfold handle_Assume, assume, mget, mput. 
-      steps. force_r. instantiate (1:= p1).
+      steps. force_r. instantiate (1:= rp).
       steps. force_r.
       {
         eapply own_wf in FMR; et. replace (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with ((fmr ⋅ (fr_tgt ⋅ mr_tgt) ⋅ ctx)) in FMR; r_solve.
-        eapply URA.wf_mon, IN0 in FMR. replace (p1 ⋅ fmr1 ⋅ (fr_tgt ⋅ mr_tgt)) with (p1 ⋅ fr_tgt ⋅ mr_tgt ⋅ fmr1) in FMR; r_solve.
+        eapply URA.wf_mon in FMR. eapply own_ctx_r in x1, H1. eapply own_wf in x1, H1; eauto. 
+        replace (rp ⋅ fmr1 ⋅ (fr_tgt ⋅ mr_tgt)) with (rp ⋅ fr_tgt ⋅ mr_tgt ⋅ fmr1) in H1; r_solve.
         eapply URA.wf_mon; eauto.
       }
       steps. force_r; eauto using iProp_Own.
       steps. eapply K with (fmr0 := fmr1); eauto using iProp_Own.
-      { rewrite URA.add_comm in WF0. eapply URA.wf_mon; eauto. }
-      { eapply own_trans; eauto. eapply Own_Upd in IN0.
-        replace (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) with (fmr ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)); [|r_solve].
-        replace (ctx ⋅ fmr1 ⋅ (p1 ⋅ fr_tgt) ⋅ mr_tgt) with (p1 ⋅ fmr1 ⋅ (ctx ⋅ fr_tgt ⋅ mr_tgt)); [|r_solve].
-        iIntros "[H H0]". iPoseProof (IN0 with "H") as "H". iMod "H".
-        iModIntro. iSplitR "H0"; eauto.       
-      }
+      { iIntros "H". iApply H3; eauto. }
+      eapply own_trans; eauto.
+      eapply own_trans. { eapply own_upd_in_middle; eauto. }
+      replace (ctx ⋅ fmr1 ⋅ (rp ⋅ fr_tgt) ⋅ mr_tgt) with (ctx ⋅ (rp ⋅ fmr1) ⋅ fr_tgt ⋅ mr_tgt); [|r_solve].
+      eapply own_upd_in_middle; eauto.
     - steps. pclearbot. gstep. econs. gfinal. left. eapply CIH; et. eapply own_upd_in_middle; eauto.
   Qed.
 

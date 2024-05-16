@@ -267,7 +267,12 @@ Section SIM.
     (@isim r g R RR true pt (st_src, (f varg) >>= k_src) (st_tgt, i_tgt))
     (@isim r g R RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, i_tgt)).
   Proof.
-    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
+    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto. grind.
+    pattern (` r1 : Any.t <- f varg;; ` x : Any.t <- (Ret ();;; Ret r1);; k_src x).
+    replace (` r1 : Any.t <- f varg;; ` x : Any.t <- (Ret ();;; Ret r1);; k_src x) with (f varg >>= k_src); grind.
+    rewrite <- bind_bind. f_equal. etrans.
+    { instantiate (1:=  (`x : Any.t <- f varg;; Ret x)). grind. } 
+    f_equal. extensionality x. grind.
   Qed.
   
   Lemma isim_inline_tgt
@@ -278,7 +283,12 @@ Section SIM.
       (@isim r g R RR ps true (st_src, i_src) (st_tgt, (f varg) >>= k_tgt))
       (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Call fn varg) >>= k_tgt)).
   Proof. 
-    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
+    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto. grind.
+    pattern (` r1 : Any.t <- f varg;; ` x : Any.t <- (Ret ();;; Ret r1);; k_tgt x).
+    replace (` r1 : Any.t <- f varg;; ` x : Any.t <- (Ret ();;; Ret r1);; k_tgt x) with (f varg >>= k_tgt); grind.
+    rewrite <- bind_bind. f_equal. etrans.
+    { instantiate (1:= (`x : Any.t <- f varg;; Ret x)). grind. }
+    f_equal. extensionality x. grind. 
   Qed.
   
   Lemma isim_tau_src
@@ -778,7 +788,63 @@ Ltac step0 :=
     try rewrite interp_hAGEs_Guarantee;
     try rewrite interp_hAGEs_ext
   ).
+
+
   Section TEST.
+    From iris.proofmode Require Import coq_tactics environments.
+
+    Global Arguments Envs _ _%proof_scope _%proof_scope _.
+    Global Arguments Enil {_}.
+    Global Arguments Esnoc {_} _%proof_scope _%string _%I.
+    
+    Context `{Σ: GRA.t}.
+    Let Ist: Any.t -> Any.t -> iProp := fun _ _ => ⌜True⌝%I.
+    Let isim_RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp := fun _ _ => ⌜True⌝%I.
+    Variable iP: iProp.
+
+    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' Ist '------------------------------------------------------------------' st_src st_tgt '------------------------------------------------------------------'  itr_src itr_tgt"
+    :=
+      (environments.envs_entails (Envs E1 E2 _) (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
+      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
+        (at level 50,
+         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' Ist '//' '------------------------------------------------------------------' '//' st_src '//' st_tgt '//' '------------------------------------------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
+
+    Notation "E1 '------------------------------------------------------------------□' Ist '------------------------------------------------------------------' st_src st_tgt '------------------------------------------------------------------'  itr_src itr_tgt"
+    :=
+      (environments.envs_entails (Envs E1 Enil _) (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
+      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
+        (at level 50,
+         format "E1 '------------------------------------------------------------------□' '//' Ist '//' '------------------------------------------------------------------' '//' st_src '//' st_tgt '//' '------------------------------------------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
+
+    Notation "E2 '------------------------------------------------------------------∗' Ist '------------------------------------------------------------------' st_src st_tgt '------------------------------------------------------------------'  itr_src itr_tgt"
+    :=
+      (environments.envs_entails (Envs Enil E2 _) (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
+      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
+        (at level 50,
+         format "E2 '------------------------------------------------------------------∗' '//' Ist '//' '------------------------------------------------------------------' '//' st_src '//' st_tgt '//' '------------------------------------------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
+
+    Notation "Ist '------------------------------------------------------------------' st_src st_tgt '------------------------------------------------------------------'  itr_src itr_tgt"
+    :=
+      (environments.envs_entails (Envs Enil Enil _) (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
+      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
+        (at level 50,
+         format "Ist '//' '------------------------------------------------------------------' '//' st_src '//' st_tgt '//' '------------------------------------------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
+   
+
+    Goal ⊢ ((⌜False⌝**iP) -* @isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Proof. iIntros "[#A B]". clarify. Qed.
+    Goal ⌜False⌝%I ⊢ (@isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Proof. iIntros "#H". Admitted.
+    Goal ⊢ (iP -* @isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Proof. iIntros "H". Admitted.
+    Goal ⊢ (@isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Proof. iIntros. Admitted.
+
+  End TEST.
+
+
+  Section TEST.
+    Context `{Σ: GRA.t}.
     Definition mss0: HModSem.t := {|
       HModSem.fnsems := [("f0", (fun _ => Ret tt↑))];
       HModSem.initial_st := tt↑
@@ -828,7 +894,8 @@ Ltac step0 :=
       ii. econs. 
       { econs.
         { econs; ss.  
-          grind. iIntros. steps!.
+          grind. iIntros. 
+          steps!.
           unfold isim_RR. et. 
         }
         econs.
