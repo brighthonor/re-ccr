@@ -631,6 +631,28 @@ Module URA.
     intros [f EQ]. exists f. apply func_ext_dep. i. apply EQ.
   Qed.
 
+  Definition agree_add (A: Type) (a0 a1: option (option A)): option (option A) :=
+    match a0, a1 with
+    | None, _ => a1
+    | _, None => a0
+    | _, _ => if excluded_middle_informative (a0 = a1) then a0 else (Some None)
+    end.
+  
+  Program Instance agree (A: Type): t := {
+    car := option (option A);
+    unit := None;
+    _add := @agree_add A;
+    _wf := fun a => a <> Some None;
+    core := fun a => a;
+  }
+  .
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. unfold agree_add in *. des_ifs. Qed.
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. exists b. auto. Qed.
+  
 End URA.
 
 (* Coercion URA.to_RA: URA.t >-> RA.t. *)
@@ -1015,8 +1037,6 @@ Qed.
 
 
 
-
-
 Module GRA.
   Class t: Type := __GRA__INTERNAL__: (nat -> URA.t).
   Class inG (RA: URA.t) (Σ: t) := InG {
@@ -1235,6 +1255,56 @@ Abort.
 ***)
 
 
+Module CoPset.
+  From stdpp Require coPset.
+  Import coPset.
+
+  Definition add (x y : option coPset) : option coPset :=
+    match x, y with
+    | Some x, Some y => if decide (x ## y) then Some (x ∪ y) else None
+    | _, _ => None
+    end.
+
+  Program Instance t : URA.t :=
+    {|
+      URA.car := option coPset;
+      URA.unit := Some ∅;
+      URA._wf := fun x => match x with Some _ => True | None => False end;
+      URA._add := add;
+      URA.core := fun x => Some ∅;
+    |}.
+  Next Obligation.
+    intros [] []; ss. des_ifs. f_equal. set_solver.
+  Qed.
+  Next Obligation.
+    unfold add. intros [] [] []; des_ifs.
+    { f_equal. set_solver. }
+    all: set_solver.
+  Qed.
+  Next Obligation.
+    unseal "ra". unfold add. intros []; des_ifs.
+    - f_equal. set_solver.
+    - set_solver.
+  Qed.
+  Next Obligation.
+    unseal "ra". ss.
+  Qed.
+  Next Obligation.
+    unseal "ra". intros [] []; ss.
+  Qed.
+  Next Obligation.
+    unseal "ra". unfold add. intros []; des_ifs.
+    - f_equal. set_solver.
+    - set_solver.
+  Qed.
+  Next Obligation.
+    intros []; ss.
+  Qed.
+  Next Obligation.
+    unseal "ra". i. exists (Some ∅). ss. f_equal. set_solver.
+  Qed.
+
+End CoPset.
 
 Declare Scope ra_scope.
 Delimit Scope ra_scope with ra.
