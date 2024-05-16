@@ -631,6 +631,28 @@ Module URA.
     intros [f EQ]. exists f. apply func_ext_dep. i. apply EQ.
   Qed.
 
+  Definition agree_add (A: Type) (a0 a1: option (option A)): option (option A) :=
+    match a0, a1 with
+    | None, _ => a1
+    | _, None => a0
+    | _, _ => if excluded_middle_informative (a0 = a1) then a0 else (Some None)
+    end.
+  
+  Program Instance agree (A: Type): t := {
+    car := option (option A);
+    unit := None;
+    _add := @agree_add A;
+    _wf := fun a => a <> Some None;
+    core := fun a => a;
+  }
+  .
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. unfold agree_add in *. des_ifs. Qed.
+  Next Obligation. unfold agree_add. des_ifs. Qed.
+  Next Obligation. exists b. auto. Qed.
+  
 End URA.
 
 (* Coercion URA.to_RA: URA.t >-> RA.t. *)
@@ -1015,8 +1037,6 @@ Qed.
 
 
 
-
-
 Module GRA.
   Class t: Type := __GRA__INTERNAL__: (nat -> URA.t).
   Class inG (RA: URA.t) (Σ: t) := InG {
@@ -1105,6 +1125,19 @@ Module GRA.
     destruct H. ss.
     dependent destruction inG_prf0.
     eapply UPD. ss.
+  Qed.
+
+  Lemma embed_core M Σ `{@GRA.inG M Σ} (r : M) : GRA.embed (URA.core r) = URA.core (GRA.embed r).
+  Proof.
+    unfold URA.core at 2; unfold to_URA; ss.
+    extensionalities i. unfold embed. des_ifs.
+    - ss. destruct inG_prf. ss.
+    - symmetry. apply URA.unit_core.
+  Qed.
+
+  Lemma embed_unit M Σ `{@GRA.inG M Σ} : GRA.embed ε = ε.
+  Proof.
+    unfold embed. extensionalities n. des_ifs. ss. destruct inG_prf. ss.
   Qed.
 
   Section GETSET.
@@ -1233,8 +1266,6 @@ Goal forall X Y (k: X -> Y),
 .
 Abort.
 ***)
-
-
 
 Declare Scope ra_scope.
 Delimit Scope ra_scope with ra.
