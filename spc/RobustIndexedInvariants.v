@@ -11,6 +11,9 @@ Local Notation index := nat.
 Section INDEXED_INVARIANT_SET.
 
   Context `{Σ : GRA.t}.
+  Context `{UNIV: Ensembles.Ensemble positive}.
+
+  Definition universe := { n : positive | Ensembles.In _ UNIV n }.
 
   Class IInvSet (Vars : index -> Type) :=
     { prop : forall (i : index), (Vars i) -> iProp }.
@@ -21,7 +24,7 @@ Section INDEXED_INVARIANT_SET.
   (*   }. *)
 
   Definition InvSetRA (Vars : index -> Type) (n : index) : URA.t :=
-    (Auth.t (positive ==> URA.agree (Vars n)))%ra.
+    (Auth.t (universe ==> URA.agree (Vars n)))%ra.
 
   Definition IInvSetRA (Vars : index -> Type) : URA.t :=
     @URA.pointwise_dep index (InvSetRA Vars).
@@ -34,6 +37,7 @@ End INDEXED_INVARIANT_SET.
 Section PCM_OWN.
 
   Context `{Σ : GRA.t}.
+  Context `{UNIV: Ensembles.Ensemble positive}.
 
   Definition OwnE `{@GRA.inG OwnEsRA Σ} (n : index) (E : coPset) :=
     OwnM (@maps_to_res index CoPset.t n (Some E)).
@@ -45,7 +49,7 @@ Section PCM_OWN.
     (∃ D, OwnM (@maps_to_res index (Auth.t Gset.t) n (Auth.black (Some D : Gset.t))))%I.
 
   Definition OwnI_white {Vars} (n : index) (i : positive) (p : Vars n) : IInvSetRA Vars :=
-    @maps_to_res_dep index (@InvSetRA Vars)
+    @maps_to_res_dep index (InvSetRA Vars)
                      n
                      (Auth.white (@maps_to_res positive (URA.agree (Vars n)) i (Some (Some p)))).
 
