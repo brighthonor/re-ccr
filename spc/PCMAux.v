@@ -96,7 +96,7 @@ Section POINTWISE.
     { r_solve. }
   Qed.
 
-  Lemma maps_to_updatable A (M: URA.t)
+  Lemma maps_to_res_updatable A (M: URA.t)
         (a: A) (m0 m1: M)
         (UPD: URA.updatable m0 m1)
     :
@@ -106,7 +106,7 @@ Section POINTWISE.
     unfold maps_to_res. des_ifs.
   Qed.
 
-  Lemma maps_to_updatable_set A (M: URA.t)
+  Lemma maps_to_res_updatable_set A (M: URA.t)
         (a: A) (m: M) (P: M -> Prop)
         (UPD: URA.updatable_set m P)
     :
