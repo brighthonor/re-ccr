@@ -1380,7 +1380,36 @@ Section WORLD_SPLIT.
     iPoseProof (empty_univ_split with "E") as "[[[E DI] L] R]".
     iFrame. iSplitL "L"; eauto.
     iExists eu. iSplitR "R"; eauto. iFrame.
-  Qed.    
+  Qed.
+
+  Fixpoint invs_in (invs: list invE) Es :=
+    match invs with
+    | [] => True
+    | (N, existT n _) :: invs' =>
+        (↑N) ⪿ (Es, n) ∧ invs_in invs' (<[n := (Es !? n)∖↑N]> Es)
+    end.
+
+  Fixpoint invs_take (invs: list invE) Es :=
+    match invs with
+    | [] => Es
+    | (N, existT n _) :: invs' =>
+        invs_take invs' (<[n := (Es !? n)∖↑N]> Es)
+    end.
+
+  Theorem world_split u n invs Es
+    (DIS: invs_in invs Es)
+    :
+    world u n Es ** invs_prop u invs
+    ⊢
+    world u n (invs_take invs Es) **
+    ∃ u', 
+    world u' n ∅ ** invs_prop u' invs **
+    (∀ n' invs',
+     (world u' n' ∅ ** invs_prop u' (invs'++invs))
+     -*
+     (world u (max n n') Es ** invs_prop u (invs'++invs))).
+  Proof.
+  Qed.
     
   (* Theorem wclosed_split u n (invs1 invs2: list invE) *)
   (*   (DIS: inv_disj (invs1 ++ invs2)) *)
