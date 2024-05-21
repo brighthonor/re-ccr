@@ -1382,7 +1382,7 @@ Section WORLD_SPLIT.
     iExists eu. iSplitR "R"; eauto. iFrame.
   Qed.
 
-  Theorem universe_travel u u' n n' Es Es' m N N' p
+  Theorem multiverse_travel u u' n n' Es Es' m N N' p
     (LT: m < n)
     (IN: (↑N) ⊆ Es !? n)
     :
