@@ -1386,35 +1386,61 @@ Section WORLD_SPLIT.
     world u n Es ⊢ world u m Es.
   Proof.
   Admitted.
-  
+
   Theorem multiverse_travel u1 u2 n1 n2 Es1 Es2 N1 N2 m p
     (LT: m < n1)
+    (LT2: m < n2)
     (IN: (↑N1) ⊆ Es1 !? m)
     :
     world u1 n1 Es1 ∗ world u2 n2 Es2 ∗ inv u1 m N1 p
     ⊢ #=>
-    (world u1 n1 (<[m := (Es1 !? m)∖↑N1]> Es1) **
-(*      (∀ *)
-(* m invs' n' (GEn: n' >= n) *)
-(*          ,  (prop m p * world u n (<[n := (Es !? n)∖↑N]> Es)) *)
-(*        -∗ world u n Es) *)
-(*       **            *)
-     world u2 n2 Es2 ** inv u2 m N2 p).
+    (world u1 n1 (<[m := (Es1 !? m)∖↑N1]> Es1) ∗
+
+     (∀ n1' (GEn: n1' >= n1),
+        (prop m p ∗ world u1 n1 (<[m := (Es1 !? m)∖↑N1]> Es1))
+      -∗ #=> world u1 n1' Es1) ∗
+
+     world u2 n2 Es2 ∗ inv u2 m N2 p).
   Proof.
-    iIntros "[[[[W E] DI] R] [V I]]".
-    iPoseProof ((FUpd_open _ n emp Es) with "I") as "Upd"; eauto.
+    iIntros "[[[[W1 E1] DI1] R1] [V I]]".
+    iPoseProof ((FUpd_open _ n1 emp Es1) with "I") as "Upd1"; eauto.
     Local Transparent FUpd. unfold FUpd.
-    iAssert (emp ** (wsats u n **OwnE_all u Es)) with "[W E]" as "WE".
+    iAssert (emp ** (wsats u1 n1 **OwnE_all u1 Es1)) with "[W1 E1]" as "WE1".
     { iFrame. }
-    iMod ("Upd" with "WE") as "[_ [W [E [P Upd]]]]".
-    iPoseProof ((world_mon (1+max m n')) with "V") as "V".
+    iMod ("Upd1" with "WE1") as "[_ [W1 [E1' [P Upd1]]]]".
+
+    iDestruct "V" as "[[[W2 E2] DI2] R2]".
+    iAssert (emp ** (wsats u2 n2 ** OwnE_all u2 Es2)) with "[W2 E2]" as "WE2".
+    { iFrame. }
+    iMod (wsats_inv_gen with "WE2") as "[_ [Upd2 [E2 I]]]"; eauto.
+
+    iModIntro. iSplitL "W1 DI1 E1' R1". { iFrame. }
+    iSplitL "Upd1"; cycle 1. { iFrame. iApply "Upd2"; eauto. }
+    iIntros "% % [P [[[W E] DI] R]]".
+    iPoseProof ("Upd1" with "P") as "Upd1".
+    iAssert (emp ** (wsats u1 n1 ** OwnE_all u1 (<[m:=Es1 !? m ∖ ↑N1]> Es1))) with "[W E]" as "WE". { iFrame. }
+    iMod ("Upd1" with "WE") as "[_ [W [E _]]]". 
+    iModIntro. iApply world_mon; eauto. iFrame.
+  Qed.
+
+
+
+
+
+
+    iPoseProof ((world_mon (1+max m n2)) with "V") as "V".
     { nia. }
-    iDestruct "V" as "[[[W' E'] DI'] R']".
-    iAssert (emp ** (wsats u' (1+max m n') ** OwnE_all u' Es')) with "[W' E']" as "WE'".
+    iDestruct "V" as "[[[W2 E2] DI2] R2]".
+    iAssert (emp ** (wsats u2 (1+max m n2) ** OwnE_all u2 Es2)) with "[W2 E2]" as "WE2".
     { iFrame. }
-    iMod (wsats_inv_gen with "WE'") as "[_ [Upd' [E' I]]]".
+    iMod (wsats_inv_gen with "WE2") as "[_ [Upd2 [E2 I]]]".
     { instantiate (1:= m). nia. }
     iFrame.
+    iModIntro. iSplitR "DI2".
+    { iPoseProof ("Upd2" with "P") as "Upd2".
+      iApply wsats_mon; cycle 1; eauto. nia.
+    }
+
     
     
 
