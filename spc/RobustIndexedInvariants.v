@@ -152,7 +152,7 @@ Section WORLD_SATISFACTION.
             | None => True
             | Some G => (exists i, i ∉ G /\ φ i)
             end)
-    : OwnD_auth u n ⊢ |==> OwnD_auth u n ∗ ∃ i, ⌜φ i⌝ ∧ OwnD u n {[i]}.
+    : OwnD_auth u n ⊢ |==>  OwnD_auth u n ∗ ∃ i, ⌜φ i⌝ ∧ OwnD u n {[i]}.
   Proof.
     iIntros "[% DA]". specialize (INF (fun _ => Some D) n). ss. des.
     assert (@URA.updatable
@@ -475,12 +475,12 @@ Section WSATS.
 
   Definition OwnDI_rest u n := OwnD_rest u n ** OwnI_rest u n.
 
-  Definition rest_univ := (∃ eu, empty_univ eu)%I.
+  Definition univ_rest := (∃ eu, empty_univ eu)%I.
 
   Definition wsats u n : iProp := ([∗ list] n' ∈ (seq 0 n), wsat u n')%I.
   
   Definition world u n Es :=
-    wsats u n ** OwnE_all u Es ** OwnDI_rest u n ** rest_univ.
+    wsats u n ** OwnE_all u Es ** OwnDI_rest u n ** univ_rest.
 
   Definition lookup_def (Es : coPsets) (n : nat) : coPset := default ⊤ (Es !! n).
 
@@ -944,26 +944,26 @@ Section WSATS.
     unfold OwnE_restR. ur. i. ur. i. des_ifs; ur; des_ifs.
   Qed.
  
-  Lemma empty_univ_split u:
-    empty_univ u ⊢ (OwnE_all u ∅ ** OwnDI_rest u 0 ** empty_univ (pos_ext_0 u) ** empty_univ (pos_ext_1 u)).
+  Lemma empty_univ_split eu:
+    empty_univ eu ⊢ (OwnE_all eu ∅ ** OwnDI_rest eu 0 ** empty_univ (pos_ext_0 eu) ** empty_univ (pos_ext_1 eu)).
   Proof.
     assert (ERA: URA.extends
-              ((OwnE_restR u ∅) ⋅
-               (empty_univR (pos_ext_0 u) (fun _ _ => Some ⊤ : CoPset.t)) ⋅
-               (empty_univR (pos_ext_1 u) (fun _ _ => Some ⊤ : CoPset.t)))
-              (empty_univR u (fun _ _ => Some ⊤ : CoPset.t) : OwnEsRA)).
+              ((OwnE_restR eu ∅) ⋅
+               (empty_univR (pos_ext_0 eu) (fun _ _ => Some ⊤ : CoPset.t)) ⋅
+               (empty_univR (pos_ext_1 eu) (fun _ _ => Some ⊤ : CoPset.t)))
+              (empty_univR eu (fun _ _ => Some ⊤ : CoPset.t) : OwnEsRA)).
     { unfold empty_univR, OwnE_restR.
       exists ε. ur. ur. extensionalities k n.
       rewrite lookup_empty.
-      destruct (k =? u)%positive eqn: EQ.
+      destruct (k =? eu)%positive eqn: EQ.
       { apply Pos.eqb_eq in EQ. subst.
         rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
-      destruct (pos_sup (pos_ext_0 u) k) eqn: SUP0.
+      destruct (pos_sup (pos_ext_0 eu) k) eqn: SUP0.
       { rewrite pos_ext_1_disj; eauto.
         erewrite pos_sup_trans; try eassumption; try apply pos_ext_0_sup_true.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
-      destruct (pos_sup (pos_ext_1 u) k) eqn: SUP1.
+      destruct (pos_sup (pos_ext_1 eu) k) eqn: SUP1.
       { erewrite pos_sup_trans; try eassumption; try apply pos_ext_1_sup_true.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
       rewrite pos_sup_cases; eauto.
@@ -971,21 +971,21 @@ Section WSATS.
     }
 
     assert (DRA: URA.extends
-              ((OwnD_restR u 0) ⋅
-               (empty_univR (pos_ext_0 u) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA) ⋅
-               (empty_univR (pos_ext_1 u) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA))
-              (empty_univR u (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA)).
+              ((OwnD_restR eu 0) ⋅
+               (empty_univR (pos_ext_0 eu) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA) ⋅
+               (empty_univR (pos_ext_1 eu) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA))
+              (empty_univR eu (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA)).
     { unfold empty_univR, OwnD_restR.
       exists ε. ur. ur. extensionalities k n.
-      destruct (k =? u)%positive eqn: EQ.
+      destruct (k =? eu)%positive eqn: EQ.
       { apply Pos.eqb_eq in EQ. subst.
         rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
-      destruct (pos_sup (pos_ext_0 u) k) eqn: SUP0.
+      destruct (pos_sup (pos_ext_0 eu) k) eqn: SUP0.
       { rewrite pos_ext_1_disj; eauto.
         erewrite pos_sup_trans; try eassumption; try apply pos_ext_0_sup_true.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
-      destruct (pos_sup (pos_ext_1 u) k) eqn: SUP1.
+      destruct (pos_sup (pos_ext_1 eu) k) eqn: SUP1.
       { erewrite pos_sup_trans; try eassumption; try apply pos_ext_1_sup_true.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
       rewrite pos_sup_cases; eauto.
@@ -993,21 +993,21 @@ Section WSATS.
     }
 
     assert (IRA: URA.extends
-              ((OwnI_restR u 0) ⋅
-               (empty_univR (pos_ext_0 u) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp) ⋅
-               (empty_univR (pos_ext_1 u) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp))                   
-              (empty_univR u (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp)).
+              ((OwnI_restR eu 0) ⋅
+               (empty_univR (pos_ext_0 eu) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp) ⋅
+               (empty_univR (pos_ext_1 eu) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp))                   
+              (empty_univR eu (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp)).
     { unfold empty_univR, OwnI_restR.
       exists ε. ur. ur. extensionalities k n.
-      destruct (k =? u)%positive eqn: EQ.
+      destruct (k =? eu)%positive eqn: EQ.
       { apply Pos.eqb_eq in EQ. subst.
         rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
-      destruct (pos_sup (pos_ext_0 u) k) eqn: SUP0.
+      destruct (pos_sup (pos_ext_0 eu) k) eqn: SUP0.
       { rewrite pos_ext_1_disj; eauto.
         erewrite pos_sup_trans; try eassumption; try apply pos_ext_0_sup_true.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
-      destruct (pos_sup (pos_ext_1 u) k) eqn: SUP1.
+      destruct (pos_sup (pos_ext_1 eu) k) eqn: SUP1.
       { erewrite pos_sup_trans; try eassumption; try apply pos_ext_1_sup_true.
         r_solve. setoid_rewrite URA.unit_id. eauto. }
       rewrite pos_sup_cases; eauto.
@@ -1024,7 +1024,7 @@ Section WSATS.
   Lemma world_init:
     empty_univ 1 ⊢ world 1 0 ∅.
   Proof.
-    unfold world, wsats, rest_univ. s. 
+    unfold world, wsats, univ_rest. s. 
     iIntros "E".
     iPoseProof (empty_univ_split with "E") as "[[[E DI] R] _]".
     iFrame. iExists (pos_ext_0 1). iFrame.
@@ -1033,7 +1033,7 @@ Section WSATS.
 End WSATS.
 
 Notation "M '!?' k" := (lookup_def M k) (at level 20).
-Notation "E '⪿' '(' Es ',' n ')'" := (subseteq_def Es n E) (at level 70).
+(* Notation "E '⪿' '(' Es ',' n ')'" := (subseteq_def Es n E) (at level 70). *)
 Section FANCY_UPDATE.
 
   Context `{Σ : GRA.t}.
@@ -1116,7 +1116,7 @@ Section FANCY_UPDATE.
     rewrite difference_union_L. set_solver.
   Qed.
 
-  Lemma FUpd_open u n' A Es n N (LT : n < n') (IN : (↑N) ⪿ (Es, n)) p :
+  Lemma FUpd_open u n' A Es n N (LT : n < n') (IN : (↑N) ⊆ Es !? n) p :
     inv u n N p ⊢
         FUpd u n' A Es
         (<[n := (Es !? n)∖↑N]> Es)
@@ -1315,7 +1315,7 @@ Use [FUpd_mask_frame] and [FUpd_intro_mask]")
   Qed.
 
   Global Instance into_acc_FUpd_inv u n' A Es n N p :
-    IntoAcc (inv u n N p) (n < n' /\ (↑N) ⪿ (Es, n)) True
+    IntoAcc (inv u n N p) (n < n' /\ (↑N) ⊆ Es !? n) True
             (FUpd u n' A Es (<[n := Es !? n ∖ ↑N]>Es))
             (FUpd u n' A (<[n := Es !? n ∖ ↑N]>Es) Es)
             (fun _ : () => prop n p) (fun _ : () => prop n p) (fun _ : () => None).
@@ -1348,11 +1348,11 @@ Section WORLD_SPLIT.
   
   Definition invE := (namespace * { n & sProp n })%type.
 
-  Definition inv_prop u (e: invE) : iProp :=
+  Definition inv_embed u (e: invE) : iProp :=
     inv u (projT1 e.2) e.1 (projT2 e.2).
 
-  Definition invs_prop u (es: list invE) : iProp :=
-    [∗ list] e ∈ es, inv_prop u e.    
+  Definition invs_embed u (es: list invE) : iProp :=
+    [∗ list] e ∈ es, inv_embed u e.    
   
   Fixpoint inv_disj_from (N: namespace) (invs: list invE) : Prop :=
     match invs with
@@ -1372,58 +1372,121 @@ Section WORLD_SPLIT.
     Proof. i. ss.  eauto with solve_ndisj. (* solve_ndisj. *) Qed.
   End TEST.
 
-  Theorem world_spawn u n Es:
-    world u n Es ⊢ (world u n Es ** ∃ u', world u' 0 ∅).
+  Theorem universe_spawn u n Es:
+    world u n Es ⊢ (world u n Es ** ∃ v, world v 0 ∅).
   Proof.
-    unfold world, rest_univ, wsats. s.
+    unfold world, univ_rest, wsats. s.
     iIntros "[W R]". iDestruct "R" as (eu) "E".
     iPoseProof (empty_univ_split with "E") as "[[[E DI] L] R]".
     iFrame. iSplitL "L"; eauto.
     iExists eu. iSplitR "R"; eauto. iFrame.
   Qed.
 
-  Fixpoint invs_in (invs: list invE) Es :=
-    match invs with
-    | [] => True
-    | (N, existT n _) :: invs' =>
-        (↑N) ⪿ (Es, n) ∧ invs_in invs' (<[n := (Es !? n)∖↑N]> Es)
-    end.
-
-  Fixpoint invs_take (invs: list invE) Es :=
-    match invs with
-    | [] => Es
-    | (N, existT n _) :: invs' =>
-        invs_take invs' (<[n := (Es !? n)∖↑N]> Es)
-    end.
-
-  Theorem world_split u n invs Es
-    (DIS: invs_in invs Es)
+  Theorem universe_travel u u' n n' Es Es' m N N' p
+    (LT: m < n)
+    (IN: (↑N) ⊆ Es !? n)
     :
-    world u n Es ** invs_prop u invs
-    ⊢
-    world u n (invs_take invs Es) **
-    ∃ u', 
-    world u' n ∅ ** invs_prop u' invs **
-    (∀ n' invs',
-     (world u' n' ∅ ** invs_prop u' (invs'++invs))
-     -*
-     (world u (max n n') Es ** invs_prop u (invs'++invs))).
+    world u n Es ∗ world u' n' Es' ∗ inv u m N p
+    ⊢ #=>
+    world u n (<[n := (Es !? n)∖↑N]> Es) **
+    world u' n' Es' ** inv u' m N' p.
   Proof.
+    
   Qed.
+
+(*   Fixpoint invs_in (invs: list invE) Es := *)
+(*     match invs with *)
+(*     | [] => True *)
+(*     | (N, existT n _) :: invs' => *)
+(*         ↑N ⊆ Es !? n ∧ invs_in invs' (<[n := (Es !? n)∖↑N]> Es) *)
+(*     end. *)
+
+(*   Fixpoint invs_remove (invs: list invE) Es := *)
+(*     match invs with *)
+(*     | [] => Es *)
+(*     | (N, existT n _) :: invs' => *)
+(*         invs_remove invs' (<[n := (Es !? n)∖↑N]> Es) *)
+(*     end. *)
+
+(*   Lemma world_inv_lt u n Es m N p: *)
+(*     world u n Es ** inv u m N p ⊢ world u n Es ** inv u m N p ** ⌜m < n⌝. *)
+(*   Proof. *)
+(*   Admitted. *)
+
+(*   Lemma world_mon {u} n m (LE: n <= m): *)
+(*     world u n ∅ ⊢ world u m ∅. *)
+(*   Proof. *)
+(*   Admitted. *)
+
+(*   Theorem world_split u n invs Es *)
+(*     (IN: invs_in invs Es) *)
+(*     : *)
+(*     world u n Es ** invs_embed u invs *)
+(*     ⊢ #=> *)
+(*       ∃ v, *)
+(*       world u n (invs_remove invs Es) ** *)
+(*       world v n ∅ ** invs_embed v invs ** *)
+(*       (∀ m invs' n' (GEn: n' >= n) (GEm: n' >= m), *)
+(*        (world u n' (invs_remove invs Es) ** *)
+(*         world v m ∅ ** invs_embed v invs') *)
+(*        -* *)
+(*        #=> (world u n' Es ** invs_embed u invs')). *)
+(*   Proof. *)
+(*     iIntros "[W INVS]". iPoseProof (world_spawn with "W") as "[W V]". *)
+(*     iDestruct "V" as (v) "V". iExists v. *)
+(*     revert n Es IN. induction invs; i. *)
+(*     { unfold invs_embed. ss. iFrame. *)
+(*       iPoseProof ((world_mon 0 n) with "V") as "V"; try lia. iFrame. *)
+(*       iModIntro. iIntros (m invs' n' LEn LEm) "[[W V] I]". iClear "INVS". *)
+(*       induction invs'; ss. *)
+(*       { iModIntro. iFrame. } *)
+(*       destruct a as [N [m' p]]. iDestruct "I" as "[I Is]". *)
+(*       unfold inv_embed at 1. s. unfold world at 2. *)
+(*       iCombine "V I" as "C". iPoseProof (world_inv_lt with "C") as "[[[[[SAT E] DI] R] I] %LT]". *)
+(*       iPoseProof ((FUpd_open _ m emp ∅) with "I") as "Upd"; eauto. *)
+(*       Local Transparent FUpd. unfold FUpd. *)
+
+      
+
+
+(*         apply insert_id in Heq. s. *)
+        
+
+        
+(*         Check lookup_insert. *)
+
+(*         admit. } *)
+      
+      
+
+        
+(* Search default. *)
+(*         default. rewrite lookup_insert. unfold default. Search (_ !! _). *)
+
+      
+      
+      
+
+      
+      
+      
+      
+    
+(*   Qed. *)
     
   (* Theorem wclosed_split u n (invs1 invs2: list invE) *)
   (*   (DIS: inv_disj (invs1 ++ invs2)) *)
   (*   : *)
-  (*   (world u n ∅ ** invs_prop u (invs1++invs2)) *)
+  (*   (world u n ∅ ** invs_embed u (invs1++invs2)) *)
   (*   ⊢ *)
   (*   ∃ u1 u2, *)
-  (*   (world u1 n ∅ ** invs_prop u1 invs1) ** *)
-  (*   (world u2 n ∅ ** invs_prop u2 invs2) ** *)
+  (*   (world u1 n ∅ ** invs_embed u1 invs1) ** *)
+  (*   (world u2 n ∅ ** invs_embed u2 invs2) ** *)
   (*   (∀ n1 n2 invs1' invs2', *)
-  (*    ((world u1 n1 ∅ ** invs_prop u1 (invs1'++invs1)) ** *)
-  (*     (world u2 n2 ∅ ** invs_prop u2 (invs2'++invs2))) *)
+  (*    ((world u1 n1 ∅ ** invs_embed u1 (invs1'++invs1)) ** *)
+  (*     (world u2 n2 ∅ ** invs_embed u2 (invs2'++invs2))) *)
   (*    -* *)
-  (*    (world u (max n (max n1 n2)) ∅ ** invs_prop u (invs1'++invs2'++invs1++invs2))). *)
+  (*    (world u (max n (max n1 n2)) ∅ ** invs_embed u (invs1'++invs2'++invs1++invs2))). *)
   (* Proof. *)
     
     
