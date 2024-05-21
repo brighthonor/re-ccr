@@ -1382,15 +1382,55 @@ Section WORLD_SPLIT.
     iExists eu. iSplitR "R"; eauto. iFrame.
   Qed.
 
-  Theorem multiverse_travel u u' n n' Es Es' m N N' p
-    (LT: m < n)
-    (IN: (↑N) ⊆ Es !? n)
-    :
-    world u n Es ∗ world u' n' Es' ∗ inv u m N p
-    ⊢ #=>
-    world u n (<[n := (Es !? n)∖↑N]> Es) **
-    world u' n' Es' ** inv u' m N' p.
+  Lemma world_mon {u} m n (LE: n <= m) Es:
+    world u n Es ⊢ world u m Es.
   Proof.
+  Admitted.
+  
+  Theorem multiverse_travel u1 u2 n1 n2 Es1 Es2 N1 N2 m p
+    (LT: m < n1)
+    (IN: (↑N1) ⊆ Es1 !? m)
+    :
+    world u1 n1 Es1 ∗ world u2 n2 Es2 ∗ inv u1 m N1 p
+    ⊢ #=>
+    (world u1 n1 (<[m := (Es1 !? m)∖↑N1]> Es1) **
+(*      (∀ *)
+(* m invs' n' (GEn: n' >= n) *)
+(*          ,  (prop m p * world u n (<[n := (Es !? n)∖↑N]> Es)) *)
+(*        -∗ world u n Es) *)
+(*       **            *)
+     world u2 n2 Es2 ** inv u2 m N2 p).
+  Proof.
+    iIntros "[[[[W E] DI] R] [V I]]".
+    iPoseProof ((FUpd_open _ n emp Es) with "I") as "Upd"; eauto.
+    Local Transparent FUpd. unfold FUpd.
+    iAssert (emp ** (wsats u n **OwnE_all u Es)) with "[W E]" as "WE".
+    { iFrame. }
+    iMod ("Upd" with "WE") as "[_ [W [E [P Upd]]]]".
+    iPoseProof ((world_mon (1+max m n')) with "V") as "V".
+    { nia. }
+    iDestruct "V" as "[[[W' E'] DI'] R']".
+    iAssert (emp ** (wsats u' (1+max m n') ** OwnE_all u' Es')) with "[W' E']" as "WE'".
+    { iFrame. }
+    iMod (wsats_inv_gen with "WE'") as "[_ [Upd' [E' I]]]".
+    { instantiate (1:= m). nia. }
+    iFrame.
+    
+    
+
+    
+    
+    revert n Es IN. induction invs; i.
+    { unfold invs_embed. ss. iFrame.
+      iPoseProof ((world_mon 0 n) with "V") as "V"; try lia. iFrame.
+      iModIntro. iIntros (m invs' n' LEn LEm) "[[W V] I]". iClear "INVS".
+      induction invs'; ss.
+      { iModIntro. iFrame. }
+      destruct a as [N [m' p]]. iDestruct "I" as "[I Is]".
+      unfold inv_embed at 1. s. unfold world at 2.
+      iCombine "V I" as "C". iPoseProof (world_inv_lt with "C") as "[[[[[SAT E] DI] R] I] %LT]".
+      iPoseProof ((FUpd_open _ m emp ∅) with "I") as "Upd"; eauto.
+      Local Transparent FUpd. unfold FUpd.
     
   Qed.
 
@@ -1410,11 +1450,6 @@ Section WORLD_SPLIT.
 
 (*   Lemma world_inv_lt u n Es m N p: *)
 (*     world u n Es ** inv u m N p ⊢ world u n Es ** inv u m N p ** ⌜m < n⌝. *)
-(*   Proof. *)
-(*   Admitted. *)
-
-(*   Lemma world_mon {u} n m (LE: n <= m): *)
-(*     world u n ∅ ⊢ world u m ∅. *)
 (*   Proof. *)
 (*   Admitted. *)
 
