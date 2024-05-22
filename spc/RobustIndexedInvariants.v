@@ -1364,14 +1364,14 @@ Section MULTIVERSE.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
   
-  Theorem multiverse_spawn u b Es:
-    world u b Es ⊢ (world u b Es ** ∃ v, world v 0 ∅).
+  Theorem multiverse_spawn u b A Es:
+    ⊢ FUpd u b (univ_rest ∗ A) Es Es (∃ v, world v 0 ∅).
   Proof.
-    unfold world, univ_rest, wsats. s.
-    iIntros "[W R]". iDestruct "R" as (eu) "E".
-    iPoseProof (empty_univ_split with "E") as "[[[E DI] L] R]".
+    unfold FUpd, world, univ_rest, wsats. s.
+    iIntros "[[R A] [S E]]". iDestruct "R" as (eu) "E0".
+    iPoseProof (empty_univ_split with "E0") as "[[[E0 DI] L] R]".
     iFrame. iSplitL "L"; eauto.
-    iExists eu. iSplitR "R"; eauto. iFrame.
+    iExists eu. iSplitR "R"; eauto. iFrame. eauto.
   Qed.
 
   Lemma multiverse_send u b A Es u0 b0 Es0 N n p
@@ -1404,6 +1404,13 @@ Section MULTIVERSE.
     iMod ("Upd" with "X") as "[A [S0 [E0 [P _]]]]".
     iFrame; eauto.
   Qed.  
+
+End MULTIVERSE.
+
+Global Opaque FUpd.
+
+(* Goal (nroot .@ "gil") ## (nroot .@ "hur"). *)
+(* eauto with solve_ndisj. *)
 
   (* Definition invE := (namespace * { n & sProp n })%type. *)
 
@@ -1532,10 +1539,3 @@ Section MULTIVERSE.
   (*   iIntros "[H _]". iPoseProof (H2 with "H") as "H". iMod "H" as "[H1 H2]". *)
   (*   iFrame. eauto. *)
   (* Qed. *)
-  
-End MULTIVERSE.
-
-Global Opaque FUpd.
-
-(* Goal (nroot .@ "gil") ## (nroot .@ "hur"). *)
-(* eauto with solve_ndisj. *)
