@@ -1040,6 +1040,16 @@ Section WSATS.
     iFrame. iExists (pos_ext_0 1). iFrame.
   Qed.
 
+  Lemma world_mon {u} m n (LE: n <= m) Es:
+    world u n Es ⊢ world u m Es.
+  Proof.
+    unfold world, wsats. iIntros "[[[W E] DI] R]". iFrame.
+    replace m with (n + (m-n)) by nia.
+    rewrite ->seq_app, big_sepL_app. iFrame.
+    iPoseProof (OwnDI_rest_mon with "DI") as "[DI W]"; eauto.
+    replace (n+(m-n)) with m by nia. iFrame.
+  Qed.
+
 End WSATS.
 
 Notation "M '!?' k" := (lookup_def M k) (at level 20).
@@ -1053,7 +1063,7 @@ Section FANCY_UPDATE.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
 
-  Definition inv u (n : level) (N : namespace) p :=
+  Definition inv u (N : namespace) (n : level) p :=
     (∃ i, ⌜i ∈ (↑N : coPset)⌝ ∧ OwnI u n i p)%I.
 
   Definition FUpd u n (A : iProp) (Es1 Es2 : coPsets) (P : iProp) : iProp :=
@@ -1070,7 +1080,7 @@ Section FANCY_UPDATE.
 
   Lemma wsats_inv_gen u n' A Es n N p :
     n < n' ->
-    ⊢ A ∗ wsats u n' ∗ OwnE_all u Es -∗ #=> (A ∗ (prop n p -∗ wsats u n') ∗ OwnE_all u Es ∗ (inv u n N p)).
+    ⊢ A ∗ wsats u n' ∗ OwnE_all u Es -∗ #=> (A ∗ (prop n p -∗ wsats u n') ∗ OwnE_all u Es ∗ (inv u N n p)).
   Proof.
     iIntros (LT) "(A & WSAT & EN)".
     iMod (wsats_OwnI_alloc_lt_gen _ _ _ LT p (fun i => i ∈ ↑N) with "WSAT") as "[I WSAT]".
@@ -1079,7 +1089,7 @@ Section FANCY_UPDATE.
   Qed.
 
   Lemma FUpd_alloc_gen u n' A Es n N p :
-    n < n' -> (inv u n N p -∗ prop n p) ⊢ FUpd u n' A Es Es (inv u n N p).
+    n < n' -> (inv u N n p -∗ prop n p) ⊢ FUpd u n' A Es Es (inv u N n p).
   Proof.
     iIntros (LT) "P (A & WSAT & EN)".
     iMod (wsats_inv_gen with "[A WSAT EN]") as "(A & W & EN & #INV)". eauto.
@@ -1088,13 +1098,13 @@ Section FANCY_UPDATE.
   Qed.
 
   Lemma FUpd_alloc u n' A Es n N p :
-    n < n' -> prop n p ⊢ FUpd u n' A Es Es (inv u n N p).
+    n < n' -> prop n p ⊢ FUpd u n' A Es Es (inv u N n p).
   Proof.
     iIntros (LT) "P". iApply FUpd_alloc_gen. auto. iIntros. iFrame.
   Qed.
 
   Lemma FUpd_open_aux u n' A Es n N E (LT : n < n') (INE : Es !! n = Some E) (IN : ↑N ⊆ E) p :
-    inv u n N p ⊢
+    inv u N n p ⊢
         FUpd u n' A Es (<[n := E∖↑N]> Es)
         ((prop n p) ∗ ((prop n p) -∗ FUpd u n' A (<[n := E∖↑N]> Es) Es emp)).
   Proof.
@@ -1127,7 +1137,7 @@ Section FANCY_UPDATE.
   Qed.
 
   Lemma FUpd_open u n' A Es n N (LT : n < n') (IN : (↑N) ⊆ Es !? n) p :
-    inv u n N p ⊢
+    inv u N n p ⊢
         FUpd u n' A Es
         (<[n := (Es !? n)∖↑N]> Es)
         ((prop n p) ∗ ((prop n p) -∗ FUpd u n' A (<[n := (Es !? n)∖↑N]> Es) Es emp)).
@@ -1325,7 +1335,7 @@ Use [FUpd_mask_frame] and [FUpd_intro_mask]")
   Qed.
 
   Global Instance into_acc_FUpd_inv u n' A Es n N p :
-    IntoAcc (inv u n N p) (n < n' /\ (↑N) ⊆ Es !? n) True
+    IntoAcc (inv u N n p) (n < n' /\ (↑N) ⊆ Es !? n) True
             (FUpd u n' A Es (<[n := Es !? n ∖ ↑N]>Es))
             (FUpd u n' A (<[n := Es !? n ∖ ↑N]>Es) Es)
             (fun _ : () => prop n p) (fun _ : () => prop n p) (fun _ : () => None).
@@ -1345,7 +1355,7 @@ Use [FUpd_mask_frame] and [FUpd_intro_mask]")
   
 End FANCY_UPDATE.
 
-Section WORLD_SPLIT.
+Section MULTIVERSE.
 
   Context `{Σ : GRA.t}.
   Context `{sProp : level -> Type}.
@@ -1354,33 +1364,7 @@ Section WORLD_SPLIT.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
   
-  Definition invE := (namespace * { n & sProp n })%type.
-
-  Definition inv_embed u (e: invE) : iProp :=
-    inv u (projT1 e.2) e.1 (projT2 e.2).
-
-  Definition invs_embed u (es: list invE) : iProp :=
-    [∗ list] e ∈ es, inv_embed u e.    
-  
-  Fixpoint inv_disj_from (N: namespace) (invs: list invE) : Prop :=
-    match invs with
-    | [] => True
-    | (N',_)::invs' => N ## N' /\ inv_disj_from N invs'
-    end.
-
-  Fixpoint inv_disj (invs: list invE) : Prop :=
-    match invs with
-    | [] => True
-    | (N,_)::invs' => inv_disj_from N invs' /\ inv_disj invs'
-    end.
-
-  Section TEST.
-    Goal forall i,
-      inv_disj [(nroot .@ "gil",i); (nroot .@ "hur", i); (nroot .@ "chung", i)].
-    Proof. i. ss.  eauto with solve_ndisj. (* solve_ndisj. *) Qed.
-  End TEST.
-
-  Theorem universe_spawn u n Es:
+  Theorem multiverse_spawn u n Es:
     world u n Es ⊢ (world u n Es ** ∃ v, world v 0 ∅).
   Proof.
     unfold world, univ_rest, wsats. s.
@@ -1390,22 +1374,12 @@ Section WORLD_SPLIT.
     iExists eu. iSplitR "R"; eauto. iFrame.
   Qed.
 
-  Lemma world_mon {u} m n (LE: n <= m) Es:
-    world u n Es ⊢ world u m Es.
-  Proof.
-    unfold world, wsats. iIntros "[[[W E] DI] R]". iFrame.
-    replace m with (n + (m-n)) by nia.
-    rewrite ->seq_app, big_sepL_app. iFrame.
-    iPoseProof (OwnDI_rest_mon with "DI") as "[DI W]"; eauto.
-    replace (n+(m-n)) with m by nia. iFrame.
-  Qed.
-
   Lemma multiverse_send u n A Es u0 n0 Es0 N m p
     (LT: m < n0)
     :
     prop m p
     ⊢
-    FUpd u n (world u0 n0 Es0 ∗ A) Es Es (inv u0 m N p).
+    FUpd u n (world u0 n0 Es0 ∗ A) Es Es (inv u0 N m p).
   Proof.
     iIntros "P [[[[[S0 E0] DI0] R0] A] [S E]]".
     iPoseProof (FUpd_alloc with "P") as "Upd"; eauto.
@@ -1419,7 +1393,7 @@ Section WORLD_SPLIT.
     (LT: m < n0)
     (IN: (↑N) ⊆ Es0 !? m)
     :
-    inv u0 m N p ∗ world u0 n0 Es0
+    inv u0 N m p ∗ world u0 n0 Es0
     ⊢
     FUpd u n A Es Es (prop m p ∗ world u0 n0 (<[m := (Es0 !? m)∖↑N]> Es0)).
   Proof.
@@ -1431,7 +1405,33 @@ Section WORLD_SPLIT.
     iFrame; eauto.
   Qed.  
 
+  (* Definition invE := (namespace * { n & sProp n })%type. *)
 
+  (* Definition inv_embed u (e: invE) : iProp := *)
+  (*   inv u e.1 (projT1 e.2) (projT2 e.2). *)
+
+  (* Definition invs_embed u (es: list invE) : iProp := *)
+  (*   [∗ list] e ∈ es, inv_embed u e.     *)
+  
+  (* Fixpoint inv_disj_from (N: namespace) (invs: list invE) : Prop := *)
+  (*   match invs with *)
+  (*   | [] => True *)
+  (*   | (N',_)::invs' => N ## N' /\ inv_disj_from N invs' *)
+  (*   end. *)
+
+  (* Fixpoint inv_disj (invs: list invE) : Prop := *)
+  (*   match invs with *)
+  (*   | [] => True *)
+  (*   | (N,_)::invs' => inv_disj_from N invs' /\ inv_disj invs' *)
+  (*   end. *)
+
+  (* Section TEST. *)
+  (*   Goal forall i, *)
+  (*     inv_disj [(nroot .@ "gil",i); (nroot .@ "hur", i); (nroot .@ "chung", i)]. *)
+  (*   Proof. i. ss.  eauto with solve_ndisj. (* solve_ndisj. *) Qed. *)
+  (* End TEST. *)
+
+  
 (*   Fixpoint invs_in (invs: list invE) Es := *)
 (*     match invs with *)
 (*     | [] => True *)
@@ -1533,7 +1533,7 @@ Section WORLD_SPLIT.
   (*   iFrame. eauto. *)
   (* Qed. *)
   
-End WORLD_SPLIT.
+End MULTIVERSE.
 
 Global Opaque FUpd.
 
