@@ -848,19 +848,20 @@ Module HModSemPair.
 Section HPSIMMODSEM.
 
   Context `{Σ: GRA.t}.
+  Import HModSem.
 
-  Variable (ms_src ms_tgt: HModSem.t).
+  Variable (ms_src ms_tgt: t).
   
-  Definition fl_src := ms_src.(HModSem.fnsems).
-  Definition fl_tgt := ms_tgt.(HModSem.fnsems).
-
+  Definition fl_src := ms_src.(fnsems).
+  Definition fl_tgt := ms_tgt.(fnsems).
+  
   Let W: Type := (Any.t) * (Any.t).
   Inductive sim: Prop := mk {
     I: Any.t -> Any.t -> iProp;
-    hpsim_fnsems: Forall2 (hpsim_fnsem fl_src fl_tgt I) ms_src.(HModSem.fnsems) ms_tgt.(HModSem.fnsems);
-    hpsim_initial: I (ms_src.(HModSem.initial_st)) (ms_tgt.(HModSem.initial_st)) ε;
-    (* sim_fnsems: Forall2 (sim_fnsem wf le fl_src fl_tgt) ms_src.(ModSem.fnsems) ms_tgt.(ModSem.fnsems); *)
-    (* sim_initial: exists w_init, wf w_init (ms_src.(HModSem.initial_st), ms_tgt.(HModSem.initial_st)); *)
+    hpsim_fnsems: Forall2 (hpsim_fnsem fl_src fl_tgt I) ms_src.(fnsems) ms_tgt.(fnsems);
+    hpsim_initial: ms_src.(initial_cond) ⊢ ms_tgt.(initial_cond) (* ∗ simulation of src/tgt initial_st as iProp. *) 
+    (* src_cond ⊢ tgt_cond ∗ (hpsim init_src init_tgt)*)
+    (* hpsim_initial: I (ms_src.(HModSem.initial_st)) (ms_tgt.(HModSem.initial_st)) ε; *)
   }.
 
 End HPSIMMODSEM.
@@ -876,7 +877,7 @@ Proof.
     rr in INV. uipropall. clarify.
     eapply hpsim_refl; eauto.
     apply URA.wf_unit.
-  - rr. uipropall.
+  (* - rr. uipropall. *)
 Qed.
 
 End HModSemPair.

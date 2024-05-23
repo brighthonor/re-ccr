@@ -82,16 +82,13 @@ Section SPEC.
   Qed.
 
 End SPEC.
-
+(* Don't want variable stb, o in isim *)
 Section SIM.
 
   Context `{Σ: GRA.t}.
   Variable Ist: Any.t -> Any.t -> iProp.
   Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
   Let _hpsim := @_hpsim Σ fl_src fl_tgt Ist false.
-  (* Variable stb_src: gname -> fspec.
-  Variable stb_tgt: gname -> fspec. *)
-
 
   Program Definition isim
           r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
@@ -626,20 +623,22 @@ Global Opaque isim.
 
 Module IModSemPair.
 Section ISIMMODSEM.
+  Import HModSem.
   Context `{Σ: GRA.t}.
   Variable (ms_src ms_tgt: HModSem.t).
-  Let fl_src := ms_src.(HModSem.fnsems).
-  Let fl_tgt := ms_tgt.(HModSem.fnsems).
   Variable Ist: Any.t -> Any.t -> iProp.
   Variable isim_RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp.
 
-
-  Let W: Type := (Any.t) * (Any.t).
+  Let fl_src := ms_src.(fnsems).
+  Let fl_tgt := ms_tgt.(fnsems).
+  Let init_src := ms_src.(initial_st).
+  Let init_tgt := ms_tgt.(initial_st).
+  Let cond_src := ms_src.(initial_cond).
+  Let cond_tgt := ms_tgt.(initial_cond).
+  
   Inductive sim: Prop := mk {
-    (* Ist: Any.t -> Any.t -> iProp; *)
-    (* isim_RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp; *)
-    isim_fnsems: Forall2 (isim_fnsem Ist fl_src fl_tgt isim_RR) ms_src.(HModSem.fnsems) ms_tgt.(HModSem.fnsems);
-    isim_initial: Ist (ms_src.(HModSem.initial_st)) (ms_tgt.(HModSem.initial_st)) ε;
+    isim_fnsems: Forall2 (isim_fnsem Ist fl_src fl_tgt isim_RR) fl_src fl_tgt;
+    isim_initial: cond_src ⊢ cond_tgt ∗ (isim Ist [] [] bot7 bot7 isim_RR false false (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt))
   }.
 
 

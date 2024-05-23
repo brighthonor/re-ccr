@@ -754,8 +754,6 @@ Section SIMMODSEM.
   Definition fl_tgt := ms_tgt.(ModSem.fnsems).
 
   Let W: Type := (Any.t) * (Any.t).
-
-  Search (_ -< _).
   
   Inductive sim: Prop := mk {
     world: Type;
@@ -969,8 +967,10 @@ Section SEMPAIR.
   (* Admitted. *)
 
   Context `{CONF: EMSConfig}.
-  Hypothesis INIT:
-    exists w, g_lift_rel w (ModSem.init_st ms_src) (ModSem.init_st ms_tgt).
+
+  (* Hypothesis INIT:
+    exists w, g_lift_rel w (ModSem.init_st ms_src) (ModSem.init_st ms_tgt). *)
+    (* sim_itree wf le [] [] false false w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st)); *)
 
   Lemma adequacy_local_aux (P Q: Prop)
         (* (wf: world -> W -> Prop)  *)
@@ -979,20 +979,25 @@ Section SEMPAIR.
       (Beh.of_program (ModSem.compile ms_tgt (Some P)))
       <1=
       (Beh.of_program (ModSem.compile ms_src (Some Q))).
-  Proof. 
-    eapply adequacy_global_itree; ss.
-    hexploit INIT. i. 
+  Proof. Admitted.
+    (* eapply adequacy_global_itree; ss.
+    (* hexploit INIT. i.  *)
     des. ginit.
     { eapply cpn7_wcompat; eauto with paco. }
     unfold ModSem.initial_itr, assume. generalize "main" as fn. i.
     hexploit (fnsems_find_iff fn). i. des.
     { steps. unshelve esplits; et. unfold ITree.map, unwrapU, triggerUB.
     (* rewrite interp_Es_bind. steps. *)
-      rewrite NONE. steps. ss. }
+      rewrite NONE. steps. des. 
+      force. exists (WF x). steps. 
+      guclo bindC_spec. econs.
+      { eapply simg_flag_down.   admit. }
+      i. steps. ss.
+    }
     (* { admit. } *)
  
     { 
-      inv H. 
+      (* inv H.  *)
       hexploit (SIM (initial_arg) (initial_arg)) ; et; cycle 1. i. des.
       steps. force. esplits; et.
       steps. unfold ITree.map, unwrapU.
@@ -1001,7 +1006,7 @@ Section SEMPAIR.
       { eapply simg_flag_down. gfinal. right. eapply sim_lift. econs; et. }
       { i. destruct vret_src, vret_tgt. des; clarify. steps. }
     }
-  Qed.
+  Qed. *)
 
 
 
@@ -1238,12 +1243,22 @@ Theorem sim_ctx
     :
       ModSemPair.sim (add ms1 ctx) (add ms2 ctx)
 .
-Proof.
-  inv SIM. inv sim_initial.
-  econs; et.
-  2: { exists x. instantiate (1:= wf_lift wf0). s.
-       rewrite ! Any.pair_split.
-       splits; et.
+Proof. Admitted.
+  (* inv SIM. inv sim_initial.
+  econs; et; cycle 1.
+  { exists x.
+    admit.
+    (****** require different 'wf' in head & continuation? ******)
+   (* instantiate (1:= wf_lift wf0). s. *)
+    (* s. rewrite ! resum_itr_bind. ginit. guclo lbindC_spec. econs.
+    { gfinal. right. et. }
+    i. rewrite ! resum_itr_bind. guclo lbindC_spec. econs.
+    { admit. }
+    i.
+    gfinal. right. exploit self_sim_itree. eapply self_sim_itree.
+    Search resum_itr.    
+    rewrite ! Any.pair_split.
+    splits; et. *)
   }
   s. unfold add_fnsems, trans_l, trans_r.
   apply Forall2_app; eapply Forall2_apply_Forall2; et; cycle 1.
@@ -1324,6 +1339,6 @@ Proof.
     specialize H1 with (x:=y) (y:=y) (w:=w) (mrs_src := t0) (mrs_tgt := t2).
     specialize (H1 eq_refl SIMMRS).
     eapply sim_ctx_aux; et.
-Qed.
+Qed. *)
 
 End SIMCTX.

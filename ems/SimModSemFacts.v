@@ -128,9 +128,9 @@ Section ADEQUACY.
       rewrite <- sim_sk in H3.
       eapply alist_find_some_iff  with (k:=s) (v:=i2) in wf_fnsems; et.
       rewrite SRC in wf_fnsems. clarify. apply H5.
-    - inv sim_initial. econs. econs.
+    (* - inv sim_initial. econs. econs.
       2: { fold sk_src sk_tgt. rewrite SKEQ. apply H. }
-      instantiate (1:= x). refl.
+      instantiate (1:= x). refl. *)
 
     Qed.
 

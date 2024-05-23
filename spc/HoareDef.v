@@ -421,12 +421,13 @@ Section HMODSEM.
   Context `{Σ: GRA.t}.
 
   Record t: Type := mk {
-    initial_st : Any.t;
     fnsems : alist gname (Any.t -> itree hAGEs Any.t);
+    initial_st : itree eventE Any.t;
+    initial_cond: iProp;
   }
   .
 
-  Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: t -> Any.t) (ms: t): ModSem.t := {|
+  Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: t -> itree eventE Any.t) (ms: t): ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
     ModSem.init_st := mst ms;
   |}
@@ -439,6 +440,7 @@ Section HMODSEM.
   Definition lift (ms: ModSem.t): t := {|
     fnsems := List.map (fun '(fn, bd) => (fn, lift_Es_fun bd)) (ModSem.fnsems ms);
     initial_st := ModSem.init_st ms;
+    initial_cond := ⌜True⌝%I
   |}
   .
 
@@ -467,8 +469,10 @@ Section HMODSEM.
     (List.map trans_l ms1.(fnsems)) ++ (List.map trans_r ms2.(fnsems)).
   
   Definition add ms1 ms2: t := {|
-    initial_st := Any.pair (initial_st ms1) (initial_st ms2);
     fnsems := add_fnsems ms1 ms2;
+    initial_st := st1 <- (initial_st ms1);; st2 <- (initial_st ms2);; Ret (Any.pair st1 st2);
+    (* initial_st := Any.pair (initial_st ms1) (initial_st ms2); *)
+    initial_cond := (initial_cond ms1) ∗ (initial_cond ms2);
   |}.
 
 End HMODSEM.
@@ -484,7 +488,7 @@ Section HMOD.
   }
   .
 
-  Definition transl (tr: Sk.t -> (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: HModSem.t -> Any.t) (md: t): Mod.t := {|
+  Definition transl (tr: Sk.t -> (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: HModSem.t -> itree eventE Any.t) (md: t): Mod.t := {|
     Mod.get_modsem := fun sk => HModSem.transl (tr sk) mst (md.(get_modsem) sk);
     Mod.sk := md.(sk);
   |}
@@ -518,19 +522,21 @@ Section SMODSEM.
 
   Record t: Type := mk {
     fnsems: list (gname * fspecbody);
-    initial_mr: Σ;
-    initial_st: Any.t;
+    initial_st: itree eventE Any.t;
+    initial_cond: iProp;
   }
   .
 
   (* DEFINE HMod first. *)
-  Definition transl (tr: fspecbody -> (Any.t -> itree hAGEs Any.t)) (mst: t -> Any.t) (ms: t): HModSem.t := {|
+  Definition transl (tr: fspecbody -> (Any.t -> itree hAGEs Any.t)) (mst: t -> itree eventE Any.t) (ms: t): HModSem.t := {|
     HModSem.fnsems := List.map (fun '(fn, sb) => (fn, tr sb)) ms.(fnsems);
     HModSem.initial_st := mst ms;
+    HModSem.initial_cond := ms.(initial_cond);
   |}
   .
 
-  Definition compile (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> Any.t) (ms: t) : ModSem.t := {|
+  (* Compile directly to ModSem. *)
+  Definition compile (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> itree eventE Any.t) (ms: t) : ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, sb) => (fn, tr sb)) ms.(fnsems);
     ModSem.init_st := mst ms;
   |}
@@ -539,12 +545,13 @@ Section SMODSEM.
   (* Definition to_hmod (ms: t): HModSem.t := transl ((fun_spec_hp stb o) ∘ fsb_body) initial_st ms. *)
   (* Definition to_mid (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid stb ∘ fsb_body) initial_st ms.
   Definition to_mid2 (stb: gname -> option fspec) (ms: t): ModSem.t := transl (fun_to_mid2 ∘ fsb_body) initial_st ms. *)
-  Definition to_tgt (stb: gname -> option fspec) (ms: t): ModSem.t := compile (fun_to_tgt stb) (fun ms => Any.pair ms.(initial_st) ms.(initial_mr)↑) ms.
+  (* Definition to_tgt (stb: gname -> option fspec) (ms: t): ModSem.t := compile (fun_to_tgt stb) (fun ms => Any.pair ms.(initial_st) ms.(initial_mr)↑) ms. *)
 
   Definition main (mainpre: Any.t -> iProp) (mainbody: Any.t -> itree hEs Any.t): t := {|
       fnsems := [("main", (mk_specbody (mk_simple (fun (_: unit) => (ord_top, mainpre, fun _ => (⌜True⌝: iProp)%I))) mainbody))];
-      initial_mr := ε;
-      initial_st := tt↑;
+      (* initial_mr := ε; *)
+      initial_st := Ret tt↑;
+      initial_cond := ⌜True⌝%I;
     |}
   .
 
@@ -565,13 +572,13 @@ Section SMOD.
   }
   .
 
-  Definition transl (tr: Sk.t -> fspecbody -> ( Any.t -> itree hAGEs Any.t)) (mst: SModSem.t -> Any.t) (md: t): HMod.t := {|
+  Definition transl (tr: Sk.t -> fspecbody -> ( Any.t -> itree hAGEs Any.t)) (mst: SModSem.t -> itree eventE Any.t) (md: t): HMod.t := {|
     HMod.get_modsem := fun sk => SModSem.transl (tr sk) mst (md.(get_modsem) sk);
     HMod.sk := md.(sk);
   |}
   .
 
-  Definition compile (tr: Sk.t -> fspecbody -> (Any.t -> itree Es Any.t)) (mst: SModSem.t -> Any.t) (md: t) : Mod.t := {|
+  Definition compile (tr: Sk.t -> fspecbody -> (Any.t -> itree Es Any.t)) (mst: SModSem.t -> itree eventE Any.t) (md: t) : Mod.t := {|
     Mod.get_modsem := fun sk => SModSem.compile (tr sk) mst (md.(get_modsem) sk);
     Mod.sk := md.(sk);
   |}
@@ -581,8 +588,8 @@ Section SMOD.
   (* Definition to_src (md: t): Mod.t := transl (fun _ => fun_to_src ∘ fsb_body) SModSem.initial_st md. *)
   (* Definition to_mid (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid stb ∘ fsb_body) SModSem.initial_st md. *)
   (* Definition to_mid2 (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid2 ∘ fsb_body) SModSem.initial_st md. *)
-  Definition to_tgt (stb: Sk.t -> gname -> option fspec) (md: t): Mod.t :=
-    compile (fun sk => fun_to_tgt (stb sk)) (fun ms => Any.pair ms.(SModSem.initial_st) ms.(SModSem.initial_mr)↑) md.
+  (* Definition to_tgt (stb: Sk.t -> gname -> option fspec) (md: t): Mod.t :=
+    compile (fun sk => fun_to_tgt (stb sk)) (fun ms => Any.pair ms.(SModSem.initial_st) ms.(SModSem.initial_mr)↑) md. *)
 
     
   Definition get_stb (mds: list t): Sk.t -> alist gname fspec :=
@@ -591,8 +598,8 @@ Section SMOD.
   Definition get_sk (mds: list t): Sk.t :=
     Sk.sort (fold_right Sk.add Sk.unit (List.map sk mds)).
 
-  Definition get_initial_mrs (mds: list t): Sk.t -> Σ :=
-    fun sk => fold_left (⋅) (List.map (SModSem.initial_mr ∘ (flip get_modsem sk)) mds) ε.
+  (* Definition get_initial_mrs (mds: list t): Sk.t -> Σ :=
+    fun sk => fold_left (⋅) (List.map (SModSem.initial_mr ∘ (flip get_modsem sk)) mds) ε. *)
 
 End SMOD.
 End SMod.
