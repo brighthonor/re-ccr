@@ -12,14 +12,11 @@ Set Implicit Arguments.
 
 Class EMSConfig := { finalize: Any.t -> option Any.t; initial_arg: Any.t }.
 
-
-
 Module ModSem.
 Section MODSEM.
 
   Record t: Type := mk {
-    init_st : Any.t;
-    (* fnsems : gname -> option (Any.t -> itree Es Any.t) *)
+    init_st : itree eventE Any.t;
     fnsems : alist gname (Any.t -> itree Es Any.t);
   }
   .
@@ -30,7 +27,7 @@ Section MODSEM.
   .
 
   Definition empty: t := {|
-    init_st := tt↑;
+    init_st := Ret (tt↑);
     fnsems := [];
   |}.
 
@@ -151,7 +148,7 @@ Section ADD.
 
   Definition add : t :=
   {|
-    init_st := Any.pair (init_st M1) (init_st M2);
+    init_st := st1 <- init_st M1;; st2 <- init_st M2;; Ret (Any.pair st1 st2);
     fnsems := add_fnsems;
   |}.
 
@@ -328,7 +325,7 @@ Section INTERP.
     | None => Ret tt
     | Some P' => assume (<<WF: P'>>)
     end;;; 
-    snd <$> interp_Es prog (prog (Call "main" initial_arg)) (init_st ms).
+    snd <$> (init_st ms >>= interp_Es prog (prog (Call "main" initial_arg))) .
 
   Let state: Type := itree eventE Any.t.
 
@@ -543,7 +540,7 @@ Section MOD.
   Definition wf (md: t): Prop := (<<WF: ModSem.wf md.(enclose)>> /\ <<SK: Sk.wf (md.(sk))>>).
 
   Definition empty: t := {|
-    get_modsem := fun _ => ModSem.mk tt↑ [];
+    get_modsem := fun _ => ModSem.empty;
     sk := Sk.unit;
   |}.
 

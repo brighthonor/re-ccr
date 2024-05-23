@@ -754,13 +754,17 @@ Section SIMMODSEM.
   Definition fl_tgt := ms_tgt.(ModSem.fnsems).
 
   Let W: Type := (Any.t) * (Any.t).
+
+  Search (_ -< _).
+  
   Inductive sim: Prop := mk {
     world: Type;
     wf: world -> W -> Prop;
     le: world -> world -> Prop;
     le_PreOrder: PreOrder le;
     sim_fnsems: Forall2 (sim_fnsem wf le fl_src fl_tgt) ms_src.(ModSem.fnsems) ms_tgt.(ModSem.fnsems);
-    sim_initial: exists w_init, wf w_init (ms_src.(ModSem.init_st), ms_tgt.(ModSem.init_st));
+    sim_initial: exists w_init,
+                 sim_itree wf le [] [] false false w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st));
   }.
 
 End SIMMODSEM.
@@ -775,7 +779,7 @@ Proof.
     induction a; ii; ss.
     econs; et. econs; ss. ii; clarify.
     destruct w. exploit self_sim_itree; et.
-  - ss.
+  - exists tt. exploit self_sim_itree; et.
 Qed.
 
 End ModSemPair.
@@ -967,6 +971,7 @@ Section SEMPAIR.
   Context `{CONF: EMSConfig}.
   Hypothesis INIT:
     exists w, g_lift_rel w (ModSem.init_st ms_src) (ModSem.init_st ms_tgt).
+
   Lemma adequacy_local_aux (P Q: Prop)
         (* (wf: world -> W -> Prop)  *)
         (WF: Q -> P)
