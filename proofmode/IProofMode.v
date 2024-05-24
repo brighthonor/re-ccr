@@ -15,6 +15,7 @@ From ExtLib Require Import
 Require Import Red IRed.
 Require Import ProofMode Invariant.
 Require Import HPSim (* HPTactics *) (* HPSimFacts *).
+Require Import RobustIndexedInvariants.
 
 From stdpp Require Import coPset gmap.
 (* Require Import FancyUpdate. *)
@@ -89,11 +90,14 @@ Section SIM.
   Variable Ist: Any.t -> Any.t -> iProp.
   Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
   Let _hpsim := @_hpsim Σ fl_src fl_tgt Ist false.
+  Let rel := ∀ x : Type, (Any.t * x → Any.t * x → iProp) → bool → bool → Any.t * itree hAGEs x → Any.t * itree hAGEs x → iProp.
+
+  Definition unlift (r: rel) := fun R RR ps pt sti_src sti_tgt res => r R RR ps pt sti_src sti_tgt res.
 
   Program Definition isim
           r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
           (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR ps pt sti_src sti_tgt) _.
+    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) (unlift r) (unlift g) _ RR ps pt sti_src sti_tgt) _.
   Next Obligation.
     guclo hpsim_extendC_spec. econs; et.
   Qed.
@@ -125,10 +129,22 @@ Section SIM.
     eapply Own_iProp; eauto.
   Qed.
 
+   Lemma isim_base r g {R} 
+        (RR: Any.t * R -> Any.t * R -> iProp)
+        ps pt sti_src sti_tgt
+    :
+    (@r R RR ps pt sti_src sti_tgt)
+      -∗
+      (isim r g RR ps pt sti_src sti_tgt)
+  .
+  Proof.
+    uiprop. i. gfinal. left. eauto.
+  Qed.
+
   Lemma isim_final
       r g ps pt {R} RR st_src st_tgt i_src i_tgt (iP: iProp)
       (SIM: forall fmr (IP: iP fmr), 
-          gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
+          gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
     :
       bi_entails
         iP
@@ -224,10 +240,10 @@ Section SIM.
     r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg
   :
     bi_entails
-      ((Ist st_src st_tgt) ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -* @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+      ((Ist st_src st_tgt) ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -∗ @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
       (isim r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt)).
   Proof. 
-    remember (∀ st_src0 st_tgt0 vret : Any.t, Ist st_src0 st_tgt0 -* isim r g RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret))%I as FR.
+    remember (∀ st_src0 st_tgt0 vret : Any.t, Ist st_src0 st_tgt0 -∗ isim r g RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret))%I as FR.
     uiprop. i. des. guclo hpsimC_spec. econs; esplits; eauto.
     econs; eauto; i; subst. 
     { instantiate (1:= FR). subst. eapply iProp_Own in H0, H1.
@@ -382,7 +398,7 @@ Section SIM.
     r g ps pt {R} RR iP st_src st_tgt k_src i_tgt 
   :
     bi_entails
-      (iP -* (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
+      (iP -∗ (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
       (@isim r g R RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt)).
   Proof.
     uiprop. i. guclo hpsimC_spec. econs; esplits; i; eauto.
@@ -403,7 +419,7 @@ Section SIM.
     r g ps pt {R} RR iP st_src st_tgt i_src k_tgt 
   :
     bi_entails
-      (iP -* (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
+      (iP -∗ (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
       (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt)).
   Proof. 
     uiprop. i. guclo hpsimC_spec. econs; esplits; i; eauto.
@@ -514,7 +530,7 @@ Section SIM.
       r g {R} RR ps pt st_src st_tgt X (x: option X) k_src i_tgt
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim r g RR ps pt (st_src, k_src x') (st_tgt, i_tgt))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim r g RR ps pt (st_src, k_src x') (st_tgt, i_tgt))
         (@isim r g R RR ps pt (st_src, unwrapU x >>= k_src) (st_tgt, i_tgt)).
   Proof.
     iIntros "H". unfold unwrapU. destruct x.
@@ -526,7 +542,7 @@ Section SIM.
         r g {R} RR ps pt st_src st_tgt X (x: option X) i_tgt
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim r g RR ps pt (st_src, Ret x') (st_tgt, i_tgt))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim r g RR ps pt (st_src, Ret x') (st_tgt, i_tgt))
         (@isim r g R RR ps pt (st_src, unwrapU x) (st_tgt, i_tgt)).
   Proof.
     erewrite (@idK_spec _ _ (unwrapU x)).
@@ -588,7 +604,7 @@ Section SIM.
     r g {R} RR ps pt st_src st_tgt X (x: option X) i_src k_tgt
   :
     bi_entails
-      (∀ x', ⌜x = Some x'⌝ -* @isim r g R RR ps pt (st_src, i_src) (st_tgt, k_tgt x'))
+      (∀ x', ⌜x = Some x'⌝ -∗ @isim r g R RR ps pt (st_src, i_src) (st_tgt, k_tgt x'))
       (isim r g RR ps pt (st_src, i_src) (st_tgt, unwrapN x >>= k_tgt)).
   Proof.
     iIntros "H". unfold unwrapN. destruct x.
@@ -602,7 +618,7 @@ Section SIM.
         r g ps pt st_src st_tgt x i_src
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim (r, g, ps, pt) Frz RR (st_src, i_src) (st_tgt, Ret x'))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim (r, g, ps, pt) Frz RR (st_src, i_src) (st_tgt, Ret x'))
         (isim (r, g, ps, pt) Frz RR (st_src, i_src) (st_tgt, unwrapN x)).
   Proof.
     erewrite (@idK_spec _ _ (unwrapN x)).
@@ -610,15 +626,314 @@ Section SIM.
     iIntros (x') "EQ". iApply "H"; auto.
   Qed. *)
 
-  Definition isim_fsem isim_RR: relation (Any.t -> itree hAGEs Any.t) :=
+  (* Definition isim_fsem isim_RR: relation (Any.t -> itree hAGEs Any.t) :=
     (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε),
                 ⊢ @isim bot7 bot7 Any.t isim_RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
 
-  Definition isim_fnsem isim_RR: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq (isim_fsem isim_RR).
+  Definition isim_fnsem isim_RR: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq (isim_fsem isim_RR). *)
 
 End SIM.
 
 Global Opaque isim.
+
+
+Section STSIM.
+  Local Notation universe := positive.
+  Local Notation level := nat.
+  Context `{Σ: GRA.t}.
+  Context `{sProp : level -> Type}.
+  Context `{Invs : @InvSet Σ}.
+  (* Context `{COPSETRA : @GRA.inG CoPset.t Σ}. *)
+  (* Context `{GSETRA : @GRA.inG Gset.t Σ}. *)
+  Context `{@IInvSet Σ sProp}.
+  Context `{@GRA.inG OwnEsRA Σ}.
+  Context `{@GRA.inG OwnDsRA Σ}.
+  Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
+
+  Variable u: universe.
+  Variable n: level.
+  Variable Ist: Any.t -> Any.t -> iProp.
+  Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
+  Let isim := @isim Σ Ist fl_src fl_tgt.
+  (* Let rel := ∀ x : Type, (Any.t * x → Any.t * x → iProp) → bool → bool → Any.t * itree hAGEs x → Any.t * itree hAGEs x → Σ → Prop. *)
+
+  (* Program Definition lift_rel (r: rel)  := 
+    fun R (RR: Any.t * R-> Any.t * R -> iProp) ps pt sti_src sti_tgt => iProp_intro (r _ RR ps pt sti_src sti_tgt) _.
+  Next Obligation.
+  Admitted. *)
+
+  (* Let RR {R}: Any.t * R -> Any.t * R -> iProp :=
+     fun '(st_src, v_src) '(st_tgt, v_tgt) => (Ist st_src st_tgt ** ⌜v_src = v_tgt⌝)%I.  *)
+
+  Definition stsim (E : coPset) 
+    r g {R} (RR: Any.t * R -> Any.t * R -> iProp) 
+    ps pt 
+    '(st_src, i_src)
+    '(st_tgt, i_tgt) 
+  :=
+    ((wsat u n ∗ OwnE u n E)
+            -∗
+            (isim r g 
+              (fun '(st_src, ret_src) '(st_tgt, ret_tgt) 
+                => (wsat u n ∗ OwnE u n ⊤) ∗ RR (st_src, ret_src) (st_tgt, ret_tgt))
+              ps pt (st_src, i_src) (st_tgt, i_tgt)))%I.
+
+  (***** stsim lemmas ****)
+
+  Lemma stsim_discard E1 E0 r g {R} 
+        (RR: Any.t * R -> Any.t * R -> iProp)
+        ps pt sti_src (sti_tgt: Any.t * itree hAGEs R)
+        (TOP: E0 ⊆ E1)
+    :
+      (stsim E0 r g RR ps pt sti_src sti_tgt)
+    -∗
+      (stsim E1 r g RR ps pt sti_src sti_tgt)
+  .
+  Proof.
+    unfold stsim. destruct sti_src, sti_tgt. iIntros "H [W E]". 
+    iApply "H". iFrame. iPoseProof (OwnE_subset with "E") as "[E0 E1]"; [eapply TOP|]. ss.
+  Qed.
+
+  Lemma stsim_base E r g {R} 
+        (RR RR': Any.t * R -> Any.t * R -> iProp)
+        (REL: RR' = (λ '(st_src, ret_src) '(st_tgt, ret_tgt), (wsat u n ** OwnE u n ⊤) ** RR (st_src, ret_src) (st_tgt, ret_tgt)))
+        ps pt sti_src sti_tgt
+        (TOP: ⊤ ⊆ E)
+    :
+    (@r R RR' ps pt sti_src sti_tgt)
+      -∗
+      (stsim E r g RR ps pt sti_src sti_tgt)
+  .
+  Proof.
+    rewrite <- stsim_discard; [|eassumption].
+    unfold stsim. destruct sti_src, sti_tgt. iIntros "H [W D]".
+    iApply isim_base. rewrite REL. iFrame.
+  Qed.
+  
+  Lemma stsim_upd
+    E r g {R} ps pt sti_src sti_tgt
+    (RR: Any.t * R -> Any.t * R -> iProp)
+  :
+    (#=> (stsim E r g RR ps pt sti_src sti_tgt))
+  -∗
+    stsim E r g RR ps pt sti_src sti_tgt.
+  Proof.
+    unfold stsim. destruct sti_src, sti_tgt.
+    iIntros "H WD". iApply isim_upd. iMod "H". iModIntro.
+    iApply "H"; eauto.
+  Qed.
+
+  Lemma stsim_bind 
+    E r g ps pt {R S} RR st_src st_tgt i_src i_tgt k_src k_tgt        
+  :
+    (@stsim E r g S
+          (fun '(st_src, ret_src) '(st_tgt, ret_tgt) =>
+              (@stsim E r g R RR false false (st_src, k_src ret_src) (st_tgt, k_tgt ret_tgt))%I)
+          ps pt (st_src, i_src) (st_tgt, i_tgt))
+     -∗ (stsim E r g RR ps pt (st_src, i_src >>= k_src) (st_tgt, i_tgt >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "H WD".
+    
+    uiprop. i.
+    guclo hpsim_bindC_spec. econs; eauto.
+    i. guclo hpsim_updateC_spec. econs.
+    uiprop in RET. ii. exploit RET; eauto; try refl.
+    i; des. esplits; eauto. eapply Own_Upd; eauto.
+  Qed.
+
+  (****** Required: Rules Using FancyUpdates ******)
+
+  Lemma stsim_ret
+    E r g {R} ps pt st_src st_tgt v_src v_tgt
+    (RR: Any.t * R -> Any.t * R -> iProp)
+    (TOP: ⊤ ⊆ E)
+  :
+    (RR (st_src, v_src) (st_tgt, v_tgt))
+  -∗
+    (@stsim E r g R RR ps pt (st_src, Ret v_src) (st_tgt, Ret v_tgt)).
+  Proof.
+    iIntros "H". rewrite <- stsim_discard; eauto.
+    unfold stsim. iIntros "[W E]". 
+    iApply isim_ret. iFrame.
+  Qed. 
+
+  Lemma stsim_syscall
+    E r g {R} RR ps pt st_src st_tgt k_src k_tgt fn varg rvs
+  :
+    (∀ vret, @stsim E r g R RR true true (st_src, k_src vret) (st_tgt, k_tgt vret))
+  -∗
+    (stsim E r g RR ps pt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iApply isim_syscall. iIntros. 
+    iPoseProof ("H" with "D") as "H". iFrame.
+  Qed.
+
+  Lemma stsim_tau_src
+    E r g {R} RR ps pt st_src st_tgt i_src i_tgt
+  :
+    (@stsim E r g R RR true pt (st_src, i_src) (st_tgt, i_tgt))
+  -∗
+    (stsim E r g RR ps pt (st_src, tau;; i_src) (st_tgt, i_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iPoseProof ("H" with "D") as "H".
+    iApply isim_tau_src. iFrame.
+  Qed.
+
+
+  Lemma stsim_tau_tgt
+    E r g {R} RR ps pt st_src st_tgt i_src i_tgt
+  :
+    (@stsim E r g R RR ps true (st_src, i_src) (st_tgt, i_tgt))
+  -∗
+    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, tau;; i_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iPoseProof ("H" with "D") as "H".
+    iApply isim_tau_tgt. iFrame.
+  Qed.
+
+  Lemma stsim_choose_src 
+    E X x r g {R} RR ps pt st_src st_tgt k_src i_tgt
+  :
+    (@stsim E r g R RR true pt (st_src, k_src x) (st_tgt, i_tgt))
+  -∗ (* same as bi_entails *)
+    (stsim E r g RR ps pt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iPoseProof ("H" with "D") as "H".
+    iApply isim_choose_src. iFrame.
+  Qed.
+
+  Lemma stsim_choose_tgt 
+    E X r g {R} RR ps pt st_src st_tgt i_src k_tgt
+  :
+    (∀ x, @stsim E r g R RR ps true (st_src, i_src) (st_tgt, k_tgt x))
+  -∗
+    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iApply isim_choose_tgt. iIntros.
+    iPoseProof ("H" with "D") as "H". iFrame.
+  Qed.
+
+  Lemma stsim_take_src 
+    E X r g {R} RR ps pt st_src st_tgt k_src i_tgt
+  :
+    (∀ x, @stsim E r g R RR true pt (st_src, k_src x) (st_tgt, i_tgt))
+  -∗ (* same as bi_entails *)
+    (stsim E r g RR ps pt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iApply isim_take_src. iIntros.
+    iPoseProof ("H" with "D") as "H". iFrame.
+  Qed.
+
+  Lemma stsim_take_tgt 
+    E X x r g {R} RR ps pt st_src st_tgt i_src k_tgt
+  :
+    (@stsim E r g R RR ps true (st_src, i_src) (st_tgt, k_tgt x))
+  -∗
+    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D".
+    iPoseProof ("H" with "D") as "H".
+    iApply isim_take_tgt. iFrame.
+  Qed.
+  
+  Lemma stsim_supdate_src
+    E X r g {R} RR ps pt st_src st_tgt k_src i_tgt
+    (run: Any.t -> Any.t * X)
+    (* (RUN: run st_src = (st_src0, x)) *)
+  :
+    (@stsim E r g R RR true pt ((run st_src).1, k_src (run st_src).2) (st_tgt, i_tgt))
+  -∗
+    (stsim E r g RR ps pt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D". 
+    iPoseProof ("H" with "D") as "H".
+    iApply isim_supdate_src. iFrame.
+  Qed.
+
+  Lemma stsim_supdate_tgt
+    E X r g {R} RR ps pt st_src st_tgt i_src k_tgt
+    (run: Any.t -> Any.t * X)
+    (* (RUN: run st_src = (st_src0, x)) *)
+  :
+    (@stsim E r g R RR ps true (st_src, i_src) ((run st_tgt).1, k_tgt (run st_tgt).2))
+  -∗
+    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "H D". 
+    iPoseProof ("H" with "D") as "H".
+    iApply isim_supdate_tgt. iFrame.
+  Qed.
+
+  Lemma stsim_assume_src
+    E r g {R} RR ps pt iP st_src st_tgt k_src i_tgt
+  :
+    (iP -∗ (@stsim E r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
+  -∗
+    (@stsim E r g R RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    unfold stsim. iIntros "H WD".
+    iApply isim_assume_src. iIntros "IP".
+    iPoseProof ("H" with "IP") as "H".
+    iPoseProof ("H" with "WD") as "H". iFrame.
+  Qed.
+
+  Lemma stsim_assume_tgt
+    E r g {R} RR ps pt iP st_src st_tgt i_src k_tgt
+  :
+    (iP ∗ (@stsim E r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
+  -∗
+    (@stsim E r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "[IP H] WD".
+    iApply isim_assume_tgt. 
+    iPoseProof ("H" with "WD") as "H". iFrame.
+  Qed.
+
+  Lemma stsim_guarantee_src
+    E r g {R} RR ps pt iP st_src st_tgt k_src i_tgt
+  :
+    (iP ∗ @stsim E r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))
+  -∗
+    (@stsim E r g R RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    unfold stsim. iIntros "[IP H] WD". 
+    iApply isim_guarantee_src. 
+    iPoseProof ("H" with "WD") as "H". iFrame.
+  Qed.  
+    
+  Lemma stsim_guarantee_tgt
+    E r g {R} RR ps pt iP st_src st_tgt i_src k_tgt
+  :
+    (iP -∗ @stsim E r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))
+  -∗
+    (@stsim E r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "H WD".
+    iApply isim_guarantee_tgt. iIntros "IP".
+    iPoseProof ("H" with "IP") as "H".
+    iPoseProof ("H" with "WD") as "H". iFrame.
+  Qed.  
+
+  Lemma stsim_progress
+    E r g {R} RR sti_src sti_tgt
+  :
+    @stsim E g g R RR false false sti_src sti_tgt
+  -∗
+    @stsim E r g R RR true true sti_src sti_tgt.
+  Proof.
+    unfold stsim. destruct sti_src, sti_tgt. iIntros "H WD".
+    iApply isim_progress. iApply "H". eauto.
+  Qed.
+
+
+End STSIM.
+
 
 
 Module IModSemPair.
@@ -627,7 +942,7 @@ Section ISIMMODSEM.
   Context `{Σ: GRA.t}.
   Variable (ms_src ms_tgt: HModSem.t).
   Variable Ist: Any.t -> Any.t -> iProp.
-  Variable isim_RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp.
+  Variable isim_RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp. (* Fix *)
 
   Let fl_src := ms_src.(fnsems).
   Let fl_tgt := ms_tgt.(fnsems).
@@ -830,11 +1145,11 @@ Ltac step0 :=
          format "Ist '//' '------------------------------------------------------------------' '//' st_src '//' st_tgt '//' '------------------------------------------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
    
 
-    Goal ⊢ ((⌜False⌝**iP) -* @isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Goal ⊢ ((⌜False⌝**iP) -∗ @isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros "[#A B]". clarify. Qed.
     Goal ⌜False⌝%I ⊢ (@isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros "#H". Admitted.
-    Goal ⊢ (iP -* @isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Goal ⊢ (iP -∗ @isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros "H". Admitted.
     Goal ⊢ (@isim Σ Ist [] [] bot7 bot7 Any.t isim_RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros. Admitted.
@@ -917,220 +1232,6 @@ Ltac step0 :=
 
 
 (* 
-Section STSIM.
-
-  Context `{Invs : @InvSet Σ}.
-  Context `{COPSETRA : @GRA.inG CoPset.t Σ}.
-  Context `{GSETRA : @GRA.inG Gset.t Σ}.
-  Context `{INVSETRA : @GRA.inG (InvSetRA Var) Σ}.
-
-  (* Let lift_rel (rr: rel):
-    forall R_src R_tgt (QQ: R_src -> R_tgt -> shared_rel), bool -> bool -> itree srcE R_src -> itree tgtE R_tgt -> shared_rel :=
-        fun R_src R_tgt QQ ps pt i_src i_tgt ths im_src im_tgt st_src st_tgt =>
-          (∃ (RR: R_src -> R_tgt -> iProp)
-             (EQ: QQ = (fun r_src r_tgt ths im_src im_tgt st_src st_tgt =>
-                          (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE ⊤)) ** RR r_src r_tgt)),
-              rr R_src R_tgt RR ps pt i_src i_tgt ** (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE ⊤)))%I. *)
-
-  Definition stsim (E : coPset) 
-    r g {R} (RR: Any.t * R -> Any.t * R -> iProp) ps pt 
-    '(st_src, i_src)
-    '(st_tgt, i_tgt) 
-  :=
-    ((wsat ** OwnE E)
-            -*
-            (@isim r g R
-              (fun '(st_src, ret_src) '(st_tgt, ret_tgt) 
-                => (wsat ** OwnE ⊤) ** RR (st_src, ret_src) (st_tgt, ret_tgt))
-              ps pt (st_src, i_src) (st_tgt, i_tgt)))%I.
-
-
-  Definition stsim (E : coPset) : rel -> rel -> rel :=
-    fun r g
-        R_src R_tgt RR ps pt i_src i_tgt =>
-      (∀ ths im_src im_tgt st_src st_tgt,
-          (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE E))
-            -*
-            (isim
-               tid
-               I
-               (lift_rel r)
-               (lift_rel g)
-               (fun r_src r_tgt ths im_src im_tgt st_src st_tgt => (default_I_past tid ths im_src im_tgt st_src st_tgt ** (wsat ** OwnE ⊤)) ** RR r_src r_tgt)
-               ps pt i_src i_tgt
-               ths im_src im_tgt st_src st_tgt))%I
-
-
-  (***** stsim lemmas ****)
-
-  Lemma stsim_ret 
-
-  Lemma stsim_syscall
-    E r g {R} RR ps pt st_src st_tgt k_src k_tgt fn varg rvs
-  :
-    (∀ vret, @stsim E r g R RR true true (st_src, k_src vret) (st_tgt, k_tgt vret))
-  -∗
-    (stsim E r g RR ps pt (st_src, trigger (Syscall fn varg rvs) >>= k_src) (st_tgt, trigger (Syscall fn varg rvs) >>= k_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iApply isim_syscall. iIntros. 
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.
-
-  Lemma stsim_tau_src
-    E r g {R} RR ps pt st_src st_tgt i_src i_tgt
-  :
-    (@stsim E r g R RR true pt (st_src, i_src) (st_tgt, i_tgt))
-  -∗
-    (stsim E r g RR ps pt (st_src, tau;; i_src) (st_tgt, i_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iPoseProof ("H" with "D") as "H".
-    iApply isim_tau_src. iFrame.
-  Qed.
-
-
-  Lemma stsim_tau_tgt
-    E r g {R} RR ps pt st_src st_tgt i_src i_tgt
-  :
-    (@stsim E r g R RR ps true (st_src, i_src) (st_tgt, i_tgt))
-  -∗
-    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, tau;; i_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iPoseProof ("H" with "D") as "H".
-    iApply isim_tau_tgt. iFrame.
-  Qed.
-
-  Lemma stsim_choose_src 
-    E X x r g {R} RR ps pt st_src st_tgt k_src i_tgt
-  :
-    (@stsim E r g R RR true pt (st_src, k_src x) (st_tgt, i_tgt))
-  -∗ (* same as bi_entails *)
-    (stsim E r g RR ps pt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iPoseProof ("H" with "D") as "H".
-    iApply isim_choose_src. iFrame.
-  Qed.
-
-  Lemma stsim_choose_tgt 
-    E X r g {R} RR ps pt st_src st_tgt i_src k_tgt
-  :
-    (∀ x, @stsim E r g R RR ps true (st_src, i_src) (st_tgt, k_tgt x))
-  -∗
-    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, trigger (Choose X) >>= k_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iApply isim_choose_tgt. iIntros.
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.
-
-  Lemma stsim_take_src 
-    E X r g {R} RR ps pt st_src st_tgt k_src i_tgt
-  :
-    (∀ x, @stsim E r g R RR true pt (st_src, k_src x) (st_tgt, i_tgt))
-  -∗ (* same as bi_entails *)
-    (stsim E r g RR ps pt (st_src, trigger (Take X) >>= k_src) (st_tgt, i_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iApply isim_take_src. iIntros.
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.
-
-  Lemma stsim_take_tgt 
-    E X x r g {R} RR ps pt st_src st_tgt i_src k_tgt
-  :
-    (@stsim E r g R RR ps true (st_src, i_src) (st_tgt, k_tgt x))
-  -∗
-    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D".
-    iPoseProof ("H" with "D") as "H".
-    iApply isim_take_tgt. iFrame.
-  Qed.
-  
-  Lemma stsim_supdate_src
-    E X r g {R} RR ps pt st_src st_tgt k_src i_tgt
-    (run: Any.t -> Any.t * X)
-    (* (RUN: run st_src = (st_src0, x)) *)
-  :
-    (@stsim E r g R RR true pt ((run st_src).1, k_src (run st_src).2) (st_tgt, i_tgt))
-  -∗
-    (stsim E r g RR ps pt (st_src, trigger (SUpdate run) >>= k_src) (st_tgt, i_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D". 
-    iPoseProof ("H" with "D") as "H".
-    iApply isim_supdate_src. iFrame.
-  Qed.
-
-  Lemma stsim_supdate_tgt
-    E X r g {R} RR ps pt st_src st_tgt i_src k_tgt
-    (run: Any.t -> Any.t * X)
-    (* (RUN: run st_src = (st_src0, x)) *)
-  :
-    (@stsim E r g R RR ps true (st_src, i_src) ((run st_tgt).1, k_tgt (run st_tgt).2))
-  -∗
-    (stsim E r g RR ps pt (st_src, i_src) (st_tgt, trigger (SUpdate run) >>= k_tgt)).
-  Proof.
-    unfold stsim. iIntros "H D". 
-    iPoseProof ("H" with "D") as "H".
-    iApply isim_supdate_tgt. iFrame.
-  Qed.
-
-  Lemma stsim_assume_src
-    E r g {R} RR ps pt iP k_src i_tgt
-  :
-    (iP -* (@stsim E r g R RR true pt (k_src tt) i_tgt))
-  -∗
-    (@stsim E r g R RR ps pt (trigger (Assume iP) >>= k_src) i_tgt).
-  Proof.
-    unfold stsim. iIntros "H" (? ?) "D".
-    iApply isim_assume_src. iIntros "IP".
-    iPoseProof ("H" with "IP") as "H".
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.
-
-  Lemma stsim_assume_tgt
-    E r g {R} RR ps pt iP i_src k_tgt
-  :
-    (iP ** (@stsim E r g R RR ps true i_src (k_tgt tt)))
-  -∗
-    (@stsim E r g R RR ps pt i_src (trigger (Assume iP) >>= k_tgt)).
-  Proof.
-    unfold stsim. iIntros "[IP H]" (? ?) "D".
-    iApply isim_assume_tgt. 
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.
-
-  Lemma stsim_guarantee_src
-    E r g {R} RR ps pt iP k_src i_tgt
-  :
-    (iP ** @stsim E r g R RR true pt (k_src tt) i_tgt)
-  -∗
-    (@stsim E r g R RR ps pt (trigger (Guarantee iP) >>= k_src) i_tgt).
-  Proof.
-    unfold stsim. iIntros "[IP H]" (? ?) "D". 
-    iApply isim_guarantee_src. 
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.  
-    
-  Lemma stsim_guarantee_tgt
-    E r g {R} RR ps pt iP i_src k_tgt
-  :
-    (iP -* @stsim E r g R RR ps true i_src (k_tgt tt))
-  -∗
-    (@stsim E r g R RR ps pt i_src (trigger (Guarantee iP) >>= k_tgt)).
-  Proof.
-    unfold stsim. iIntros "H" (? ?) "D".
-    iApply isim_guarantee_tgt. iIntros "IP".
-    iPoseProof ("H" with "IP") as "H".
-    iPoseProof ("H" with "D") as "H". iFrame.
-  Qed.  
-
-End STSIM.
-
- *)
 
 
 
@@ -1475,7 +1576,7 @@ End STSIM.
         ((inv_with le I w0 st_src st_tgt)
            ** (pre: iProp)
            ** (∀ st_src st_tgt ret_src ret_tgt,
-                  inv_with le I w0 st_src st_tgt -* (post ret_src ret_tgt: iProp) -* isim (g, g, true, true) RR None (st_src, k_src ret_src) (st_tgt, k_tgt ret_tgt)))
+                  inv_with le I w0 st_src st_tgt -∗ (post ret_src ret_tgt: iProp) -∗ isim (g, g, true, true) RR None (st_src, k_src ret_src) (st_tgt, k_tgt ret_tgt)))
         (isim (r, g, ps, pt) RR fuel (st_src, trigger (Call fn arg_src) >>= k_src) (st_tgt, trigger (Call fn arg_tgt) >>= k_tgt)).
   Proof.
     red. unfold Entails. autorewrite with iprop.
@@ -1526,7 +1627,7 @@ End STSIM.
                   ** (pre: iProp)
                   **
                   (∀ st_src st_tgt ret_src ret_tgt,
-                      ((inv_with le I w0 st_src st_tgt) ** (post ret_src ret_tgt: iProp)) -* isim (g, g, true, true) RR (Some fuel1) (st_src, i_src) (st_tgt, k_tgt ret_tgt)))
+                      ((inv_with le I w0 st_src st_tgt) ** (post ret_src ret_tgt: iProp)) -∗ isim (g, g, true, true) RR (Some fuel1) (st_src, i_src) (st_tgt, k_tgt ret_tgt)))
         (isim (r, g, ps, pt) RR (Some fuel0) (st_src, i_src) (st_tgt, trigger (Call fn arg_tgt) >>= k_tgt)).
   Proof.
     red. unfold Entails. autorewrite with iprop.
@@ -1684,7 +1785,7 @@ End STSIM.
            ** (pre: iProp)
            **
            (∀ st_src st_tgt ret_src ret_tgt,
-               (inv_with le I w0 st_src st_tgt) -* (post ret_src ret_tgt: iProp) -* RR st_src st_tgt ret_src ret_tgt))
+               (inv_with le I w0 st_src st_tgt) -∗ (post ret_src ret_tgt: iProp) -∗ RR st_src st_tgt ret_src ret_tgt))
         (isim (r, g, ps, pt) RR fuel (st_src, trigger (Call fn arg_src)) (st_tgt, trigger (Call fn arg_tgt))).
   Proof.
     erewrite (@idK_spec _ _ (trigger (Call fn arg_src))).
@@ -1706,7 +1807,7 @@ End STSIM.
            ** (pre: iProp)
            **
            (∀ st_src st_tgt ret_src ret_tgt,
-               (inv_with le I w0 st_src st_tgt) -* (post ret_src ret_tgt: iProp) -* RR st_src st_tgt tt ret_tgt))
+               (inv_with le I w0 st_src st_tgt) -∗ (post ret_src ret_tgt: iProp) -∗ RR st_src st_tgt tt ret_tgt))
         (isim (r, g, ps, pt) RR (Some (1: Ord.t)) (st_src, Ret tt) (st_tgt, trigger (Call fn arg_tgt))).
   Proof.
     erewrite (@idK_spec _ _ (trigger (Call fn arg_tgt))).
@@ -2015,7 +2116,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt P k_src i_tgt
     :
       bi_entails
-        (⌜P⌝ -* isim (r, g, true, pt) RR None (st_src, k_src tt) (st_tgt, i_tgt))
+        (⌜P⌝ -∗ isim (r, g, true, pt) RR None (st_src, k_src tt) (st_tgt, i_tgt))
         (isim (r, g, ps, pt) RR fuel (st_src, assume P >>= k_src) (st_tgt, i_tgt)).
   Proof.
     iIntros "H". unfold assume. hred_l.
@@ -2028,7 +2129,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt P i_tgt
     :
       bi_entails
-        (⌜P⌝ -* isim (r, g, true, pt) RR None (st_src, Ret tt) (st_tgt, i_tgt))
+        (⌜P⌝ -∗ isim (r, g, true, pt) RR None (st_src, Ret tt) (st_tgt, i_tgt))
         (isim (r, g, ps, pt) RR fuel (st_src, assume P) (st_tgt, i_tgt)).
   Proof.
     erewrite (@idK_spec _ _ (assume P)).
@@ -2108,7 +2209,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt P i_src k_tgt
     :
       bi_entails
-        (⌜P⌝ -* isim (r, g, ps, true) RR fuel (st_src, i_src) (st_tgt, k_tgt tt))
+        (⌜P⌝ -∗ isim (r, g, ps, true) RR fuel (st_src, i_src) (st_tgt, k_tgt tt))
         (isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, guarantee P >>= k_tgt)).
   Proof.
     iIntros "H". unfold guarantee. hred_r.
@@ -2122,7 +2223,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt P i_src
     :
       bi_entails
-        (⌜P⌝ -* isim (r, g, ps, true) RR fuel (st_src, i_src) (st_tgt, Ret tt))
+        (⌜P⌝ -∗ isim (r, g, ps, true) RR fuel (st_src, i_src) (st_tgt, Ret tt))
         (isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, guarantee P)).
   Proof.
     erewrite (@idK_spec _ _ (guarantee P)).
@@ -2188,7 +2289,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt X (x: option X) k_src i_tgt
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim (r, g, ps, pt) RR fuel (st_src, k_src x') (st_tgt, i_tgt))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim (r, g, ps, pt) RR fuel (st_src, k_src x') (st_tgt, i_tgt))
         (isim (r, g, ps, pt) RR fuel (st_src, unwrapU x >>= k_src) (st_tgt, i_tgt)).
   Proof.
     iIntros "H". unfold unwrapU. destruct x.
@@ -2202,7 +2303,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt x i_tgt
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim (r, g, ps, pt) RR fuel (st_src, Ret x') (st_tgt, i_tgt))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim (r, g, ps, pt) RR fuel (st_src, Ret x') (st_tgt, i_tgt))
         (isim (r, g, ps, pt) RR fuel (st_src, unwrapU x) (st_tgt, i_tgt)).
   Proof.
     erewrite (@idK_spec _ _ (unwrapU x)).
@@ -2270,7 +2371,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt X (x: option X) i_src k_tgt
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, k_tgt x'))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, k_tgt x'))
         (isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, unwrapN x >>= k_tgt)).
   Proof.
     iIntros "H". unfold unwrapN. destruct x.
@@ -2284,7 +2385,7 @@ End STSIM.
         r g fuel ps pt st_src st_tgt x i_src
     :
       bi_entails
-        (∀ x', ⌜x = Some x'⌝ -* isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, Ret x'))
+        (∀ x', ⌜x = Some x'⌝ -∗ isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, Ret x'))
         (isim (r, g, ps, pt) RR fuel (st_src, i_src) (st_tgt, unwrapN x)).
   Proof.
     erewrite (@idK_spec _ _ (unwrapN x)).
@@ -2307,7 +2408,7 @@ End STSIM.
                   ** (pre: iProp)
                   **
                   (∀ st_src st_tgt ret_src ret_tgt,
-                      ((inv_with le I w0 st_src st_tgt) ** (post ret_src ret_tgt: iProp)) -* ∃ ret_tgt', ⌜ret_tgt = Any.upcast ret_tgt'⌝ ∧ isim (g, g, true, true) RR (Some fuel1) (st_src, i_src) (st_tgt, k_tgt ret_tgt')))
+                      ((inv_with le I w0 st_src st_tgt) ** (post ret_src ret_tgt: iProp)) -∗ ∃ ret_tgt', ⌜ret_tgt = Any.upcast ret_tgt'⌝ ∧ isim (g, g, true, true) RR (Some fuel1) (st_src, i_src) (st_tgt, k_tgt ret_tgt')))
         (isim (r, g, ps, pt) RR (Some fuel0) (st_src, i_src) (st_tgt, ccallU fn arg_tgt >>= k_tgt)).
   Proof.
     iIntros "[H0 H1]". unfold ccallU. hred_r. iApply isim_call_pure; eauto.
