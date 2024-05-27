@@ -732,14 +732,12 @@ Section STSIM.
           ps pt (st_src, i_src) (st_tgt, i_tgt))
      -∗ (stsim E r g RR ps pt (st_src, i_src >>= k_src) (st_tgt, i_tgt >>= k_tgt)).
   Proof.
-    unfold stsim. iIntros "H WD".
+  Admitted.
+    (* unfold stsim. iIntros "H WD". 
+    iPoseProof ("H" with "WD") as "H". 
+    iApply isim_bind. iApply "H".
     
-    uiprop. i.
-    guclo hpsim_bindC_spec. econs; eauto.
-    i. guclo hpsim_updateC_spec. econs.
-    uiprop in RET. ii. exploit RET; eauto; try refl.
-    i; des. esplits; eauto. eapply Own_Upd; eauto.
-  Qed.
+  Qed. *)
 
   (****** Required: Rules Using FancyUpdates ******)
 
@@ -752,10 +750,21 @@ Section STSIM.
   -∗
     (@stsim E r g R RR ps pt (st_src, Ret v_src) (st_tgt, Ret v_tgt)).
   Proof.
-    iIntros "H". rewrite <- stsim_discard; eauto.
+    iIntros "H". Set Printing All. rewrite <- stsim_discard; eauto.
     unfold stsim. iIntros "[W E]". 
     iApply isim_ret. iFrame.
   Qed. 
+
+  Lemma stsim_call 
+    E r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg
+  :
+    ((Ist st_src st_tgt) ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -∗ @stsim E r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+  -∗  
+    (stsim E r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt)).
+  Proof.
+    unfold stsim. iIntros "[IST H] WD". iApply isim_call. iFrame.
+    iIntros (? ? ?) "IST". iPoseProof ("H" with "IST") as "H". iApply "H". eauto.
+  Qed.  
 
   Lemma stsim_syscall
     E r g {R} RR ps pt st_src st_tgt k_src k_tgt fn varg rvs
@@ -981,6 +990,8 @@ End IModPair.
 
 (* Section TACTICS. *)
 
+
+  (*** Simply switching isim -> stsim? ***)
   Ltac ired_l := try Red.prw ltac:(IRed._red_gen) 1 2 1 0.
   Ltac ired_r := try Red.prw ltac:(IRed._red_gen) 1 1 1 0.
   Ltac ired_both := ired_l; ired_r.
