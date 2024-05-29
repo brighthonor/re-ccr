@@ -33,12 +33,12 @@ Definition pending1 `{@GRA.inG MapRA1 Σ}: iProp :=
   OwnM (Excl.just tt, URA.unit: @URA.car (Auth.t (Z ==> (Excl.t Z)))%ra).
 
 Definition pending `{@GRA.inG MapRA0 Σ} `{@GRA.inG MapRA1 Σ}: iProp :=
-  pending0 ** pending1.
+  pending0 ∗ pending1.
 
 Fixpoint initial_points_tos `{@GRA.inG MapRA1 Σ} (sz: nat): iProp :=
   match sz with
   | 0 => True%I
-  | S sz' => initial_points_tos sz' ** map_points_to sz' 0
+  | S sz' => initial_points_tos sz' ∗ map_points_to sz' 0
   end.
 
 Section SPECS.

@@ -70,8 +70,9 @@ Section A.
 
   Definition SMapSem: SModSem.t := {|
     SModSem.fnsems := MapSbtb;
-    SModSem.initial_mr := GRA.embed (Excl.unit, Auth.excl ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra) ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra));
-    SModSem.initial_st := (fun (_: Z) => 0%Z)↑;
+    SModSem.initial_cond := Own (GRA.embed (Excl.unit, Auth.excl ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra) ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra)));
+    (* SModSem.initial_mr := GRA.embed (Excl.unit, Auth.excl ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra) ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra)); *)
+    SModSem.initial_st := Ret (fun (_: Z) => 0%Z)↑;
   |}
   .
 
@@ -82,5 +83,6 @@ Section A.
   .
 
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Definition Map: Mod.t := (SMod.to_tgt GlobalStb SMap).
+  Definition HMap: HMod.t := (SMod.to_hmod GlobalStb SMap).
+  (* Definition Map: Mod.t := (SMod.to_tgt GlobalStb SMap). *)
 End A.

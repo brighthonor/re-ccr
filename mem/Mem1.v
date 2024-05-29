@@ -254,8 +254,8 @@ Section PROOF.
 
   Definition SMemSem (sk: Sk.t): SModSem.t := {|
     SModSem.fnsems := MemSbtb;
-    SModSem.initial_mr := (GRA.embed (Auth.black (initial_mem_mr csl sk)));
-    SModSem.initial_st := tt↑;
+    SModSem.initial_cond := Own (GRA.embed (Auth.black (initial_mem_mr csl sk)));
+    SModSem.initial_st := Ret tt↑;
   |}
   .
 
@@ -265,7 +265,7 @@ Section PROOF.
   |}
   .
 
-  Definition Mem: Mod.t := (SMod.to_tgt (fun _ => to_stb [])) SMem.
+  (* Definition Mem: Mod.t := (SMod.to_tgt (fun _ => to_stb [])) SMem. *)
 
 End PROOF.
 Global Hint Unfold MemStb: stb.

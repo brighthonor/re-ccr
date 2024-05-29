@@ -76,8 +76,8 @@ Section M.
 
   Definition SMapSem: SModSem.t := {|
     SModSem.fnsems := MapSbtbM;
-    SModSem.initial_mr := ε;
-    SModSem.initial_st := (fun (_: Z) => 0%Z, 0%Z)↑;
+    SModSem.initial_cond := Own ε;
+    SModSem.initial_st := Ret (fun (_: Z) => 0%Z, 0%Z)↑;
   |}
   .
 
@@ -88,5 +88,6 @@ Section M.
   .
 
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Definition Map: Mod.t := (SMod.to_tgt GlobalStb SMap).
+  Definition HMap: HMod.t := (SMod.to_hmod GlobalStb SMap).
+  (* Definition Map: Mod.t := (SMod.to_tgt GlobalStb SMap). *)
 End M.

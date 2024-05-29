@@ -6,6 +6,8 @@ Require Import Behavior.
 Require Import ModSem.
 Require Import Skeleton.
 Require Import MapHeader.
+Require Import PCM.
+Require Import HoareDef STB IPM.
 
 Set Implicit Arguments.
 
@@ -71,7 +73,7 @@ Section I.
 
   Definition MapSem: ModSem.t := {|
     ModSem.fnsems := [("init", cfunU initF); ("get", cfunU getF); ("set", cfunU setF); ("set_by_user", cfunU set_by_userF)];
-    ModSem.init_st := Vnullptr↑;
+    ModSem.init_st := Ret Vnullptr↑;
   |}
   .
 
@@ -80,4 +82,10 @@ Section I.
     Mod.sk := [("init", Gfun↑); ("get", Gfun↑); ("set", Gfun↑); ("set_by_user", Gfun↑)];
   |}
   .
+
+
+  Context `{@GRA.inG MapRA0 Σ}.
+  (* Context `{@GRA.inG MapRA1 Σ}. *)
+  Definition HMap : HMod.t := HMod.lift Map.
+
 End I.

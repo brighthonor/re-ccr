@@ -494,6 +494,8 @@ Section HMOD.
   |}
   . 
 
+
+  (********** What will be initial_st of Mod? (How to compile initial_cond) *********)
   Definition to_mod (md: t): Mod.t := transl (fun _ => interp_hp_fun) HModSem.initial_st md.
 
   Definition lift (md: Mod.t): t := {|
@@ -563,8 +565,8 @@ Module SMod.
 Section SMOD.
 
   Context `{Σ: GRA.t}.
-  Variable stb: gname -> option fspec.
-  Variable o: ord.
+  Variable stb: Sk.t -> gname -> option fspec.
+  (* Variable o: ord. *)
 
   Record t: Type := mk {
     get_modsem: Sk.t -> SModSem.t;
@@ -584,7 +586,10 @@ Section SMOD.
   |}
   .
 
-  Definition to_hmod (md:t): HMod.t := transl (fun _ => (fun_spec_hp stb o) ∘ fsb_body) SModSem.initial_st md.
+  Definition to_hmod (md:t): HMod.t := transl (fun sk => (interp_sb_hp (stb sk))) SModSem.initial_st md.
+  (* Definition to_hmod (md:t): HMod.t := transl (fun sk => (fun_spec_hp (stb sk) o) ∘ fsb_body) SModSem.initial_st md. *)
+
+
   (* Definition to_src (md: t): Mod.t := transl (fun _ => fun_to_src ∘ fsb_body) SModSem.initial_st md. *)
   (* Definition to_mid (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid stb ∘ fsb_body) SModSem.initial_st md. *)
   (* Definition to_mid2 (stb: gname -> option fspec) (md: t): Mod.t := transl (fun _ => fun_to_mid2 ∘ fsb_body) SModSem.initial_st md. *)
