@@ -16,10 +16,10 @@ From ExtLib Require Import
      Structures.Maps
      Data.Map.FMapAList.
 
-Require Import HTactics2 ProofMode STB Invariant.
+Require Import ProofMode STB Invariant.
 Require Import Mem1.
 
-Require Import SimModSemFacts.
+Require Import SimModSemFacts IProofMode.
 
 Set Implicit Arguments.
 
@@ -142,10 +142,8 @@ Section SIMMODSEM.
     iMod "H". iDestruct "H" as "[H0 H1]". iFrame. auto.
   Qed.
 
-  Let wf: _ -> W -> Prop :=
-        @mk_wf
-          _ unit
-          (fun _ st_src st_tgt =>
+  Let Ist: Any.t -> Any.t -> iProp :=
+        (fun st_src st_tgt =>
              ((∃ f sz, ⌜st_src = f↑ /\ st_tgt = (f, sz)↑⌝ ** black_map f ** unallocated sz ** pending1) ∨ (initial_map ** ⌜st_src = (fun (_: Z) => 0%Z)↑ /\ st_tgt = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
 
   Variable GlobalStbM: Sk.t -> gname -> option fspec.
@@ -154,7 +152,7 @@ Section SIMMODSEM.
   Variable GlobalStb: Sk.t -> gname -> option fspec.
   Hypothesis STB_set: forall sk, (GlobalStb sk) "set" = Some set_spec.
 
-  Hypothesis PUREINCL: forall sk, stb_pure_incl (GlobalStbM sk) (GlobalStb sk).
+  (* Hypothesis PUREINCL: forall sk, stb_pure_incl (GlobalStbM sk) (GlobalStb sk). *)
 
   Lemma pending1_unique:
     pending1 -∗ pending1 -∗ False%I.
@@ -164,6 +162,46 @@ Section SIMMODSEM.
     rr in H2. ur in H2. unseal "ra". des.
     rr in H2. ur in H2. unseal "ra". ss.
   Qed.
+
+  Require Import RobustIndexedInvariants.
+  Require Import IRed.
+
+  Local Notation universe := positive.
+  Local Notation level := nat.
+
+  Context `{sProp : level -> Type}.
+  Context `{Invs : @InvSet Σ}.
+  Context `{@IInvSet Σ sProp}.
+  Context `{@GRA.inG OwnEsRA Σ}.
+  Context `{@GRA.inG OwnDsRA Σ}.
+  Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
+
+  Theorem sim: HModPair.sim (MapA.HMap GlobalStbM) (MapM.HMap GlobalStbM) Ist ∅ 1 0.
+  Proof.
+  Admitted.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* 
+
 
   Theorem correct: refines2 [MapM.Map GlobalStbM] [MapA.Map GlobalStb].
   Proof.
@@ -352,6 +390,6 @@ Section SIMMODSEM.
       }
     }
     Unshelve. all: ss.
-  Qed.
+  Qed. *)
 
 End SIMMODSEM.

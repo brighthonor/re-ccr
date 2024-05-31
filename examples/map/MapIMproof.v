@@ -227,6 +227,54 @@ Section SIMMODSEM.
   
   (* hy this line affects 'rewrite unfold_iter' ??? *)
 
+  Require Import IProofMode.
+  Require Import RobustIndexedInvariants.
+  Require Import IRed.
+
+  Local Notation universe := positive.
+  Local Notation level := nat.
+
+  Context `{sProp : level -> Type}.
+  Context `{Invs : @InvSet Σ}.
+  Context `{@IInvSet Σ sProp}.
+  Context `{@GRA.inG OwnEsRA Σ}.
+  Context `{@GRA.inG OwnDsRA Σ}.
+  Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
+
+  Let Ist: Any.t -> Any.t -> iProp := 
+    (fun st_src st_tgt =>
+             ((∃ blk ofs l (f: Z -> Z) (sz: Z), 
+             ⌜st_src = (f, sz)↑ /\ (length l = Z.to_nat sz) /\ (forall k (SZ: (0 <= k < sz)%Z), nth_error l (Z.to_nat k) = Some (f k)) /\ st_tgt = (Vptr blk ofs)↑⌝ 
+             ∗ OwnM ((blk, ofs) |-> (List.map Vint l)) ∗ pending0) 
+             ∨ (⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
+
+  Theorem sim: HModPair.sim (MapM.HMap GlobalStbM) (MapI.Map) Ist ∅ 1 0.
+  Proof.
+    econs; eauto.
+    i. r. econs; cycle 1.
+    { 
+      iIntros "H". ss. iSplitL "H"; eauto.
+      rewrite !resum_itr_ret. steps.
+      { admit. }
+      iSplits.
+      { iRight. eauto. }
+    }
+    econs.
+    {
+      econs; eauto. grind.
+      iIntros. unfold cfunU, initF, MapI.initF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s. 
+      steps.
+      iAssert (⌜True⌝%I) as "H". admit.
+
+    }
+     
+  Admitted.
+
+
+
+
+
+(* 
   Theorem correct: refines2 [MapI.Map] [MapM.Map GlobalStbM].
   Proof.
     eapply adequacy_local2. econs; ss. i. rr.
@@ -387,6 +435,6 @@ Section SIMMODSEM.
       iret _; ss. iModIntro. iSplit; ss.
     }
     Unshelve. all: ss.
-  Qed.
+  Qed. *)
 
 End SIMMODSEM.

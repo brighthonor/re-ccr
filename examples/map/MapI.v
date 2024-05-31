@@ -30,8 +30,10 @@ def set_by_user(k: int) ≡
 
 Section I.
   Local Open Scope string_scope.
-
-  Definition initF: list val -> itree Es val :=
+  Context `{Σ: GRA.t}.
+  Context `{@GRA.inG MapRA0 Σ}.
+  (* Context `{@GRA.inG MapRA1 Σ}. *)
+  Definition initF: list val -> itree hAGEs val :=
     fun varg =>
       `sz: Z <- (pargs [Tint] varg)?;;
       `r: val <- ccallU "alloc" [Vint sz];;
@@ -48,7 +50,7 @@ Section I.
       Ret Vundef
   .
 
-  Definition getF: list val -> itree Es val :=
+  Definition getF: list val -> itree hAGEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       data <- trigger sGet;; data <- data↓?;; vptr <- (vadd data (Vint (k * 8)))?;;
@@ -56,7 +58,7 @@ Section I.
       Ret (Vint r)
   .
 
-  Definition setF: list val -> itree Es val :=
+  Definition setF: list val -> itree hAGEs val :=
     fun varg =>
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       data <- trigger sGet;; data <- data↓?;; vptr <- (vadd data (Vint (k * 8)))?;;
@@ -64,28 +66,26 @@ Section I.
       Ret Vundef
   .
 
-  Definition set_by_userF: list val -> itree Es val :=
+  Definition set_by_userF: list val -> itree hAGEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       v <- trigger (Syscall "input" (([]: list Z)↑) (fun _ => True));; v <- v↓?;;
       ccallU "set" [Vint k; Vint v]
   .
 
-  Definition MapSem: ModSem.t := {|
-    ModSem.fnsems := [("init", cfunU initF); ("get", cfunU getF); ("set", cfunU setF); ("set_by_user", cfunU set_by_userF)];
-    ModSem.init_st := Ret Vnullptr↑;
+  Definition MapSem: HModSem.t := {|
+    HModSem.fnsems := [("init", cfunU initF); ("get", cfunU getF); ("set", cfunU setF); ("set_by_user", cfunU set_by_userF)];
+    HModSem.initial_st := Ret Vnullptr↑;
+    HModSem.initial_cond := ⌜True⌝%I
   |}
   .
 
-  Definition Map: Mod.t := {|
-    Mod.get_modsem := fun _ => MapSem;
-    Mod.sk := [("init", Gfun↑); ("get", Gfun↑); ("set", Gfun↑); ("set_by_user", Gfun↑)];
+  Definition Map: HMod.t := {|
+    HMod.get_modsem := fun _ => MapSem;
+    HMod.sk := [("init", Gfun↑); ("get", Gfun↑); ("set", Gfun↑); ("set_by_user", Gfun↑)];
   |}
   .
 
-
-  Context `{@GRA.inG MapRA0 Σ}.
-  (* Context `{@GRA.inG MapRA1 Σ}. *)
-  Definition HMap : HMod.t := HMod.lift Map.
+  (* Definition HMap : HMod.t := HMod.lift Map. *)
 
 End I.
