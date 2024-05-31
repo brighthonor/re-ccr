@@ -90,26 +90,24 @@ Section SIM.
   Variable Ist: Any.t -> Any.t -> iProp.
   Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
   Let _hpsim := @_hpsim Σ fl_src fl_tgt Ist false.
-  Let rel := ∀ x : Type, (Any.t * x → Any.t * x → iProp) → bool → bool → Any.t * itree hAGEs x → Any.t * itree hAGEs x → iProp.
+  Let rel := ∀ R : Type, (Any.t * R → Any.t * R → iProp) → bool → bool → Any.t * itree hAGEs R → Any.t * itree hAGEs R → iProp.
 
   (**** COMMENT: If using (_ -> iProp) for r, g: need a replacement of 'bot7' in wsim_fsem. ****)
 
-  (* Variant unlift (r: rel):
-    forall R RR, bool -> bool -> Any.t * itree hAGEs R -> Any.t * itree hAGEs R -> Σ -> Prop :=
-  | unlift_intro
-      R RR ps pt sti_src sti_tgt res
-      (REL: r R RR ps pt sti_src sti_tgt res)
-    :
-      unlift r RR ps pt sti_src sti_tgt res
-  . *)
-
   (* Definition unlift (r: rel) := fun R RR ps pt sti_src sti_tgt res => r R RR ps pt sti_src sti_tgt res. *)
+  
+  Variant unlift (r: rel) R RR ps pt sti_src sti_tgt res: Prop :=
+    | unlift_intro
+        (WF: URA.wf res)
+        (REL: Own res ⊢ |==> r R RR ps pt sti_src sti_tgt)
+  .
 
+  Definition ibot : rel := fun _ _ _ _ _ _ => False%I.
 
   Program Definition isim
           r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
           (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) r g _ RR ps pt sti_src sti_tgt) _.
+    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) (unlift r) (unlift g) _ RR ps pt sti_src sti_tgt) _.
     (* iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) (unlift r) (unlift g) _ RR ps pt sti_src sti_tgt) _. *)
   Next Obligation.
     guclo hpsim_extendC_spec. econs; et.
@@ -125,8 +123,16 @@ Section SIM.
   (*   gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt sti_src sti_tgt fmr. *)
   (* Proof. uiprop in SIM. eauto. Qed. *)
 
-
 (***** isim lemmas *****)
+
+  Lemma unlift_ibot:
+    unlift ibot <7= bot7.
+  Proof.
+    unfold ibot. i. destruct PR.
+    eapply Own_iProp in REL; eauto.
+    rr in REL. uiprop in REL. des.
+    rr in REL. uiprop in REL. eauto.
+  Qed.
 
   Lemma isim_init
       r g ps pt {R} RR st_src st_tgt i_src i_tgt iP fmr
@@ -135,13 +141,13 @@ Section SIM.
                 (@isim r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt)))
       (CUR: Own fmr ⊢ iP)
     :
-      gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
+      gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
       (* gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr. *)
   Proof.
     guclo hpsim_updateC_spec. econs; ii; esplits; eauto.
-    uiprop in ENTAIL. eapply ENTAIL; eauto.
-    eapply Own_iProp; eauto.
+    uiprop in ENTAIL. exploit ENTAIL; eauto using Own_iProp.
   Qed.
+  
 (* 
    Lemma isim_base r g {R} 
         (RR: Any.t * R -> Any.t * R -> iProp)
@@ -165,59 +171,52 @@ Section SIM.
     uiprop. i. eapply hpsim_flag_down. eauto. 
   Qed. *)
 
-  Lemma isim_final
-      r g ps pt {R} RR st_src st_tgt i_src i_tgt (iP: iProp)
-      (SIM: forall fmr (IP: iP fmr), 
-          gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr)
-          (* gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr) *)
-    :
-      bi_entails
-        iP
-        (isim r g RR ps pt (st_src, i_src) (st_tgt, i_tgt)).
-  Proof. 
-    uiprop. i. guclo hpsim_extendC_spec. econs; eauto. refl.
-  Qed.
+  (* GIL: Deleted the following because it is subsumed by [isim_wand]. *)
+  
+  (* Lemma isim_final *)
+  (*     r g ps pt {R} RR st_src st_tgt i_src i_tgt (iP: iProp) *)
+  (*     (SIM: forall fmr (IP: iP fmr),  *)
+  (*         gpaco7 _hpsim (cpn7 _hpsim) r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr) *)
+  (*         (* gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr) *) *)
+  (*   : *)
+  (*     bi_entails *)
+  (*       iP *)
+  (*       (isim r g RR ps pt (st_src, i_src) (st_tgt, i_tgt)). *)
+  (* Proof.  *)
+  (*   uiprop. i. guclo hpsim_extendC_spec. econs; eauto. refl. *)
+  (* Qed. *)
 
-  (* Lemma unlift_mon r0 r1
+  Lemma unlift_mon r0 r1
     (MON: forall R RR ps pt sti_src sti_tgt,
             bi_entails
               (@r0 R RR ps pt sti_src sti_tgt)
-              (#=> (@r1 R RR ps pt sti_src sti_tgt)))
+              (#=> @r1 R RR ps pt sti_src sti_tgt))
   :
     unlift r0 <7= unlift r1.
   Proof.
-    unfold unlift. i.
-    assert (r0 x0 x1 x2 x3 x4 x5 ⊢ #=> r1 x0 x1 x2 x3 x4 x5).
-    { iIntros "H". iApply MON. eauto. }
-    dependent destruction PR.
-    hexploit MON; eauto. i.
-    rr in H. autorewrite with iprop in H.
-    hexploit H; [|eauto|..].
-    { eapply URA.wf_mon. eauto. }
-    i. rr in H0. autorewrite with iprop in H0.
-    hexploit H0; eauto. i. des. econs; eauto.
-  Qed.   *)
+    i. destruct PR. econs; eauto.
+    iIntros "H". iPoseProof (REL with "H") as "H".
+    iMod "H". iPoseProof (MON with "H") as "H". eauto.
+  Qed.
 
-  (* Lemma isim_mono_knowledge 
+  Lemma isim_mono_knowledge 
     r0 g0 r1 g1 {R} RR ps pt sti_src sti_tgt
     (MON0: forall R RR ps pt sti_src sti_tgt,
             bi_entails
               (@r0 R RR ps pt sti_src sti_tgt)
-              (#=> (@r1 R RR ps pt sti_src sti_tgt)))
+              (#=> @r1 R RR ps pt sti_src sti_tgt))
     (MON1: forall R RR ps pt sti_src sti_tgt,
             bi_entails
               (@g0 R RR ps pt sti_src sti_tgt)
-              (#=> (@g1 R RR ps pt sti_src sti_tgt)))
+              (#=> @g1 R RR ps pt sti_src sti_tgt))
     :
     bi_entails
       (@isim r0 g0 R RR ps pt sti_src sti_tgt)
-      (isim r1 g1 RR ps pt sti_src sti_tgt).
+      (@isim r1 g1 R RR ps pt sti_src sti_tgt).
   Proof.
     uiprop. i. 
-    eapply gpaco7_mon; eauto.
-    { unfold unlift. i. eapply unlift_mon; eauto. }
-    { eapply unlift_mon; eauto. }
-  Qed. *)
+    eapply gpaco7_mon; eauto using unlift_mon.
+  Qed.
 
   Lemma isim_upd
       r g ps pt {R} RR sti_src sti_tgt
@@ -1314,7 +1313,7 @@ Section wsim.
 
   Definition wsim_fsem RR: relation (Any.t -> itree hAGEs Any.t) :=
     (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε),
-                ⊢ @isim bot7 bot7 Any.t RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
+                ⊢ @isim ibot ibot Any.t RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
 
   Definition wsim_fnsem RR: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq (wsim_fsem RR).
 
@@ -1365,7 +1364,7 @@ Section WSIMMODSEM.
  
   Inductive sim: Prop := mk {
     wsim_fnsems: Forall2 (wsim_fnsem Ist fl_src fl_tgt RR) fl_src fl_tgt;
-    wsim_initial: cond_src ⊢ cond_tgt ∗ (isim (fun _ _ => ⌜True⌝%I) [] [] bot7 bot7 (fun '(_, v_src) '(_, v_tgt) => Ist v_src v_tgt) false false (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt))
+    wsim_initial: cond_src ⊢ cond_tgt ∗ (isim (fun _ _ => ⌜True⌝%I) [] [] ibot ibot (fun '(_, v_src) '(_, v_tgt) => Ist v_src v_tgt) false false (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt))
     (* In initial itree, states are dummy and return values are initial states of main-itree. *)
   }.     
      
@@ -1642,13 +1641,13 @@ Ltac step0 :=
     Variable iP: iProp.
 
 
-    Goal ⊢ ((⌜False⌝**iP) -∗ wsim 1 0 Ist [] [] ∅ bot7 bot7 RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Goal ⊢ ((⌜False⌝**iP) -∗ wsim 1 0 Ist [] [] ∅ ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros "[#A B]". clarify. Qed.
-    Goal ⌜False⌝%I ⊢ (wsim 1 0 Ist [] [] ∅ bot7 bot7 RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Goal ⌜False⌝%I ⊢ (wsim 1 0 Ist [] [] ∅ ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros "#H". Admitted.
-    Goal ⊢ (iP -∗ wsim 1 0 Ist [] [] ∅ bot7 bot7 RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Goal ⊢ (iP -∗ wsim 1 0 Ist [] [] ∅ ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
     Proof. iIntros "H". Admitted.
-    Goal ⊢ (wsim 1 0 Ist [] [] ∅ bot7 bot7 RR false false (tt↑, trigger (Assume (⌜False⌝%I));;; Ret tt↑ >>= (fun r => Ret r)) (tt↑, Ret tt↑)).
+    Goal ⊢ (wsim 1 0 Ist [] [] ∅ ibot ibot RR false false (tt↑, trigger (Assume (⌜False⌝%I));;; Ret tt↑ >>= (fun r => Ret r)) (tt↑, Ret tt↑)).
     Proof. iIntros. steps. Admitted.
 
 
