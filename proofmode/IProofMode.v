@@ -95,7 +95,7 @@ Section SIM.
   (**** COMMENT: If using (_ -> iProp) for r, g: need a replacement of 'bot7' in wsim_fsem. ****)
 
   (* Definition unlift (r: rel) := fun R RR ps pt sti_src sti_tgt res => r R RR ps pt sti_src sti_tgt res. *)
-  
+
   Variant unlift (r: rel) R RR ps pt sti_src sti_tgt res: Prop :=
     | unlift_intro
         (WF: URA.wf res)
@@ -148,29 +148,6 @@ Section SIM.
     uiprop in ENTAIL. exploit ENTAIL; eauto using Own_iProp.
   Qed.
   
-(* 
-   Lemma isim_base r g {R} 
-        (RR: Any.t * R -> Any.t * R -> iProp)
-        ps pt sti_src sti_tgt
-    :
-    (@r R RR ps pt sti_src sti_tgt)
-      -∗
-      (isim r g RR ps pt sti_src sti_tgt)
-  .
-  Proof.
-    uiprop. i. gfinal. left. eauto.
-  Qed.
-
-  Lemma isim_reset 
-    r g {R} RR ps pt sti_src sti_tgt
-  :
-    bi_entails
-      (@isim r g R RR false false sti_src sti_tgt)
-      (isim r g RR ps pt sti_src sti_tgt).
-  Proof.
-    uiprop. i. eapply hpsim_flag_down. eauto. 
-  Qed. *)
-
   (* GIL: Deleted the following because it is subsumed by [isim_wand]. *)
   
   (* Lemma isim_final *)
@@ -724,6 +701,77 @@ Section SIM.
                 ⊢ @isim bot7 bot7 Any.t isim_RR false false (st_src, itr_src) (st_tgt, itr_tgt)))%signature.
 
   Definition isim_fnsem isim_RR: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq (isim_fsem isim_RR). *)
+
+  Lemma isim_base r g R (RR: Any.t * R -> Any.t * R -> iProp)
+    ps pt sti_src sti_tgt
+    :
+    bi_entails
+      (r R RR ps pt sti_src sti_tgt)
+      (isim r g RR ps pt sti_src sti_tgt).
+  Proof.
+    uiprop. i. gfinal. left. econs; eauto.  eapply iProp_Own in H.
+    iIntros "H". iModIntro. iStopProof. eauto.
+  Qed.
+
+  Lemma isim_reset 
+    r g {R} RR ps pt sti_src sti_tgt
+  :
+    bi_entails
+      (@isim r g R RR false false sti_src sti_tgt)
+      (@isim r g R RR ps pt sti_src sti_tgt).
+  Proof.
+    uiprop. i. eapply hpsim_flag_down. eauto. 
+  Qed.
+
+  Lemma isim_coind (r g: rel) A P RA RRA psA ptA srcA tgtA
+    (COIND: forall (g0: rel) (a:A),
+      bi_entails
+        (P a
+         ∗ □ (∀ R RR ps pt src tgt, g R RR ps pt src tgt -∗ g0 R RR ps pt src tgt)
+         ∗ □ (∀ a, P a -∗ g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))
+        (@isim r g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))
+    :
+    forall (a:A),
+      bi_entails
+        (P a)
+        (@isim r g (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)).
+  Proof.
+    i. iIntros "H". iPoseProof (bupd_intro with "H") as "H". iStopProof.
+    rr. autorewrite with iprop.
+    revert_until COIND. gcofix CIH. i.
+    uiprop in H0. des.
+    guclo hpsim_updateC_spec. econs. ii. exists r2.
+    esplits; cycle 1.
+    { uiprop. i. exists r2. split; try refl.
+      i. eapply H1. eapply URA.wf_extends; eauto. apply URA.extends_add; eauto. }
+    clear r1 H1 H WF.
+    guclo hpsim_updateC_spec. econs; ii; esplits; eauto.
+    specialize (COIND
+      (fun R RR ps pt src tgt =>
+         g R RR ps pt src tgt ∨
+         ∃ a, P a ∗ ⌜@existT Type (fun _ => _) R (RR,ps,pt,src,tgt) =
+                      existT (RA a) (RRA a,psA a,ptA a,srcA a,tgtA a)⌝)%I a).
+    rr in COIND. autorewrite with iprop in COIND.
+    eapply gpaco7_mon. eapply COIND; eauto.
+    - rr. autorewrite with iprop. exists r2, ε. r_solve.
+      esplits; eauto. eapply Own_iProp, URA.wf_unit.
+      iIntros "_"; iSplit.
+      + iModIntro. iIntros (R RR ps pt src tgt) "H". iFrame.
+      + iModIntro. iIntros (a0) "HP". iRight. iExists a0. iFrame. eauto.
+    - eauto.
+    - i. destruct PR. rr in REL. autorewrite with iprop in REL.
+      exploit REL; eauto using Own_iProp. clear REL.
+      intros REL. rr in REL. autorewrite with iprop in REL.
+      des. rr in REL. autorewrite with iprop in REL. des.
+      + eapply CIH0. econs; eauto.
+        rr; i. uiprop. i. esplits; eauto.
+        i. apply REL0. eapply URA.wf_extends, H2. eapply URA.extends_add; eauto.
+      + repeat (rr in REL; autorewrite with iprop in REL; des). subst.
+        rr in REL2. uiprop in REL2. depdes REL2.
+        eapply CIH; eauto. uiprop. esplits; eauto.
+        i. apply REL0 in H1. eapply URA.wf_mon with (b:=b).
+        eapply eq_ind; eauto. r_solve.
+  Qed.
 
 End SIM.
 
