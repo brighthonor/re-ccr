@@ -6,7 +6,7 @@ From iris Require base_logic.lib.invariants.
 Require Import Coqlib PCM PCMAux IProp IPM.
 Require Import Coq.Logic.ClassicalEpsilon.
 
-Local Notation universe := positive.
+Local Notation world_id := positive.
 Local Notation level := nat.
   
 Section INDEXED_INVARIANT_SET.
@@ -20,13 +20,13 @@ Section INDEXED_INVARIANT_SET.
     (Auth.t (positive ==> URA.agree (sProp n)))%ra.
 
   Definition OwnIsRA (sProp : level -> Type) : URA.t :=
-    URA.pointwise universe (@URA.pointwise_dep level (InvSetRA sProp)).
+    URA.pointwise world_id (@URA.pointwise_dep level (InvSetRA sProp)).
 
   Definition OwnEsRA : URA.t :=
-    URA.pointwise universe (URA.pointwise level CoPset.t).
+    URA.pointwise world_id (URA.pointwise level CoPset.t).
   
   Definition OwnDsRA : URA.t :=
-    URA.pointwise universe (URA.pointwise level (Auth.t Gset.t)).
+    URA.pointwise world_id (URA.pointwise level (Auth.t Gset.t)).
 
 End INDEXED_INVARIANT_SET.
 
@@ -34,27 +34,27 @@ Section PCM_OWN.
 
   Context `{Σ : GRA.t}.
 
-  Definition OwnI {sProp} `{@GRA.inG (OwnIsRA sProp) Σ} (u: universe) (n : level) (i : positive) (p : sProp n) :=
+  Definition OwnI {sProp} `{@GRA.inG (OwnIsRA sProp) Σ} (u: world_id) (n : level) (i : positive) (p : sProp n) :=
     OwnM (maps_to_res u (@maps_to_res_dep level (@InvSetRA sProp)
           n (Auth.white (@maps_to_res positive (URA.agree (sProp n)) i (Some (Some p))))) : OwnIsRA sProp).
 
-  Definition OwnI_authR {sProp} `{@GRA.inG (OwnIsRA sProp) Σ} (u: universe) (n : level) (I : gmap positive (sProp n)) : OwnIsRA sProp :=
+  Definition OwnI_authR {sProp} `{@GRA.inG (OwnIsRA sProp) Σ} (u: world_id) (n : level) (I : gmap positive (sProp n)) : OwnIsRA sProp :=
     maps_to_res u (@maps_to_res_dep level _ n (@Auth.black (positive ==> URA.agree (sProp n))%ra
                                                  (fun i => Some <$> (I !! i)))).
 
-  Definition OwnI_auth {sProp} `{@GRA.inG (OwnIsRA sProp) Σ} (u: universe) (n: level) (I : gmap positive (sProp n)) :=
+  Definition OwnI_auth {sProp} `{@GRA.inG (OwnIsRA sProp) Σ} (u: world_id) (n: level) (I : gmap positive (sProp n)) :=
     OwnM (OwnI_authR u n I).
   
-  Definition OwnE `{@GRA.inG OwnEsRA Σ} (u: universe) (n : level) (E : coPset) :=
+  Definition OwnE `{@GRA.inG OwnEsRA Σ} (u: world_id) (n : level) (E : coPset) :=
     OwnM (maps_to_res u (@maps_to_res level CoPset.t n (Some E)) : OwnEsRA).
 
-  Definition OwnD `{@GRA.inG OwnDsRA Σ} (u: universe) (n : level) (D: gset positive) :=
+  Definition OwnD `{@GRA.inG OwnDsRA Σ} (u: world_id) (n : level) (D: gset positive) :=
     OwnM (maps_to_res u (@maps_to_res level (Auth.t Gset.t) n (Auth.white (Some D: Gset.t))) : OwnDsRA).
 
-  Definition OwnD_authR `{@GRA.inG OwnDsRA Σ} (u: universe) (n : level) (D: gset positive) : OwnDsRA :=
+  Definition OwnD_authR `{@GRA.inG OwnDsRA Σ} (u: world_id) (n : level) (D: gset positive) : OwnDsRA :=
     maps_to_res u (@maps_to_res level (Auth.t Gset.t) n (Auth.black (Some D : Gset.t))).
 
-  Definition OwnD_auth `{@GRA.inG OwnDsRA Σ} (u: universe) (n : level): iProp :=
+  Definition OwnD_auth `{@GRA.inG OwnDsRA Σ} (u: world_id) (n : level): iProp :=
     (∃ D, OwnM (OwnD_authR u n D))%I.
 
   Lemma OwnE_level_diff `{@GRA.inG OwnEsRA Σ} u n1 n2 (E : coPset) :
@@ -138,7 +138,7 @@ Section WORLD_SATISFACTION.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
 
-  Variable u : universe.
+  Variable u : world_id.
   Variable n : level.
 
   Definition inv_satall (I : gmap positive (sProp n)) :=
@@ -416,7 +416,7 @@ Section WSATS.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
 
-  Definition OwnD_restR (u: universe) (b: level) : OwnDsRA :=
+  Definition OwnD_restR (u: world_id) (b: level) : OwnDsRA :=
     fun u' n =>
       if (u' =? u)%positive
       then
@@ -459,28 +459,31 @@ Section WSATS.
 
   Definition OwnE_top (Es : coPsets) : Prop := map_Forall (fun _ E => ⊤ ⊆ E) Es.
 
-  Definition empty_univR {R: universe -> level -> URA.t} eu (r: forall u n, R u n) :=
+  Definition empty_worldsR {R: world_id -> level -> URA.t} eu (r: forall u n, R u n) :=
     fun u n =>
       if (pos_sup eu u)
       then r u n
       else ε.
 
-  Definition empty_univ (eu: universe) :=
-    OwnM (empty_univR eu (fun _ _ => Some ⊤ : CoPset.t) : OwnEsRA)
-    **
-    OwnM (empty_univR eu (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA)
-    **
-    OwnM (empty_univR eu (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp)
+  Definition empty_worlds (eu: world_id) : iProp :=
+    OwnM (empty_worldsR eu (fun _ _ => Some ⊤ : CoPset.t) : OwnEsRA)
+    ∗
+    OwnM (empty_worldsR eu (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA)
+    ∗
+    OwnM (empty_worldsR eu (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp)
     .
 
-  Definition OwnDI_rest u b := OwnD_rest u b ** OwnI_rest u b.
-
-  Definition univ_rest := (∃ eu, empty_univ eu)%I.
+  Definition free_worlds := (∃ eu, empty_worlds eu)%I.
 
   Definition wsats u b : iProp := ([∗ list] n ∈ (seq 0 b), wsat u n)%I.
+
+  Definition free_auth u b : iProp := OwnD_rest u b ∗ OwnI_rest u b.
+
+  Definition world u b Es : iProp :=
+    wsats u b ∗ OwnE_all u Es ∗ free_worlds.
   
-  Definition world u b Es :=
-    wsats u b ** OwnE_all u Es ** OwnDI_rest u b ** univ_rest.
+  Definition closed_world u b Es : iProp :=
+    free_auth u b ∗ world u b Es.
 
   Definition lookup_def (Es : coPsets) n : coPset := default ⊤ (Es !! n).
 
@@ -506,8 +509,8 @@ Section WSATS.
     iApply big_sepL_app. ss. iDestruct "A" as "[A B]". iFrame.
   Qed.
 
-  Lemma OwnDI_rest_nin_ u (b b' : level) (NIN : b < b')
-    : OwnDI_rest u b ⊢ OwnDI_rest u b' ∗
+  Lemma free_auth_nin_ u (b b' : level) (NIN : b < b')
+    : free_auth u b ⊢ free_auth u b' ∗
                        ([∗ list] n ∈ (seq b (b' - b)), wsat u n).
   Proof.
     induction NIN.
@@ -562,12 +565,12 @@ Section WSATS.
             rewrite URA.unit_id. reflexivity.
           }
       }
-      unfold OwnDI_rest, OwnD_rest, OwnI_rest.
+      unfold free_auth, OwnD_rest, OwnI_rest.
       rewrite H3. iDestruct "AUTH" as "[AUTH NEW]".
       rewrite H4. iDestruct "DA" as "[DA NEWD]".
       iPoseProof (wsat_init with "[NEWD NEW]") as "NEW". iFrame.
       replace (S b - b) with 1 by lia. ss. iFrame.
-    - unfold OwnDI_rest in *.
+    - unfold free_auth in *.
       iIntros "[DA AUTH]". iPoseProof (IHNIN with "[DA AUTH]") as "[[DA AUTH] SAT]". iFrame.
       clear IHNIN.
       assert ((OwnI_restR u m) =
@@ -632,14 +635,14 @@ Section WSATS.
       iFrame.
   Qed.
 
-  Lemma OwnDI_rest_nin u (b b' : level) (LE : b <= b')
-    : OwnDI_rest u b ⊢ OwnDI_rest u b' ∗
+  Lemma free_auth_nin u (b b' : level) (LE : b <= b')
+    : free_auth u b ⊢ free_auth u b' ∗
                        ([∗ list] n ∈ (seq b (b' - b)), wsat u n).
   Proof.
     iIntros "R".
     destruct (le_lt_or_eq _ _ LE); subst; cycle 1.
     - replace (b'-b') with 0 by nia. s. iFrame.
-    - iApply OwnDI_rest_nin_; eauto.
+    - iApply free_auth_nin_; eauto.
   Qed.
 
   Lemma wsats_nin u (b b' : level):
@@ -658,10 +661,10 @@ Section WSATS.
   Qed.
 
   Lemma wsats_allocs u b b':
-    b <= b' -> OwnDI_rest u b ∗ wsats u b ⊢ OwnDI_rest u b' ∗ wsats u b'.
+    b <= b' -> free_auth u b ∗ wsats u b ⊢ free_auth u b' ∗ wsats u b'.
   Proof.
     iIntros (LE) "(AUTH & SAT)".
-    iPoseProof ((OwnDI_rest_nin _ _ _ LE) with "AUTH") as "(AUTH & NEW)". iFrame.
+    iPoseProof ((free_auth_nin _ _ _ LE) with "AUTH") as "(AUTH & NEW)". iFrame.
     iPoseProof ((wsats_nin _ _ _ LE) with "[SAT NEW]") as "SAT". iFrame. iFrame.
   Qed.
 
@@ -699,9 +702,9 @@ Section WSATS.
             | None => True
             | Some G => (exists i, i ∉ G /\ φ i)
             end)
-    : OwnDI_rest u b ∗ wsats u b ⊢        
+    : free_auth u b ∗ wsats u b ⊢        
                  |==> ((∃ i, ⌜φ i⌝ ∧ OwnI u n i p)
-                         ∗ OwnDI_rest u (S n) ∗ (prop n p -∗ wsats u (S n))).
+                         ∗ free_auth u (S n) ∗ (prop n p -∗ wsats u (S n))).
   Proof.
     iIntros "(AUTH & WSAT)".
     iPoseProof ((wsats_allocs u b (S n)) with "[AUTH WSAT]") as "[AUTH WSAT]". lia. iFrame.
@@ -715,20 +718,20 @@ Section WSATS.
             | None => True
             | Some G => (exists i, i ∉ G /\ φ i)
             end)
-    : OwnDI_rest u b ∗ wsats u b ∗ prop n p
+    : free_auth u b ∗ wsats u b ∗ prop n p
                  ⊢ |==> ((∃ i, ⌜φ i⌝ ∧ OwnI u n i p)
-                           ∗ OwnDI_rest u (S n) ∗ wsats u (S n)).
+                           ∗ free_auth u (S n) ∗ wsats u (S n)).
   Proof.
     iIntros "(A & W & P)". iMod (wsats_OwnI_alloc_ge_gen with "[A W]") as "(I & A & W)".
     1,2: eauto.
     iFrame. iModIntro. iFrame. iApply "W". iFrame.
   Qed.
 
-  Lemma OwnDI_rest_OwnI_le u b n i p :
-    OwnI u n i p ∗ OwnDI_rest u b ⊢ ⌜n < b⌝.
+  Lemma free_auth_OwnI_le u b n i p :
+    OwnI u n i p ∗ free_auth u b ⊢ ⌜n < b⌝.
   Proof.
     iIntros "(I & (_ & AUTH))".
-    unfold OwnI, OwnDI_rest, OwnI_rest.
+    unfold OwnI, free_auth, OwnI_rest.
     iCombine "AUTH I" as "AUTH".
     iPoseProof (OwnM_valid with "AUTH") as "%WF".
     unfold OwnI_restR, maps_to_res, maps_to_res_dep in WF.
@@ -954,15 +957,15 @@ Section WSATS.
     unfold OwnE_restR. ur. i. ur. i. des_ifs; ur; des_ifs.
   Qed.
  
-  Lemma empty_univ_split eu:
-    empty_univ eu ⊢ (OwnE_all eu ∅ ** OwnDI_rest eu 0 ** empty_univ (pos_ext_0 eu) ** empty_univ (pos_ext_1 eu)).
+  Lemma empty_worlds_split eu:
+    empty_worlds eu ⊢ (OwnE_all eu ∅ ∗ free_auth eu 0 ∗ empty_worlds (pos_ext_0 eu) ∗ empty_worlds (pos_ext_1 eu)).
   Proof.
     assert (ERA: URA.extends
               ((OwnE_restR eu ∅) ⋅
-               (empty_univR (pos_ext_0 eu) (fun _ _ => Some ⊤ : CoPset.t)) ⋅
-               (empty_univR (pos_ext_1 eu) (fun _ _ => Some ⊤ : CoPset.t)))
-              (empty_univR eu (fun _ _ => Some ⊤ : CoPset.t) : OwnEsRA)).
-    { unfold empty_univR, OwnE_restR.
+               (empty_worldsR (pos_ext_0 eu) (fun _ _ => Some ⊤ : CoPset.t)) ⋅
+               (empty_worldsR (pos_ext_1 eu) (fun _ _ => Some ⊤ : CoPset.t)))
+              (empty_worldsR eu (fun _ _ => Some ⊤ : CoPset.t) : OwnEsRA)).
+    { unfold empty_worldsR, OwnE_restR.
       exists ε. ur. ur. extensionalities k n.
       rewrite lookup_empty.
       destruct (k =? eu)%positive eqn: EQ.
@@ -982,10 +985,10 @@ Section WSATS.
 
     assert (DRA: URA.extends
               ((OwnD_restR eu 0) ⋅
-               (empty_univR (pos_ext_0 eu) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA) ⋅
-               (empty_univR (pos_ext_1 eu) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA))
-              (empty_univR eu (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA)).
-    { unfold empty_univR, OwnD_restR.
+               (empty_worldsR (pos_ext_0 eu) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA) ⋅
+               (empty_worldsR (pos_ext_1 eu) (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA))
+              (empty_worldsR eu (fun _ _ => Auth.black (Some ∅ : Gset.t)) : OwnDsRA)).
+    { unfold empty_worldsR, OwnD_restR.
       exists ε. ur. ur. extensionalities k n.
       destruct (k =? eu)%positive eqn: EQ.
       { apply Pos.eqb_eq in EQ. subst.
@@ -1004,10 +1007,10 @@ Section WSATS.
 
     assert (IRA: URA.extends
               ((OwnI_restR eu 0) ⋅
-               (empty_univR (pos_ext_0 eu) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp) ⋅
-               (empty_univR (pos_ext_1 eu) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp))                   
-              (empty_univR eu (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp)).
-    { unfold empty_univR, OwnI_restR.
+               (empty_worldsR (pos_ext_0 eu) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp) ⋅
+               (empty_worldsR (pos_ext_1 eu) (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp))                   
+              (empty_worldsR eu (fun _ n => @Auth.black (_ ==> URA.agree (sProp n))%ra (fun _ => None)) : OwnIsRA sProp)).
+    { unfold empty_worldsR, OwnI_restR.
       exists ε. ur. ur. extensionalities k n.
       destruct (k =? eu)%positive eqn: EQ.
       { apply Pos.eqb_eq in EQ. subst.
@@ -1024,29 +1027,29 @@ Section WSATS.
       r_solve.
     }
 
-    iIntros "[[ERA DRA] IRA]".
+    iIntros "(ERA & DRA & IRA)".
     iPoseProof ((OwnM_extends ERA) with "ERA") as "[[NE E1] E2]".
     iPoseProof ((OwnM_extends DRA) with "DRA") as "[[ND D1] D2]".
     iPoseProof ((OwnM_extends IRA) with "IRA") as "[[NI I1] I2]".
     iFrame. unfold OwnEs. rewrite big_sepM_empty. eauto.
   Qed.
   
-  Lemma world_init:
-    empty_univ 1 ⊢ world 1 0 ∅.
+  Lemma closed_world_init:
+    empty_worlds 1 ⊢ closed_world 1 0 ∅.
   Proof.
-    unfold world, wsats, univ_rest. s. 
+    unfold closed_world, world, wsats, free_worlds. s. 
     iIntros "E".
-    iPoseProof (empty_univ_split with "E") as "[[[E DI] R] _]".
+    iPoseProof (empty_worlds_split with "E") as "(E & DI & R & _)".
     iFrame. iExists (pos_ext_0 1). iFrame.
   Qed.
 
-  Lemma world_mon {u} b b' (LE: b <= b') Es:
-    world u b Es ⊢ world u b' Es.
+  Lemma closed_world_mon {u} b b' (LE: b <= b') Es:
+    closed_world u b Es ⊢ closed_world u b' Es.
   Proof.
-    unfold world, wsats. iIntros "[[[W E] DI] R]". iFrame.
+    unfold closed_world, world, wsats. iIntros "(F & W & E & R)". iFrame.
     replace b' with (b + (b'-b)) by nia.
     rewrite ->seq_app, big_sepL_app. iFrame.
-    iPoseProof (OwnDI_rest_nin with "DI") as "[DI W]"; eauto.
+    iPoseProof (free_auth_nin with "F") as "(FI & W)"; eauto.
     replace (b+(b'-b)) with b' by nia. iFrame.
   Qed.
 
@@ -1067,23 +1070,24 @@ Section FANCY_UPDATE.
     (∃ i, ⌜i ∈ (↑N : coPset)⌝ ∧ OwnI u n i p)%I.
 
   Definition FUpd u b (A : iProp) (Es1 Es2 : coPsets) (P : iProp) : iProp :=
-    A ∗ wsats u b ∗ OwnE_all u Es1 ∗ univ_rest -∗ #=> (A ∗ wsats u b ∗ OwnE_all u Es2 ∗ univ_rest ∗ P).
+    A ∗ world u b Es1 -∗ |==> (A ∗ world u b Es2 ∗ P).
 
   Lemma FUpd_mono u b b' A Es1 Es2 P :
     (b <= b') -> FUpd u b A Es1 Es2 P ⊢ FUpd u b' A Es1 Es2 P.
   Proof.
-    iIntros (LE) "FUPD (A & SAT & EN)".
+    unfold FUpd, world.
+    iIntros (LE) "FUPD (A & SAT & EN & R)".
     iPoseProof ((wsats_in _ _ _ LE) with "SAT") as "[SAT K]".
-    iMod ("FUPD" with "[A SAT EN]") as "(A & SAT & EN & P)". iFrame.
-    iModIntro. iFrame. iApply wsats_nin. apply LE. iFrame.
+    iMod ("FUPD" with "[A SAT EN R]") as "(A & (SAT & EN & R) & P)"; iFrame.
+    iApply wsats_nin. apply LE. iFrame. eauto.
   Qed.
 
-  Lemma wsats_inv_gen u b A Es N n p :
+  Lemma wsats_inv_gen u b Es N n p :
     n < b ->
-    ⊢ A ∗ wsats u b ∗ OwnE_all u Es -∗ #=> (A ∗ (prop n p -∗ wsats u b) ∗ OwnE_all u Es ∗ (inv u N n p)).
+    wsats u b ∗ OwnE_all u Es -∗ |==> inv u N n p ∗ (prop n p -∗ wsats u b) ∗ OwnE_all u Es.
   Proof.
-    iIntros (LT) "(A & WSAT & EN)".
-    iMod (wsats_OwnI_alloc_lt_gen _ _ _ LT p (fun i => i ∈ ↑N) with "WSAT") as "[I WSAT]".
+    iIntros (LT) "(WSAT & EN)".
+    iMod (wsats_OwnI_alloc_lt_gen _ _ _ LT p (fun i => i ∈ ↑N) with "WSAT") as "(I & WSAT)".
     - i. des_ifs. apply iris.base_logic.lib.invariants.fresh_inv_name.
     - iFrame. auto.
   Qed.
@@ -1091,10 +1095,10 @@ Section FANCY_UPDATE.
   Lemma FUpd_alloc_gen u b A Es N n p :
     n < b -> (inv u N n p -∗ prop n p) ⊢ FUpd u b A Es Es (inv u N n p).
   Proof.
-    iIntros (LT) "P (A & WSAT & EN & R)".
-    iMod (wsats_inv_gen with "[A WSAT EN]") as "(A & W & EN & #INV)". eauto.
-    iSplitL "A". iApply "A". iFrame.
-    iPoseProof ("P" with "INV") as "P". iPoseProof ("W" with "P") as "W". iModIntro. iFrame. auto.
+    iIntros (LT) "P (A & W & E & R)".
+    iMod (wsats_inv_gen with "[W E]") as "(#INV & W & E)"; eauto. iFrame.
+    iPoseProof ("P" with "INV") as "P". iPoseProof ("W" with "P") as "W".
+    iModIntro. iFrame. eauto.
   Qed.
 
   Lemma FUpd_alloc u b A Es N n p :
@@ -1106,7 +1110,7 @@ Section FANCY_UPDATE.
   Lemma FUpd_open_aux u b A Es n N E (LT : n < b) (INE : Es !! n = Some E) (IN : ↑N ⊆ E) p :
     inv u N n p ⊢
         FUpd u b A Es (<[n := E∖↑N]> Es)
-        ((prop n p) ∗ ((prop n p) -∗ FUpd u b A (<[n := E∖↑N]> Es) Es emp)).
+        (prop n p ∗ ((prop n p) -∗ FUpd u b A (<[n := E∖↑N]> Es) Es emp)).
   Proof.
     iIntros "[% (%iN & #HI)] (A & WSAT & ENS & R)".
     iPoseProof ((OwnE_acc_in _ _ _ _ INE) with "ENS") as "[EN ENS]".
@@ -1146,12 +1150,12 @@ Section FANCY_UPDATE.
     unfold lookup_def, subseteq_def in *. destruct (Es !! n) eqn:CASES; ss.
     - iApply FUpd_open_aux; auto. unfold inv; auto. iFrame.
     - iAssert (
-          (#=> (A ∗ (wsats u b ∗ (OwnE_all u (<[n:=⊤ ∖ ↑N]> Es) ∗ univ_rest ∗ (prop n p ∗ (prop n p -∗ FUpd u b A (<[n:=⊤ ∖ ↑N]> Es) (<[n:=⊤]>Es) emp))))))
-            -∗
-            #=> (A ∗ (wsats u b ∗ (OwnE_all u (<[n:=⊤ ∖ ↑N]> Es) ∗ univ_rest ∗ (prop n p ∗ (prop n p -∗ FUpd u b A (<[n:=⊤ ∖ ↑N]> Es) Es emp))))))%I as "K".
-      { iIntros ">[A [SAT [ENS [R [P K]]]]]". iModIntro. iFrame. iIntros "P".
-        iPoseProof ("K" with "P") as "K". iIntros "[A [SAT [ENS R]]]".
-        iPoseProof ("K" with "[A SAT ENS R]") as ">[A [SAT [ENS R]]]". iFrame.
+          (|==> (A ∗ world u b (<[n:=⊤ ∖ ↑N]> Es) ∗ prop n p ∗ (prop n p -∗ FUpd u b A (<[n:=⊤ ∖ ↑N]> Es) (<[n:=⊤]>Es) emp)))
+          -∗
+          (|==> (A ∗ world u b (<[n:=⊤ ∖ ↑N]> Es) ∗ prop n p ∗ (prop n p -∗ FUpd u b A (<[n:=⊤ ∖ ↑N]> Es) Es emp))))%I as "K".
+      { iIntros ">(A & (SAT & ENS & R) & P & K)". iModIntro. iFrame. iIntros "P".
+        iPoseProof ("K" with "P") as "K". iIntros "(A & SAT & ENS & R)".
+        iPoseProof ("K" with "[A SAT ENS R]") as ">(A & (SAT & ENS & R) & _)". iFrame.
         iMod (OwnE_free with "ENS") as "ENS". auto.
         iModIntro. iFrame.
       }
@@ -1165,9 +1169,9 @@ Section FANCY_UPDATE.
   Qed.
 
   Lemma FUpd_intro u b A Es P :
-    #=> P ⊢ FUpd u b A Es Es P.
+    (|==> P) ⊢ FUpd u b A Es Es P.
   Proof.
-    iIntros "P H". iMod "P". iModIntro. iFrame. iFrame.
+    iIntros ">P H". iModIntro. iFrame. iFrame.
   Qed.
 
   Lemma FUpd_mask_frame_gen u b A Es1 Es2 n E P :
@@ -1176,8 +1180,8 @@ Section FANCY_UPDATE.
          FUpd u b A (<[n := (Es1 !? n) ∪ E]>Es1) (<[n := (Es2 !? n) ∪ E]>Es2) P.
   Proof.
     rewrite /FUpd. iIntros (D) "H (A & WSAT & ENS & R)".
-    iPoseProof ((OwnE_acc_in _ _ n) with "ENS") as "[EN ENS]". apply lookup_insert.
-    iPoseProof (OwnE_disjoint _ _ _ _ D with "EN") as "[EN1 EN]".
+    iPoseProof ((OwnE_acc_in _ _ n) with "ENS") as "(EN & ENS)". apply lookup_insert.
+    iPoseProof (OwnE_disjoint _ _ _ _ D with "EN") as "(EN1 & EN)".
     iPoseProof (OwnE_all_union with "[ENS EN1]") as "ENS". iFrame.
     replace (∅ ∪ lookup_def Es1 n) with (lookup_def Es1 n) by set_solver.
     destruct (coPset_equiv_dec E ∅); cycle 1.
@@ -1185,14 +1189,14 @@ Section FANCY_UPDATE.
       2:{ exfalso. set_solver. }
       rewrite insert_insert. rewrite (insert_id Es1).
       2:{ unfold lookup_def, default. rewrite Heq. ss. }
-      iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & WSAT & ENS2 & R & P)". iFrame.
+      iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & (WSAT & ENS2 & R) & P)". iFrame.
       destruct (Es2 !! n) eqn:CASES.
-      2:{ iMod ((OwnE_acc_new _ _ _ CASES) with "ENS2") as "[EN2 _]".
+      2:{ iMod ((OwnE_acc_new _ _ _ CASES) with "ENS2") as "(EN2 & _)".
           iPoseProof (OwnE_exploit with "[EN EN2]") as "%DIS". iFrame.
           set_solver.
       }
       unfold lookup_def. rewrite CASES. ss.
-      iPoseProof ((OwnE_acc_in _ _ _ _ CASES) with "ENS2") as "[EN2 ENS]".
+      iPoseProof ((OwnE_acc_in _ _ _ _ CASES) with "ENS2") as "(EN2 & ENS)".
       iPoseProof (OwnE_union with "[EN EN2]") as "EN". iFrame.
       iPoseProof (OwnE_all_union with "[ENS EN]") as "ENS". iFrame.
       replace (∅ ∪ (c0 ∪ E)) with (c0 ∪ E) by set_solver.
@@ -1204,12 +1208,12 @@ Section FANCY_UPDATE.
       destruct (Es1 !! n) eqn:CASES.
       - rewrite (insert_id Es1).
         2:{ unfold lookup_def, default. rewrite CASES. ss. }
-        iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & WSAT & ENS2 & P & R)". iFrame.
+        iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & (WSAT & ENS2 & R) & P)". iFrame.
         iMod (OwnE_lookup_def with "ENS2") as "ENS2". iModIntro. iFrame.
       - replace (lookup_def Es1 n) with (⊤ : coPset).
         2:{ unfold lookup_def, default. rewrite CASES. ss. }
         iMod ((OwnE_free _ _ _ CASES) with "ENS") as "ENS".
-        iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & WSAT & ENS2 & P & R)". iFrame.
+        iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & (WSAT & ENS2 & R) & P)". iFrame.
         iMod (OwnE_lookup_def with "ENS2") as "ENS2". iModIntro. iFrame.
     }
   Qed.
@@ -1231,10 +1235,10 @@ Section FANCY_UPDATE.
          FUpd u b A (<[n:=E1]>Es1) (<[n:=E2]>Es2) (FUpd u b A (<[n:=E2]>Es3) (<[n:=E1]>Es3) P).
   Proof.
     rewrite /FUpd. iIntros (HE) "H (A & WSAT & ENS & R)".
-    iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & WSAT & ENS & R & P)". iFrame.
+    iPoseProof ("H" with "[A WSAT ENS R]") as ">(A & (WSAT & ENS & R) & P)". iFrame.
     iModIntro.
     rewrite (union_difference_L _ _ HE).
-    iPoseProof (OwnE_all_disjoint with "ENS") as "[ENS EN]".
+    iPoseProof (OwnE_all_disjoint with "ENS") as "(ENS & EN)".
     { set_solver. }
     iFrame. iIntros "(A & WSAT & ENS & R)". iModIntro. iFrame.
     iApply OwnE_all_union. iFrame.
@@ -1276,8 +1280,8 @@ Section FANCY_UPDATE.
   Proof.
     rewrite /FromModal /FUpd. ss.
     iIntros (HE) "P (A & WSAT & EN & R)". iModIntro. iFrame.
-    iPoseProof (OwnE_acc_in with "EN") as "[EN ENS]". apply lookup_insert.
-    iPoseProof ((OwnE_subset _ _ _ _ HE) with "EN") as "[EN1 _]".
+    iPoseProof (OwnE_acc_in with "EN") as "(EN & ENS)". apply lookup_insert.
+    iPoseProof ((OwnE_subset _ _ _ _ HE) with "EN") as "(EN1 & _)".
     iPoseProof (OwnE_all_union with "[ENS EN1]") as "ENS". iFrame. rewrite insert_insert.
     replace (∅ ∪ E2) with E2 by set_solver. iFrame.
   Qed.
@@ -1294,19 +1298,19 @@ Use [FUpd_mask_frame] and [FUpd_intro_mask]")
     ElimModal True p false (|==> P) P (FUpd u b A Es1 Es2 Q) (FUpd u b A Es1 Es2 Q) | 10.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim /FUpd.
-    iIntros (_) "[P K] I". iMod "P". iApply ("K" with "P"). iFrame.
+    iIntros (_) "(>P & K) I". iApply ("K" with "P"). iFrame.
   Qed.
 
   Global Instance elim_modal_FUpd_FUpd u p b b' A Es1 Es2 Es3 P Q :
     ElimModal (b <= b') p false (FUpd u b A Es1 Es2 P) P (FUpd u b' A Es1 Es3 Q) (FUpd u b' A Es2 Es3 Q).
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim.
-    iIntros (LT) "[P K] I". inv LT.
+    iIntros (LT) "(P & K) I". inv LT.
     - rewrite /FUpd.
-      iMod ("P" with "I") as "(A & WSAT & EN & R & P)". iApply ("K" with "P"). iFrame.
+      iMod ("P" with "I") as "(A & (WSAT & EN & R) & P)". iApply ("K" with "P"). iFrame.
     - iPoseProof (FUpd_mono _ b (S m) with "P") as "P". lia.
       rewrite /FUpd.
-      iMod ("P" with "I") as "(A & WSAT & EN & R & P)". iApply ("K" with "P"). iFrame.
+      iMod ("P" with "I") as "(A & (WSAT & EN & R) & P)". iApply ("K" with "P"). iFrame.
   Qed.
 
   Global Instance elim_modal_FUpd_FUpd_general p u b A Es0 Es1 Es2 n E0 E1 E2 E3 P Q :
@@ -1364,45 +1368,41 @@ Section MULTIVERSE.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
   
-  Theorem multiverse_spawn u b A Es:
-    ⊢ FUpd u b A Es Es (∃ v, world v 0 ∅).
+  Theorem spawn_world u b A Es:
+    ⊢ FUpd u b A Es Es (∃ v, closed_world v 0 ∅).
   Proof.
-    unfold FUpd, world, univ_rest, wsats. s.
-    iIntros "[A [S [E R]]]". iDestruct "R" as (eu) "E0".
-    iPoseProof (empty_univ_split with "E0") as "[[[E0 DI] L] R]".
+    unfold FUpd, closed_world, world, free_worlds, wsats. s.
+    iIntros "(A & S & E & R)". iDestruct "R" as (eu) "EW".
+    iPoseProof (empty_worlds_split with "EW") as "(EW & FA & L & R)".
     iFrame. iSplitL "L"; eauto.
-    iExists eu. iSplitR "R"; eauto. iFrame. eauto.
+    iExists eu. iFrame. eauto.
   Qed.
 
-  Lemma multiverse_send u b A Es u0 b0 Es0 N n p
+  Lemma send_iprop u b A Es u0 b0 Es0 N n p
     (LT: n < b0)
     :
-    prop n p
+    prop n p ∗ closed_world u0 b0 Es0
     ⊢
-    FUpd u b (world u0 b0 Es0 ∗ A) Es Es (inv u0 N n p).
+    FUpd u b A Es Es (inv u0 N n p ∗ closed_world u0 b0 Es0).
   Proof.
-    iIntros "P [[[[[S0 E0] DI0] R0] A] [S [E R]]]".
+    iIntros "(P & F0 & S0 & E0 & R0) (A & S & E & R)".
     iPoseProof (FUpd_alloc with "P") as "Upd"; eauto.
-    unfold FUpd, world.
-    iCombine "A S0 E0 R0" as "X".
-    iMod ("Upd" with "X") as "[A [S0 [E0 [R0 I0]]]]".
-    iFrame; eauto.
+    iMod ("Upd" with "[A S0 E0 R0]") as "(A & (S0 & E0 & R0) & I0)".
+    iFrame; iAssumption. iFrame; eauto.
   Qed.
 
-  Lemma multiverse_receive u b A Es u0 b0 Es0 N n p
+  Lemma receive_iprop u b A Es u0 b0 Es0 N n p
     (LT: n < b0)
     (IN: (↑N) ⊆ Es0 !? n)
     :
-    inv u0 N n p ∗ world u0 b0 Es0
+    inv u0 N n p ∗ closed_world u0 b0 Es0
     ⊢
-    FUpd u b A Es Es (prop n p ∗ world u0 b0 (<[n := (Es0 !? n)∖↑N]> Es0)).
+    FUpd u b A Es Es (prop n p ∗ closed_world u0 b0 (<[n := (Es0 !? n)∖↑N]> Es0)).
   Proof.
-    iIntros "[I [[[S0 E0] DI0] R0]] [A [S [E R]]]".
+    iIntros "(I & F0 & S0 & E0 & R0) (A & S & E & R)".
     iPoseProof (FUpd_open with "I") as "Upd"; eauto.
-    unfold FUpd, world.
-    iCombine "A S0 E0 R0" as "X".
-    iMod ("Upd" with "X") as "[A [S0 [E0 [R0 [P _]]]]]".
-    iFrame; eauto.
+    iMod ("Upd" with "[A S0 E0 R0]") as "(A & (S0 & E0 &R0) & P & _)".
+    iFrame; iAssumption. iFrame; eauto.
   Qed.  
 
 End MULTIVERSE.
@@ -1503,7 +1503,7 @@ Global Opaque FUpd.
   (* Qed. *)
 
   (* Lemma OwnE_split u: *)
-  (*   OwnE_all u ∅ ⊢ #=> (OwnE_all (pos_ext_0 u) ∅ ** OwnE_all (pos_ext_1 u) ∅). *)
+  (*   OwnE_all u ∅ ⊢ |==> (OwnE_all (pos_ext_0 u) ∅ ∗ OwnE_all (pos_ext_1 u) ∅). *)
   (* Proof. *)
   (*   unfold OwnEs, OwnE_rest, OwnEs, OwnE. *)
   (*   rewrite !big_sepM_empty. *)
