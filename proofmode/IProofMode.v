@@ -83,6 +83,7 @@ Section SPEC.
   Qed.
 
 End SPEC.
+
 (* Don't want variable stb, o in isim *)
 Section SIM.
 
@@ -96,7 +97,7 @@ Section SIM.
 
   (* Definition unlift (r: rel) := fun R RR ps pt sti_src sti_tgt res => r R RR ps pt sti_src sti_tgt res. *)
 
-  Variant unlift (r: rel) R RR ps pt sti_src sti_tgt res: Prop :=
+  Variant iunlift (r: rel) R RR ps pt sti_src sti_tgt res: Prop :=
     | unlift_intro
         (WF: URA.wf res)
         (REL: Own res ⊢ |==> r R RR ps pt sti_src sti_tgt)
@@ -107,7 +108,7 @@ Section SIM.
   Program Definition isim
           r g {R} (RR: Any.t * R-> Any.t * R -> iProp) ps pt
           (sti_src sti_tgt : Any.t * itree hAGEs R): iProp := 
-    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) (unlift r) (unlift g) _ RR ps pt sti_src sti_tgt) _.
+    iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) (iunlift r) (iunlift g) _ RR ps pt sti_src sti_tgt) _.
     (* iProp_intro (gpaco7 (_hpsim) (cpn7 _hpsim) (unlift r) (unlift g) _ RR ps pt sti_src sti_tgt) _. *)
   Next Obligation.
     guclo hpsim_extendC_spec. econs; et.
@@ -125,8 +126,8 @@ Section SIM.
 
 (***** isim lemmas *****)
 
-  Lemma unlift_ibot:
-    unlift ibot <7= bot7.
+  Lemma iunlift_ibot:
+    iunlift ibot <7= bot7.
   Proof.
     unfold ibot. i. destruct PR.
     eapply Own_iProp in REL; eauto.
@@ -141,7 +142,7 @@ Section SIM.
                 (@isim r g R RR ps pt (st_src, i_src) (st_tgt, i_tgt)))
       (CUR: Own fmr ⊢ iP)
     :
-      gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
+      gpaco7 _hpsim (cpn7 _hpsim) (iunlift r) (iunlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr.
       (* gpaco7 _hpsim (cpn7 _hpsim) (unlift r) (unlift g) R RR ps pt (st_src, i_src) (st_tgt, i_tgt) fmr. *)
   Proof.
     guclo hpsim_updateC_spec. econs; ii; esplits; eauto.
@@ -163,13 +164,13 @@ Section SIM.
   (*   uiprop. i. guclo hpsim_extendC_spec. econs; eauto. refl. *)
   (* Qed. *)
 
-  Lemma unlift_mon r0 r1
+  Lemma iunlift_mon r0 r1
     (MON: forall R RR ps pt sti_src sti_tgt,
             bi_entails
               (@r0 R RR ps pt sti_src sti_tgt)
               (#=> @r1 R RR ps pt sti_src sti_tgt))
   :
-    unlift r0 <7= unlift r1.
+    iunlift r0 <7= iunlift r1.
   Proof.
     i. destruct PR. econs; eauto.
     iIntros "H". iPoseProof (REL with "H") as "H".
@@ -192,7 +193,7 @@ Section SIM.
       (@isim r1 g1 R RR ps pt sti_src sti_tgt).
   Proof.
     uiprop. i. 
-    eapply gpaco7_mon; eauto using unlift_mon.
+    eapply gpaco7_mon; eauto using iunlift_mon.
   Qed.
 
   Lemma isim_upd
@@ -726,9 +727,9 @@ Section SIM.
   Lemma isim_coind (r g: rel) A P RA RRA psA ptA srcA tgtA
     (COIND: forall (g0: rel) (a:A),
       bi_entails
-        (P a
-         ∗ □ (∀ R RR ps pt src tgt, g R RR ps pt src tgt -∗ g0 R RR ps pt src tgt)
-         ∗ □ (∀ a, P a -∗ g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))
+        ((□ ((∀ R RR ps pt src tgt, g R RR ps pt src tgt -∗ g0 R RR ps pt src tgt) ∗
+             (∀ a, P a -∗ g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))) ∗
+         P a)
         (@isim r g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))
     :
     forall (a:A),
@@ -753,11 +754,11 @@ Section SIM.
                       existT (RA a) (RRA a,psA a,ptA a,srcA a,tgtA a)⌝)%I a).
     rr in COIND. autorewrite with iprop in COIND.
     eapply gpaco7_mon. eapply COIND; eauto.
-    - rr. autorewrite with iprop. exists r2, ε. r_solve.
+    - rr. autorewrite with iprop. exists ε, r2. r_solve.
       esplits; eauto. eapply Own_iProp, URA.wf_unit.
-      iIntros "_"; iSplit.
-      + iModIntro. iIntros (R RR ps pt src tgt) "H". iFrame.
-      + iModIntro. iIntros (a0) "HP". iRight. iExists a0. iFrame. eauto.
+      iIntros "_". iModIntro. iSplitL "".
+      + iIntros (R RR ps pt src tgt) "H". iFrame.
+      + iIntros (a0) "HP". iRight. iExists a0. iFrame. eauto.
     - eauto.
     - i. destruct PR. rr in REL. autorewrite with iprop in REL.
       exploit REL; eauto using Own_iProp. clear REL.
@@ -779,7 +780,7 @@ Global Opaque isim.
 
 
 Section wsim.
-  Local Notation universe := positive.
+  Local Notation world_id := positive.
   Local Notation level := nat.
   Context `{Σ: GRA.t}.
   Context `{sProp : level -> Type}.
@@ -791,7 +792,7 @@ Section wsim.
   Context `{@GRA.inG OwnDsRA Σ}.
   Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
 
-  Variable u: universe.
+  Variable u: world_id.
   Variable n: level.
   Variable Ist: Any.t -> Any.t -> iProp.
   Variable fl_src fl_tgt: alist gname (Any.t -> itree hAGEs Any.t).
@@ -807,17 +808,9 @@ Section wsim.
      fun '(st_src, v_src) '(st_tgt, v_tgt) => (Ist st_src st_tgt ** ⌜v_src = v_tgt⌝)%I.  *)
 
   Definition wsim (ES : coPsets) 
-    r g {R} (RR: Any.t * R -> Any.t * R -> iProp) 
-    ps pt 
-    '(st_src, i_src)
-    '(st_tgt, i_tgt) 
+    r g {R} (RR: Any.t * R -> Any.t * R -> iProp) ps pt src tgt
   :=
-    ((wsats u n ∗ OwnE_all u ES ∗ univ_rest)
-            -∗
-            (isim r g 
-              (fun '(st_src, ret_src) '(st_tgt, ret_tgt) 
-                => (wsats u n ∗ OwnE_all u ∅ ∗ univ_rest) ∗ RR (st_src, ret_src) (st_tgt, ret_tgt))
-              ps pt (st_src, i_src) (st_tgt, i_tgt)))%I.
+    (world u n ES -∗ isim r g RR ps pt src tgt)%I.
 
   (***** wsim lemmas ****)
 
@@ -848,21 +841,6 @@ Section wsim.
     iApply isim_upd. iMod (OwnE_free_all with "E") as "E"; eauto.
     iApply "H". iFrame; eauto.
   Qed.
-(* 
-  Lemma wsim_base 
-    Es r g {R} RR RR'
-    (REL: RR' = (λ '(st_src, ret_src) '(st_tgt, ret_tgt), (wsats u n ** (OwnE_all u ∅ ** univ_rest)) ** RR (st_src, ret_src) (st_tgt, ret_tgt)))
-    ps pt sti_src sti_tgt
-    (TOP: OwnE_top Es)
-  :
-    (@r R RR' ps pt sti_src sti_tgt)
-  -∗
-    (wsim Es r g RR ps pt sti_src sti_tgt).
-  Proof.
-    rewrite <- wsim_free_all; [|eassumption].
-    unfold wsim. destruct sti_src, sti_tgt. iIntros "H [W D]".
-    iApply isim_base. rewrite REL. iFrame.
-  Qed. *)
   
   Lemma wsim_upd
     E r g {R} ps pt sti_src sti_tgt
@@ -893,7 +871,7 @@ Section wsim.
     unfold wsim. destruct sti_src, sti_tgt. iIntros "H R D".
     iApply isim_wand.
     iPoseProof ("H" with "D") as "H".
-    iSplitR "H"; [|auto]. iIntros (? ? ? ?) "[D H]".
+    iSplitR "H"; [|auto]. iIntros (? ? ? ?) "H".
     iPoseProof ("R" $! _ _ with "H") as "H". iFrame.
   Qed.
 
@@ -925,22 +903,18 @@ Section wsim.
     iIntros. iFrame.
   Qed.
 
-  Lemma wsim_bind_top 
+  Lemma wsim_bind_top
     Es r g {R S} RR ps pt st_src st_tgt i_src i_tgt k_src k_tgt
   :
-    (@wsim Es r g S (fun '(s_src, r_src) '(s_tgt, r_tgt) => wsim ∅ r g RR false false (s_src, k_src r_src) (s_tgt, k_tgt r_tgt)) ps pt (st_src, i_src) (st_tgt, i_tgt))
+    (@wsim Es r g S (fun '(s_src, r_src) '(s_tgt, r_tgt) => isim r g RR false false (s_src, k_src r_src) (s_tgt, k_tgt r_tgt)) ps pt (st_src, i_src) (st_tgt, i_tgt))
   -∗
     (@wsim Es r g R RR ps pt (st_src, i_src >>= k_src) (st_tgt, i_tgt >>= k_tgt)).
   Proof.
-    unfold wsim. iIntros "H W".
-    iPoseProof ("H" with "W") as "H".
-    iApply isim_bind. iApply (isim_mono with "H").
-    iIntros (? ? ? ?) "[W H]".
-    iApply ("H" with "W"). 
+    iIntros "H W". iPoseProof ("H" with "W") as "H".
+    iApply isim_bind. iApply (isim_mono with "H"). eauto.
   Qed.
 
   (****** FUpd Rules ******)
-
 
   Lemma wsim_FUpd
     Es0 Es1 r g {R} RR ps pt sti_src sti_tgt 
@@ -951,11 +925,9 @@ Section wsim.
   Proof.
     Local Transparent FUpd.
     unfold wsim. destruct sti_src, sti_tgt. iIntros "F WD".
-    iAssert (emp ** (wsats u n ∗ OwnE_all u Es0 ∗ univ_rest)) with "[WD]" as "C".
-    { iFrame. }
+    iAssert (emp ** world u n Es0) with "[WD]" as "WD". { iFrame. }
     iApply isim_upd.
-    unfold FUpd. 
-    iMod ("F" with "C") as "[A [W [E [U SIM]]]]".
+    iMod ("F" with "WD") as "(_ & W & SIM)".
     iApply "SIM"; iFrame. eauto.
   Qed.
 
@@ -1006,7 +978,7 @@ Section wsim.
     { eauto. }
     iMod "H0". iModIntro. iApply ("H1" with "H0").
   Qed.
-  
+
   Global Instance wsim_elim_FUpd
          Es0 Es1 r g {R} RR
          ps pt sti_src sti_tgt p
@@ -1018,15 +990,13 @@ Section wsim.
     (@wsim Es0 r g R RR ps pt sti_src sti_tgt)
     (wsim Es1 r g RR ps pt sti_src sti_tgt).
   Proof.
-  Admitted.
-  (*Comment: Proved, but iModIntro takes too long. *)
-    (* unfold ElimModal. rewrite bi.intuitionistically_if_elim.
-    i. iIntros "[H0 H1]".
-    iApply wsim_FUpd.
-    iMod "H0". instantiate (1:= Es1). iModIntro.
-    iApply ("H1" with "H0").
-  Qed. *)
-
+    unfold ElimModal. rewrite bi.intuitionistically_if_elim.
+    i. iIntros "(H0 & H1)".
+    iApply wsim_FUpd. instantiate (1:= Es1).
+    iMod "H0". iApply FUpd_intro; iModIntro. (* iModIntro doesn't work. why? *)
+    iApply "H1". eauto.
+  Qed.
+  
   Global Instance wsim_add_modal_FUpd
          Es r g {R} RR
          ps pt sti_src sti_tgt
@@ -1205,53 +1175,49 @@ Section wsim.
   Qed.
 
   Lemma wsim_assume_src
-    Es r g {R} RR ps pt iP st_src st_tgt k_src i_tgt
+    P r g {R} RR ps pt st_src st_tgt k_src i_tgt
   :
-    (iP -∗ (@wsim Es r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
+    (P ∗ free_auth u n -∗ (@wsim ∅ r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
   -∗
-    (@wsim Es r g R RR ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt)).
+    (isim r g RR ps pt (st_src, trigger (Assume (P ∗ closed_world u n ∅)) >>= k_src) (st_tgt, i_tgt)).
   Proof.
-    unfold wsim. iIntros "H WD".
-    iApply isim_assume_src. iIntros "IP".
-    iPoseProof ("H" with "IP") as "H".
-    iPoseProof ("H" with "WD") as "H". iFrame.
-  Qed.
-
-  Lemma wsim_assume_tgt
-    Es r g {R} RR ps pt iP st_src st_tgt i_src k_tgt
-  :
-    (iP ∗ (@wsim Es r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
-  -∗
-    (@wsim Es r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt)).
-  Proof.
-    unfold wsim. iIntros "[IP H] WD".
-    iApply isim_assume_tgt. 
-    iPoseProof ("H" with "WD") as "H". iFrame.
+    iIntros "H". iApply isim_assume_src. iIntros "(P & (F & W))".
+    iPoseProof ("H" with "[P F]") as "H". iFrame.
+    iApply "H". eauto.
   Qed.
 
   Lemma wsim_guarantee_src
-    Es r g {R} RR ps pt iP st_src st_tgt k_src i_tgt
+    P Es r g {R} RR ps pt st_src st_tgt k_src i_tgt
+    (TOP: OwnE_top Es)
   :
-    (iP ∗ @wsim Es r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))
+    (P ∗ free_auth u n ∗ @isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt))
   -∗
-    (@wsim Es r g R RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt)).
+    (wsim Es r g RR ps pt (st_src, trigger (Guarantee (P ∗ closed_world u n ∅)) >>= k_src) (st_tgt, i_tgt)).
   Proof.
-    unfold wsim. iIntros "[IP H] WD". 
-    iApply isim_guarantee_src. 
-    iPoseProof ("H" with "WD") as "H". iFrame.
+    iIntros "(P & F & H)". iApply wsim_free_all; eauto.
+    iIntros "WD". iApply isim_guarantee_src. iFrame.
   Qed.  
-    
-  Lemma wsim_guarantee_tgt
-    Es r g {R} RR ps pt iP st_src st_tgt i_src k_tgt
+  
+  Lemma wsim_assume_tgt
+    P u0 n0 Es r g {R} RR ps pt st_src st_tgt i_src k_tgt
   :
-    (iP -∗ @wsim Es r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))
+    (P ∗ closed_world u0 n0 ∅ ∗ (@wsim Es r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
   -∗
-    (@wsim Es r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt)).
+    (wsim Es r g RR ps pt (st_src, i_src) (st_tgt, trigger (Assume (P ∗ closed_world u0 n0 ∅)) >>= k_tgt)).
   Proof.
-    unfold wsim. iIntros "H WD".
-    iApply isim_guarantee_tgt. iIntros "IP".
-    iPoseProof ("H" with "IP") as "H".
-    iPoseProof ("H" with "WD") as "H". iFrame.
+    iIntros "(P & CW & H) WD". iApply isim_assume_tgt. iFrame.
+    iApply "H". eauto.
+  Qed.
+
+  Lemma wsim_guarantee_tgt
+    P u0 n0 Es r g {R} RR ps pt st_src st_tgt i_src k_tgt
+  :
+    (P ∗ closed_world u0 n0 ∅ -∗ @wsim Es r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))
+  -∗
+    (wsim Es r g RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee (P ∗ closed_world u0 n0 ∅)) >>= k_tgt)).
+  Proof.
+    iIntros "H WD". iApply isim_guarantee_tgt. iIntros "IP".
+    iPoseProof ("H" with "IP") as "H". iApply "H". eauto.
   Qed.  
 
   Lemma wsim_progress
@@ -1261,9 +1227,47 @@ Section wsim.
   -∗
     @wsim Es r g R RR true true sti_src sti_tgt.
   Proof.
-    unfold wsim. destruct sti_src, sti_tgt. iIntros "H WD".
+    destruct sti_src, sti_tgt. iIntros "H WD".
     iApply isim_progress. iApply "H". eauto.
   Qed.
+
+  Lemma wsim_base Es r g R (RR: Any.t * R -> Any.t * R -> iProp)
+    ps pt sti_src sti_tgt
+    :
+    bi_entails
+      (world u n Es -∗ r R RR ps pt sti_src sti_tgt)
+      (wsim Es r g RR ps pt sti_src sti_tgt).
+  Proof.
+    iIntros "H W". iApply isim_base. iApply "H". eauto.
+  Qed.
+
+  Lemma wsim_reset 
+    Es r g {R} RR ps pt sti_src sti_tgt
+  :
+    bi_entails
+      (@wsim Es r g R RR false false sti_src sti_tgt)
+      (@wsim Es r g R RR ps pt sti_src sti_tgt).
+  Proof.
+    iIntros "H W". iApply isim_reset. iApply "H". eauto.
+  Qed.
+
+  Lemma wsim_coind Es r g A P RA RRA psA ptA srcA tgtA
+    (COIND: forall g0 (a:A),
+      bi_entails
+        ((□ ((∀ R RR ps pt src tgt, g R RR ps pt src tgt -∗ g0 R RR ps pt src tgt) ∗
+             (∀ a, P a ∗ world u n Es -∗ g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))) ∗
+         P a)
+        (@wsim Es r g0 (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)))
+    :
+    forall (a:A),
+      bi_entails
+        (P a)
+        (@wsim Es r g (RA a) (RRA a) (psA a) (ptA a) (srcA a) (tgtA a)).
+  Proof.
+    i. iIntros "P W". iApply (isim_coind _ (fun a => P a ∗ world u n Es)%I); i.
+    - iIntros "(H & P & W)". iRevert "W". iApply COIND. eauto.
+    - iFrame.
+  Qed.  
 
   (********)
 
@@ -1381,7 +1385,7 @@ Global Opaque wsim.
 Module HModSemPair.
 Section WSIMMODSEM.
   Import HModSem.
-  Local Notation universe := positive.
+  Local Notation world_id := positive.
   Local Notation level := nat.
 
   Context `{Σ: GRA.t}.
@@ -1393,7 +1397,7 @@ Section WSIMMODSEM.
   Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
 
   Variable (ms_src ms_tgt: HModSem.t).
-  (* Variable u: universe. *)
+  (* Variable u: world_id. *)
   (* Variable n: level. *)
   Variable Ist: Any.t -> Any.t -> iProp.
   (* Variable RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp.  *)
@@ -1427,7 +1431,7 @@ End HModSemPair.
 
 Module HModPair.
 Section WSIMMOD.
-  Local Notation universe := positive.
+  Local Notation world_id := positive.
   Local Notation level := nat.
 
   Context `{Σ: GRA.t}.
@@ -1442,7 +1446,7 @@ Section WSIMMOD.
   Variable Ist: Any.t -> Any.t -> iProp.
   (* Variable RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp. *)
   (* Variable Es: coPsets. *)
-  (* Variable u: universe. *)
+  (* Variable u: world_id. *)
   (* Variable n: level. *)
 
   Inductive sim: Prop := mk {
@@ -1642,7 +1646,7 @@ Ltac step0 :=
     Global Arguments Enil {_}.
     Global Arguments Esnoc {_} _%proof_scope _%string _%I.
     
-    Local Notation universe := positive.
+    Local Notation world_id := positive.
     Local Notation level := nat.
   
     Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' Ist '------------------------------------------------------------------' st_src st_tgt '------------------------------------------------------------------'  itr_src itr_tgt"
@@ -1705,7 +1709,7 @@ Ltac step0 :=
 
   Section TEST.
     Import HModSem HMod.
-    Local Notation universe := positive.
+    Local Notation world_id := positive.
     Local Notation level := nat.
   
     Context `{Σ: GRA.t}.
