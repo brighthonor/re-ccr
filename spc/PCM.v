@@ -1045,7 +1045,7 @@ Module GRA.
     inG_prf: RA = Σ inG_id;
   }
   .
-  Class subG (Σ0 Σ1: t) := SubG i : { j | Σ0 i = Σ1 j }.
+  (* Class subG (Σ0 Σ1: t) := SubG i : { j | Σ0 i = Σ1 j }. *)
   (* Class subG (GRA0 GRA1: t) := SubG { subG_prf: forall i, { j | GRA0 i = GRA1 j } }. *)
 
   Definition of_list (RAs: list URA.t): t := fun n => List.nth n RAs (of_RA.t RA.empty).
