@@ -4,7 +4,7 @@ From iris Require Import bi.big_op.
 From iris Require base_logic.lib.invariants.
 From Coq Require Import Program Arith.
 Require Import Coqlib PCM PCMAux IProp IPM.
-Require Import PropExtensionality.
+(* Require Import PropExtensionality. *)
 
 Module HRA.
 
@@ -194,14 +194,17 @@ Module sProp.
 
   Definition sProp (n : level) : Type := _sProp (S n).
 
-  Definition affinely {n} (p : sProp n) : sProp n :=
-    and empty p.
-
   Fixpoint liftn n {m} (p: sProp m) : sProp (n+m) :=
     match n return sProp (n+m) with
     | 0 => p
     | S n' => lift (liftn n' p)
     end.
+  
+  Definition affinely {n} (p : sProp n) : sProp n :=
+    and empty p.
+
+  Definition ownM `{IN: @GRA.inG M Γ} {n} (r: M) : sProp n :=
+    ownm IN.(GRA.inG_id) (eq_rect _ (@URA.car) r _ IN.(GRA.inG_prf)).
   
   End SPROP.
 
@@ -227,8 +230,8 @@ Module sPropI.
 
   Section INTERP.
 
-  Context `{α: SAtom.t}.
   Context `{sub: @HRA.subG Γ Σ}.
+  Context `{α: SAtom.t (Γ:=Γ) (Σ:=Σ)}.
 
   Import sProp.
 
@@ -263,8 +266,8 @@ End sPropI.
 
 Section RED.
 
-  Context `{α: SAtom.t}.
   Context `{sub: @HRA.subG Γ Σ}.
+  Context `{α: SAtom.t (Γ:=Γ) (Σ:=Σ)}.
 
   Import sProp.
   Import sPropI.
@@ -272,6 +275,16 @@ Section RED.
   Lemma red_sem_ownm n i a :
     interp n (ownm i a) = OwnM a.
   Proof. reflexivity. Qed.
+
+  Lemma red_sem_ownM `{@GRA.inG M Γ} n (r: M) :
+    interp n (ownM r) = OwnM r.
+  Proof.
+    unfold ownM. rewrite red_sem_ownm.
+    destruct sub eqn: EQsub. subst. destruct H. subst. ss.
+    f_equal. unfold HRA.in_subG, HRA.embed. ss.
+    erewrite (UIP _ _ _ (HRA.embed_obligation_1 inG_id)).
+    reflexivity.
+  Qed.
   
   Lemma red_sem_atom n a :
     interp n (atom a) = α n a.
@@ -282,7 +295,7 @@ Section RED.
   Proof. reflexivity. Qed.
 
   Lemma red_sem_lift n p :
-    interp n (lift p) = _interp n p.
+    interp (S n) (lift p) = interp n p.
   Proof. reflexivity. Qed.
 
   Lemma red_sem_pure n P :
@@ -408,6 +421,7 @@ Notation "'⌜' P '⌝'" := (sProp.pure P) : sProp_scope.
 Notation "'⊤'" := ⌜True⌝ : sProp_scope.
 Notation "'⊥'" := ⌜False⌝ : sProp_scope.
 
+Notation "'<ownm>' r" := (sProp.ownM r) (at level 20) : sProp_scope.
 Notation "'⟨' A '⟩'" := (sProp.atom A) : sProp_scope.
 Notation "⤉ P" := (sProp.lift P) (at level 20) : sProp_scope.
 
