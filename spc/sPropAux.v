@@ -12,12 +12,9 @@ Module WD.
 
   Section WD.
 
-  Context `{τ: GTyp.t}.
-  Context `{_C0: @HRA.subG Γ Σ}.
-  Context `{_C1: @GPF.inG ST.t τ}.
-  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.
-  Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
-    
+  Context `{_W: CtxSL.t}.
+  Context `{_W0: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
+  
   Variant shape : Type :=
   | _owni (u: positive) (i: positive)
   .
@@ -39,7 +36,7 @@ Module WD.
 
   Global Instance t: SRFMSem.t := interp.
 
-  Context `{_C4: @SRFMSemG.inG _ _ _ t β}.
+  Context `{_W1: @SRFMSemG.inG _ _ _ t β}.
   
   Definition owni {n} u i (p: SRFSyn.t n) :=
     ⟨ _owni u i, fun _ => p ⟩%SRF.
@@ -48,93 +45,20 @@ Module WD.
 
 End WD.
 
-(* Section TL_FORMULA. *)
+Module CtxSLSTWD.
+  
+  Class t
+    `{_C: CtxSLST.t}
+    `{_C: @GRA.inG (OwnIsRA SRFSyn.t) Σ}
+    `{_C: @SRFMSemG.inG _ _ _ WD.t β}
+    := ctxSL: unit.
 
-(*   Context {AA : AuxAtom}. *)
-(*   Context {STT : StateTypes}. *)
-
-(*   Definition _Formula := (@_formula (@Atom.t AA STT)). *)
-(*   Definition Formula := (@formula (@Atom.t AA STT)). *)
-
-(* End TL_FORMULA. *)
-
-(* Section TLRAS. *)
-
-(*   Context {AA : AuxAtom}. *)
-
-(*   Class TLRAs (STT : StateTypes) (Σ : GRA.t) := *)
-(*     { *)
-(*       (* Invariant related default RAs *) *)
-(*       _OWNESRA : @GRA.inG OwnEsRA Σ; *)
-(*       _OWNDSRA : @GRA.inG OwnDsRA Σ; *)
-(*       _IINVSETRA : @GRA.inG (IInvSetRA Formula) Σ; *)
-(*       (* State related default RAs *) *)
-(*       _THDRA: @GRA.inG ThreadRA Σ; *)
-(*       _STATESRC: @GRA.inG (stateSrcRA st_src_type) Σ; *)
-(*       _STATETGT: @GRA.inG (stateTgtRA st_tgt_type) Σ; *)
-(*       _IDENTSRC: @GRA.inG (identSrcRA id_src_type) Σ; *)
-(*       _IDENTTGT: @GRA.inG (identTgtRA id_tgt_type) Σ; *)
-(*       (* Liveness logic related default RAs *) *)
-(*       _OBLGRA: @GRA.inG ObligationRA.t Σ; *)
-(*       _EDGERA: @GRA.inG EdgeRA Σ; *)
-(*       _ARROWSHOTRA: @GRA.inG ArrowShotRA Σ; *)
-(*       _ARROWRA: @GRA.inG (@ArrowRA id_tgt_type Formula) Σ; *)
-(*       _SHAREDUTY: @GRA.inG (@ShareDutyRA id_tgt_type Formula) Σ; *)
-(*     }. *)
-
-(* End TLRAS. *)
-
-(* Section EXPORT. *)
-
-(*   Context {AA : AuxAtom}. *)
-(*   Context {STT : StateTypes}. *)
-(*   Context `{Σ : GRA.t}. *)
-(*   Context {TLRAS : TLRAs STT Σ}. *)
-
-(*   (* Invariant related default RAs *) *)
-(*   #[export] Instance OWNESRA : @GRA.inG OwnEsRA Σ := _OWNESRA. *)
-(*   #[export] Instance OWNDSRA : @GRA.inG OwnDsRA Σ:= _OWNDSRA. *)
-(*   #[export] Instance IINVSETRA : @GRA.inG (IInvSetRA Formula) Σ:= _IINVSETRA. *)
-(*   (* State related default RAs *) *)
-(*   #[export] Instance THDRA: @GRA.inG ThreadRA Σ:= _THDRA. *)
-(*   #[export] Instance STATESRC: @GRA.inG (stateSrcRA st_src_type) Σ:= _STATESRC. *)
-(*   #[export] Instance STATETGT: @GRA.inG (stateTgtRA st_tgt_type) Σ:= _STATETGT. *)
-(*   #[export] Instance IDENTSRC: @GRA.inG (identSrcRA id_src_type) Σ:= _IDENTSRC. *)
-(*   #[export] Instance IDENTTGT: @GRA.inG (identTgtRA id_tgt_type) Σ:= _IDENTTGT. *)
-(*   (* Liveness logic related default RAs *) *)
-(*   #[export] Instance OBLGRA: @GRA.inG ObligationRA.t Σ:= _OBLGRA. *)
-(*   #[export] Instance EDGERA: @GRA.inG EdgeRA Σ:= _EDGERA. *)
-(*   #[export] Instance ARROWSHOTRA: @GRA.inG ArrowShotRA Σ:= _ARROWSHOTRA. *)
-(*   #[export] Instance ARROWRA: @GRA.inG (@ArrowRA id_tgt_type Formula) Σ:= _ARROWRA. *)
-(*   #[export] Instance SHAREDUTY: @GRA.inG (@ShareDutyRA id_tgt_type Formula) Σ:= _SHAREDUTY. *)
-
-(* End EXPORT. *)
-
-(* Section TL_INTERP. *)
-
-(*   Context {AA : AuxAtom}. *)
-(*   Context {STT : StateTypes}. *)
-(*   Context `{Σ : GRA.t}. *)
-(*   Context `{AAI : @AAInterp Σ AA}. *)
-(*   Context {TLRAS : @TLRAs AA STT Σ}. *)
-
-(*   Definition AtomSem := (@Atom_to_semantics AA STT Σ AAI TLRAS). *)
-(*   Definition SynSem := (@formula_sem (@Atom.t AA STT) Σ (@AtomSem)). *)
-
-(*   Global Instance SynIISet : @IInvSet Σ Formula := *)
-(*     {| prop := SynSem |}. *)
-
-(* End TL_INTERP. *)
+End CtxSLSTWD.
 
 Module WDRed.
   Section RED.
 
-  Context `{τ: GTyp.t}.
-  Context `{_C0: @HRA.subG Γ Σ}.
-  Context `{_C1: @GPF.inG ST.t τ}.
-  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
-  Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
-  Context `{_C4: @SRFMSemG.inG _ _ α WD.t β}.
+  Context `{_C: CtxSLSTWD.t}.
 
   Lemma owni n u i (p: SRFSyn.t n) :
     SRFSem.t n (WD.owni u i p) = OwnI u n i p.
@@ -146,10 +70,10 @@ Module WDRed.
 End WDRed.
 
 Ltac WD_red := (try rewrite ! @WDRed.owni
-                ).
+               ).
 
 Ltac WD_red_all := (try rewrite ! @WDRed.owni in *
-                    ).
+                   ).
 
 (***
 
@@ -160,18 +84,8 @@ Ltac WD_red_all := (try rewrite ! @WDRed.owni in *
 
 Section test.
 
-  (* System constraints *)
-
-  Context `{τ: GTyp.t}.
-  Context `{_C0: @HRA.subG Γ Σ}.
-  Context `{_C1: @GPF.inG ST.t τ}.
-  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.
-  Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
-  Context `{_C4: @SRFMSemG.inG _ _ α WD.t β}.
-  
-  (* User-defined ownm constraints *)
-
-  Context `{@GRA.inG OwnEsRA Γ}.
+  Context `{_C: CtxSLSTWD.t}.
+  Context `{_U: @GRA.inG OwnEsRA Γ}.
   
   Variable x: SRFSyn.t 3.
 
@@ -181,8 +95,6 @@ Section test.
     (<ownm> maps_to_res 1%positive (@maps_to_res nat CoPset.t 1 (Some ∅))).
 
 End test.
-
-
 
 
 
