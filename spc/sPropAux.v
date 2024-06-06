@@ -3,7 +3,7 @@ From sflib Require Import sflib.
 From iris Require Import bi.big_op.
 From iris Require base_logic.lib.invariants.
 From Coq Require Import Program Arith.
-Require Import Coqlib PCM PCMAux IProp IPM sProp.
+Require Import Coqlib PCM PCMAux IProp IPM SRF sProp.
 Require Import RobustIndexedInvariants.
 
 Local Notation level := nat.
@@ -23,10 +23,6 @@ Module ST.
   | listT : type -> type
   | pgmapT : type -> type
   | metaT : type
-  (* | nat_wfT : type *)
-  (* | owfT : type *)
-  (* | tidsetT : type *)
-  (* | codeT (idT stT R : Type) : type *)
   .
 
   Fixpoint interp (ty : type) (sProp : Type) : Type :=
@@ -39,10 +35,6 @@ Module ST.
     | listT ty1 => list (interp ty1 sProp)
     | pgmapT ty1 => gmap positive (interp ty1 sProp)
     | metaT => Type
-    (* | nat_wfT => T nat_wf *)
-    (* | owfT => T owf *)
-    (* | tidsetT => TIdSet.t *)
-    (* | codeT idT stT R => itree (threadE idT stT) R *)
     end.
 
   Global Instance t : PF.t := {
@@ -51,6 +43,7 @@ Module ST.
     }.
   
   End TYPES.
+  
 End ST.
 
 (** Notations and Coercions. *)
@@ -70,74 +63,60 @@ Module BO.
 
   Section BIGOP.
 
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
-    
-  Import sProp sPropI.
+  Context `{τ: gTyp.t}.
+  Context `{_C0: @HRA.subG Γ Σ}.
+  Context `{_C1: @GPF.inG ST.t τ}.  
+  Context `{_C2: @SRFMSemG.inG _ SL.syntax α (@SL.t Γ Σ sub τ α) β}.
 
   (* Maybe we can make Syntax as an instance for big_opMs. *)
   Definition syn_big_sepM
              (n : level) {K} {H1 : EqDecision K} {H2 : Countable K}
              {A} (I : @gmap K H1 H2 A)
-             (f : K -> A -> sProp n)
-    : sProp n :=
-    fold_right (fun hd tl => sepconj (uncurry f hd) tl) empty (map_to_list I).
+             (f : K -> A -> SRFSyn.t n)
+    : SRFSyn.t n :=
+    fold_right (fun hd tl => (uncurry f hd) ∗ tl)%SRF SL.empty (map_to_list I).
 
   Lemma red_syn_big_sepM n K {H1 : EqDecision K} {H2 : Countable K} A I f :
-    interp n (@syn_big_sepM n K _ _ A I f) = ([∗ map] i ↦ a ∈ I, interp n (f i a))%I.
+    SRFSem.t n (@syn_big_sepM n K _ _ A I f) = ([∗ map] i ↦ a ∈ I, SRFSem.t n (f i a))%I.
   Proof.
     ss. unfold big_opM. rewrite seal_eq. unfold big_op.big_opM_def.
     unfold syn_big_sepM. simpl. remember (map_to_list I) as L.
     clear HeqL I. induction L.
-    { ss. }
-    ss. rewrite @red_sem_sepconj. rewrite IHL. f_equal.
+    { ss. SL_red_all. eauto. }
+    ss. SL_red_all. rewrite IHL. f_equal.
     destruct a. ss.
   Qed.
 
   Definition syn_big_sepS
              (n : level) {K} {H1 : EqDecision K} {H2 : Countable K}
              (I : @gset K H1 H2)
-             (f : K -> sProp n)
-    : sProp n :=
-    fold_right (fun hd tl => sepconj (f hd) tl) empty (elements I).
+             (f : K -> SRFSyn.t n)
+    : SRFSyn.t n :=
+    fold_right (fun hd tl => (f hd) ∗ tl)%SRF emp%SRF (elements I).
 
   Lemma red_syn_big_sepS n K {H1 : EqDecision K} {H2 : Countable K} I f :
-    interp n (@syn_big_sepS n K _ _ I f) = ([∗ set] i ∈ I, interp n (f i))%I.
+    SRFSem.t n (@syn_big_sepS n K _ _ I f) = ([∗ set] i ∈ I, SRFSem.t n (f i))%I.
   Proof.
     ss. unfold big_opS. rewrite seal_eq. unfold big_op.big_opS_def.
     unfold syn_big_sepS. remember (elements I) as L.
     clear HeqL I. induction L.
-    { ss. }
-    ss. rewrite @red_sem_sepconj. rewrite IHL. f_equal.
+    { ss. SL_red_all. eauto. }
+    ss. SL_red_all. rewrite IHL. f_equal.
   Qed.
 
   Definition syn_big_sepL1
              (n : level) {A} (I : list A)
-             (f : A -> sProp n)
-    : sProp n :=
-    fold_right (fun hd tl => sepconj (f hd) tl) empty I.
+             (f : A -> SRFSyn.t n)
+    : SRFSyn.t n :=
+    fold_right (fun hd tl => (f hd) ∗ tl)%SRF emp%SRF I.
 
   Lemma red_syn_big_sepL1 n A I f :
-    interp n (@syn_big_sepL1 n A I f) = ([∗ list] a ∈ I, interp n (f a))%I.
+    SRFSem.t n (@syn_big_sepL1 n A I f) = ([∗ list] a ∈ I, SRFSem.t n (f a))%I.
   Proof.
     ss. induction I; ss.
-    rewrite @red_sem_sepconj. rewrite IHI. f_equal.
+    { SL_red_all. ss. }
+    SL_red_all. rewrite IHI. f_equal.
   Qed.
-
-  (* Additional definitions. *)
-
-  (* Definition syn_sat_list *)
-  (*            n X (Ts : X -> Type) (x : X) (intp : Ts x -> sProp n) (l : list (Ts x)) *)
-  (*   : sProp n := *)
-  (*   foldr (fun t (p : sProp n) => (intp t ∗ p)%F) ⊤%F l. *)
-
-  (* Lemma red_syn_sat_list n X Ts x intp l : *)
-  (*   interp n (syn_sat_list n X Ts x intp l) = *)
-  (*     @Regions.sat_list X Ts Σ x (fun (t : Ts x) => interp n (intp t)) l. *)
-  (* Proof. *)
-  (*   induction l; ss. *)
-  (*   rewrite @red_sem_sepconj. rewrite IHl. f_equal. *)
-  (* Qed. *)
 
   End BIGOP.
 
@@ -169,13 +148,16 @@ Notation "'[∗' n , A 'list]' x ∈ l , P" :=
 
 Require Import RobustIndexedInvariants.
 
-Module SA.
+Module WD.
 
-  Section ATOM.
+  Section WD.
 
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
-  Context `{@GRA.inG (OwnIsRA sProp.sProp) Σ}.
+  Context `{τ: gTyp.t}.
+  Context `{_C0: @HRA.subG Γ Σ}.
+  Context `{_C1: @GPF.inG ST.t τ}.
+  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
+  Context `{_C3: @SRFMSemG.inG _ SL.syntax α (@SL.t Γ Σ sub τ α) β}.
+  Context `{_C4: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
     
   Variant shape : Type :=
   | _owni (u: positive) (i: positive)
@@ -186,31 +168,32 @@ Module SA.
     | _owni u i => fin 1
     end.
 
-  Global Instance atoms: PF.t := {
+  Global Instance syntax: PF.t := {
       shp := shape;
       deg := degree;
     }.
 
-  Definition interp n (s: shape) : (degree s (sProp._sProp n) -> sProp.sProp n) -> (degree s (sProp._sProp n) -> iProp) -> iProp :=
+  Definition interp n (s: shape) : (degree s (SRFSyn._t n) -> SRFSyn.t n) -> (degree s (SRFSyn._t n) -> iProp) -> iProp :=
     match s with
-    | _owni u i => fun p P => @OwnI _ sProp.sProp _ u n i (p 0%fin)
+    | _owni u i => fun p P => @OwnI _ SRFSyn.t _ u n i (p 0%fin)
     end.
 
-  Global Instance t: SAtom.t := interp.
+  Global Instance t: SRFMSem.t := interp.
 
-  Definition owni `{@GAtom.inG _ _ _ _ _ t β} {n} u i (p: sProp.sProp n) :=
-    (⟨ existT (_owni u i) (fun _ => p) ⟩)%F.
+  Context `{IN:@SRFMSemG.inG _ _ _ t β}.
   
-  End ATOM.
+  Definition owni {n} u i (p: SRFSyn.t n) :=
+    ⟨ existT (_owni u i) (fun _ => p) ⟩%SRF.
+  
+  End WD.
 
-End SA.
+End WD.
 
 (** Notations and coercions. *)
-Notation "'τ{' t ',' n '}'" := (PF.deg t (sProp._sProp n)).
-Notation "'τ{' t '}'" := (PF.deg t (sProp._sProp _)).
-(* Notation "'⟪' A ',' n '⟫'" := (SAtom.interp n A). *)
-Notation "'⟦' F ',' n '⟧'" := (sPropI.interp n F).
-Notation "'⟦' F '⟧'" := (sPropI.interp _ F).
+Notation "'τ{' t ',' n '}'" := (PF.deg t (SRFSyn._t n)).
+Notation "'τ{' t '}'" := (PF.deg t (SRFSyn._t _)).
+Notation "'⟦' F ',' n '⟧'" := (SRFSem.t n F).
+Notation "'⟦' F '⟧'" := (SRFSem.t _ F).
 
 (* Section TL_FORMULA. *)
 
@@ -290,48 +273,30 @@ Notation "'⟦' F '⟧'" := (sPropI.interp _ F).
 
 (* End TL_INTERP. *)
 
-Section RED.
+Module WDRed.
+  Section RED.
 
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
-  Context `{@GPF.inG ST.t τ}.
-  Context `{@GRA.inG (OwnIsRA sProp.sProp) Σ}.
-  Context `{@GAtom.inG _ _ _ _ _ SA.t β}.
+  Context `{τ: gTyp.t}.
+  Context `{_C0: @HRA.subG Γ Σ}.
+  Context `{_C1: @GPF.inG ST.t τ}.
+  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
+  Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
+  Context `{_C4: @SRFMSemG.inG _ _ α WD.t β}.
 
-  Lemma red_sem_owni n u i (p: sProp.sProp n) :
-    sPropI.interp n (SA.owni u i p) = OwnI u n i p.
+  Lemma owni n u i (p: SRFSyn.t n) :
+    SRFSem.t n (WD.owni u i p) = OwnI u n i p.
   Proof.
-    unfold SA.owni. rewrite ! @red_sem_atom. reflexivity.
+    unfold WD.owni. SRF_red_all. reflexivity.
   Qed.
 
-End RED.
+  End RED.
+End WDRed.
 
-Global Opaque sPropI.interp.
+Ltac WD_red := (try rewrite ! @WDRed.owni
+                ).
 
-(** Simple formula reduction tactics. *)
-Ltac red_tl_binary_once := red_sem_binary_once.
-
-Ltac red_tl_unary_once := (red_sem_unary_once;
-                           try rewrite ! @red_sem_owni
-                           ).
-
-Ltac red_tl_binary := repeat red_tl_binary_once.
-Ltac red_tl_unary := repeat red_tl_unary_once.
-Ltac red_tl := repeat (red_tl_binary; red_tl_unary).
-
-Ltac red_tl_binary_once_every := red_sem_binary_once_every.
-
-Ltac red_tl_unary_once_every := (red_sem_unary_once_every;
-                                 try rewrite ! @red_sem_owni in *
-                                ).
-
-Ltac red_tl_binary_every := repeat red_tl_binary_once.
-Ltac red_tl_unary_every := repeat red_tl_unary_once.
-Ltac red_tl_every := repeat (red_tl_binary_every; red_tl_unary_every).
-
-
-
-
+Ltac WD_red_all := (try rewrite ! @WDRed.owni in *
+                    ).
 
 (***
 
@@ -339,86 +304,29 @@ Ltac red_tl_every := repeat (red_tl_binary_every; red_tl_unary_every).
 
  ***)
 
-Module QuantTest.
-
-  Section QT.
-
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
-    
-  Variant shape : Type :=
-  | _my_univ i (ty: τ i)
-  | _my_ex i (ty: τ i)
-  .
-
-  Definition degree (s: shape) (sProp: Type) : Type :=
-    match s with
-    | _my_univ i ty => PF.deg ty sProp
-    | _my_ex i ty => PF.deg ty sProp
-    end.
-
-  Global Instance quantifiers: PF.t := {
-      shp := shape;
-      deg := degree;
-    }.
-
-  Definition interp n (s: shape) : (degree s (sProp._sProp n) -> sProp.sProp n) -> (degree s (sProp._sProp n) -> iProp) -> iProp :=
-    match s with
-    | _my_univ i ty => fun p P => Univ P
-    | _my_ex i ty => fun p P => Ex P
-    end.
-
-  Global Instance t: SAtom.t := interp.
-
-  Definition my_univ `{@GAtom.inG _ _ _ _ _ t β} {n} i ty p : sProp.sProp n :=
-    (⟨ existT (_my_univ i ty) p ⟩)%F.
-
-  Definition my_ex `{@GAtom.inG _ _ _ _ _ t β} {n} i ty p : sProp.sProp n :=
-    (⟨ existT (_my_ex i ty) p ⟩)%F.
-  
-  End QT.
-
-End QuantTest.
-
-
 
 Section test.
 
   (* System constraints *)
 
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
-  Context `{@GPF.inG ST.t τ}.
-  Context `{@GRA.inG (OwnIsRA sProp.sProp) Σ}.
-  Context `{@GAtom.inG _ _ _ _ _ SA.t β}.
-
-  (* User-defined atom constraints *)
+  Context `{τ: gTyp.t}.
+  Context `{_C0: @HRA.subG Γ Σ}.
+  Context `{_C1: @GPF.inG ST.t τ}.
+  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
+  Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
+  Context `{_C4: @SRFMSemG.inG _ _ α WD.t β}.
   
-  Context `{@GAtom.inG _ _ _ _ _ QuantTest.t β}.
-    
   (* User-defined ownm constraints *)
 
   Context `{@GRA.inG OwnEsRA Γ}.
   
-  Variable x: sProp.sProp 3.
+  Variable x: SRFSyn.t 3.
 
   Definition gee: iProp := ⟦ x ⟧.
 
-  Definition foo : sProp.sProp 0 :=
+  Definition foo : SRFSyn.t 0 :=
     (<ownm> maps_to_res 1%positive (@maps_to_res nat CoPset.t 1 (Some ∅))).
 
-  Lemma red_sem_my_univ n i ty p :
-    sPropI.interp n (QuantTest.my_univ i ty p) = (∀ x, sPropI.interp n (p x))%I.
-  Proof.
-    unfold QuantTest.my_univ. rewrite @red_sem_atom. reflexivity.
-  Qed.
-
-  Lemma red_sem_my_ex `{@GPF.inG T τ} n i ty p :
-    sPropI.interp n (QuantTest.my_ex i ty p) = (∃ x, sPropI.interp n (p x))%I.
-  Proof.
-    unfold QuantTest.my_ex. rewrite @red_sem_atom. reflexivity.
-  Qed.
-  
 End test.
 
 

@@ -3,8 +3,7 @@ From sflib Require Import sflib.
 From iris Require Import bi.big_op.
 From iris Require base_logic.lib.invariants.
 From Coq Require Import Program Arith.
-Require Import Coqlib PCM PCMAux IProp IPM.
-(* Require Import PropExtensionality. *)
+Require Import Coqlib PCM PCMAux IProp IPM SRF.
 
 Module HRA.
 
@@ -39,386 +38,342 @@ End HRA.
 
 Coercion HRA.subG_map: HRA.subG >-> Funclass.
 
-Module PF.
-  
-  Class t: Type := {
-    shp: Type;
-    deg: shp -> forall (sProp:Type), Type;
-   }.
-
-End PF.
-
-Coercion PF.shp: PF.t >-> Sortclass.
-
-Module GPF.
-  
-  Class t: Type := __GATOM: nat -> PF.t.
-
-  Class inG (F: PF.t) (GF: t) : Type := {
-    inG_id: nat;
-    inG_prf: F = GF inG_id;
-  }.
-
-End GPF.
-
 Module gTyp.
 
   Class t: Type := __GTYP : GPF.t.
 
 End gTyp.
 
-Module gAtom.
-  
-  Class t: Type := __GATM: GPF.t.
+Module SL.
 
-End gAtom.
+  Section SL.
 
-Local Notation level := nat.
-
-Module sProp.
-
-  Section SYNTAX.
-
-  Context `{Γ: HRA.t}.
-  Context `{τ: gTyp.t}.
-  Context `{α: gAtom.t}.
-
-  Inductive t {sProp : Type} : Type :=
-  | _ownm i (r : Γ i) : t
-  | _atom i (s: α i) (p: PF.deg s sProp -> t)
-  | lift (p : sProp) : t
-  | pure (P : Prop) : t
-  | and (p q : t) : t
-  | or  (p q : t) : t
-  | impl (p q : t) : t
-  | _univ i (ty : τ i) (p: PF.deg ty sProp -> t) : t
-  | _ex   i (ty : τ i) (p: PF.deg ty sProp -> t) : t
-  | empty : t
-  | sepconj (p q : t) : t
-  | wand (p q : t) : t
-  | persistently (p : t) : t
-  | plainly (p : t) : t
-  | upd (p : t) : t
-  .
-
-  Fixpoint _sProp (n : level) : Type :=
-    match n with
-    | O => Empty_set
-    | S m => t (sProp := _sProp m) 
-    end.
-
-  Definition sProp (n : level) : Type := _sProp (S n).
-
-  Fixpoint liftn n {m} (p: sProp m) : sProp (n+m) :=
-    match n return sProp (n+m) with
-    | 0 => p
-    | S n' => lift (liftn n' p)
-    end.
-  
-  Definition affinely {n} (p : sProp n) : sProp n :=
-    and empty p.
-
-  Definition ownm `{IN: @GRA.inG M Γ} {n} (r: M) : sProp n.
-    destruct IN. subst.
-    exact (_ownm _ r).
-  Defined.
-
-  Definition univ `{T: PF.t} `{IN: @GPF.inG T τ} {n} (ty: T) (p: PF.deg ty (_sProp n) -> sProp n) : sProp n.
-    destruct IN. subst.
-    exact (_univ _ ty p).
-  Defined.
-
-  Definition ex `{T: PF.t} `{IN: @GPF.inG T τ} {n} (ty: T) (p: PF.deg ty (_sProp n) -> sProp n) : sProp n.
-    destruct IN. subst.
-    exact (_ex _ ty p).
-  Defined.
-  
-  End SYNTAX.
-
-End sProp.
-
-Module SAtom.
-
-  Section SATOM.
-
-  Context `{Γ: HRA.t}.
-  Context `{Σ: GRA.t}.
-  Context `{τ: gTyp.t}.
-  Context `{α: gAtom.t}.
-  Context `{A: PF.t}.
-
-  Class t : Type := 
-    interp: forall n (s: A) (p: PF.deg s (sProp._sProp n) -> sProp.sProp n) (P: PF.deg s (sProp._sProp n) -> iProp), iProp
-  .
-
-  End SATOM.
-  
-End SAtom.
-
-Module GAtom.
-
-  Section GATM.
-
-  Context `{Γ: HRA.t}.
-  Context `{Σ: GRA.t}.
+  Context `{sub: @HRA.subG Γ Σ}.
   Context `{τ: gTyp.t}.
     
-  Class t `{α: gAtom.t}: Type := __GATOM: forall i, SAtom.t (A:= α i).
-
-  Class inG (A: PF.t) (α: gAtom.t) (B: @SAtom.t _ _ _ α A) (β: t) : Type := {
-    inG_id: nat;
-    inG_prf: existT A B = existT (α inG_id) (β inG_id);
+  Global Instance domain : SRFDom.t := {
+    dom := iProp;
+    void := False%I;
   }.
+    
+  Variant shape : Type :=
+    | _ownm i (r : Γ i)
+    | _pure (P : Prop)
+    | _and
+    | _or
+    | _impl
+    | _univ i (ty : τ i)
+    | _ex   i (ty : τ i)
+    | _empty
+    | _sepconj
+    | _wand
+    | _persistently
+    | _plainly
+    | _upd
+  .
   
-  End GATM.
-
-End GAtom.
-
-Module sPropI.
-
-  Section INTERP.
-
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
-
-  Import sProp.
-
-  Fixpoint _interp n : _sProp n -> iProp :=
-    match n with
-    | O => fun _ => ⌜False⌝%I
-    | S m => fix _interp_aux (syn : _sProp (S m)) : iProp :=
-      match syn with
-      | _ownm i a => OwnM a
-      | _atom i s p => β i m s p (_interp_aux ∘ p)
-      | lift p => _interp m p
-      | pure P => Pure P
-      | and p q => And (_interp_aux p) (_interp_aux q)
-      | or p q => Or (_interp_aux p) (_interp_aux q)
-      | impl p q => Impl (_interp_aux p) (_interp_aux q)
-      | _univ i ty p => Univ (_interp_aux ∘ p)
-      | _ex i ty p => Ex (_interp_aux ∘ p)
-      | empty => Emp
-      | sepconj p q => Sepconj (_interp_aux p) (_interp_aux q)
-      | wand p q => Wand (_interp_aux p) (_interp_aux q)
-      | persistently p => Persistently (_interp_aux p)
-      | plainly p => IProp.Plainly (_interp_aux p)
-      | upd p => Upd (_interp_aux p)
-      end
+  Definition degree (s: shape) (Prev: Type) : Type :=
+    match s with
+    | _ownm i r => fin 0
+    | _pure P => fin 0
+    | _and => fin 2
+    | _or => fin 2
+    | _impl => fin 2
+    | _univ i ty => PF.deg ty Prev
+    | _ex   i ty => PF.deg ty Prev
+    | _empty => fin 0
+    | _sepconj => fin 2
+    | _wand => fin 2
+    | _persistently => fin 1
+    | _plainly => fin 1
+    | _upd => fin 1
     end.
 
-  Definition interp n : sProp n -> iProp := _interp (S n).
+  Global Instance syntax: PF.t := {
+      shp := shape;
+      deg := degree;
+    }.
 
-  Program Definition atom `{IN: @GAtom.inG _ _ _ A α B β} {n} (a: {s: A & (PF.deg s (_sProp n) -> sProp n)}) : sProp n.
-    destruct a as [s p]. destruct IN. inv inG_prf.
-    exact (_atom inG_id s p).
+  Context `{α: @SRFMSynG.t}.
+  
+  Definition interp n (s: shape) : (degree s (SRFSyn._t n) -> SRFSyn.t n) -> (degree s (SRFSyn._t n) -> iProp) -> iProp :=
+    match s with
+    | _ownm i r => fun _ _ => OwnM r
+    | _pure P => fun _ _ => Pure P
+    | _and => fun _ P => And (P 0%fin) (P 1%fin)
+    | _or => fun _ P => Or (P 0%fin) (P 1%fin)
+    | _impl => fun _ P => Impl (P 0%fin) (P 1%fin)
+    | _univ i ty => fun _ P => Univ P
+    | _ex   i ty => fun _ P => Ex P
+    | _empty => fun _ _ => Emp
+    | _sepconj => fun _ P => Sepconj (P 0%fin) (P 1%fin)
+    | _wand => fun _ P => Wand (P 0%fin) (P 1%fin)
+    | _persistently => fun _ P => Persistently (P 0%fin)
+    | _plainly => fun _ P => IProp.Plainly (P 0%fin)
+    | _upd => fun _ P => Upd (P 0%fin)
+    end.
+
+  Global Instance t: SRFMSem.t := interp.
+
+  Context `{@SRFMSemG.inG _ _ _ t β}.
+  
+  Definition ownm `{IN: @GRA.inG M Γ} {n} (r: M) : SRFSyn.t n.
+    destruct IN. subst.
+    refine ⟨ existT (_ownm _ r) _ ⟩%SRF.
+    i. inv X.
+  Defined.
+
+  Definition pure {n} (P: Prop) : SRFSyn.t n.
+    refine ⟨ existT (_pure P) _ ⟩%SRF.
+    i. inv X.
+  Defined.
+
+  Definition and {n} (p1 p2: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_and) _ ⟩%SRF.
+    i. destruct X.
+    - exact p1.
+    - exact p2.
+  Defined.
+
+  Definition or {n} (p1 p2: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_or) _ ⟩%SRF.
+    i. destruct X.
+    - exact p1.
+    - exact p2.
+  Defined.
+
+  Definition impl {n} (p1 p2: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_impl) _ ⟩%SRF.
+    i. destruct X.
+    - exact p1.
+    - exact p2.
   Defined.
   
-  End INTERP.
+  Definition univ `{IN: @GPF.inG T τ} {n} (ty:T) (p: PF.deg ty (SRFSyn._t n) -> SRFSyn.t n) : SRFSyn.t n.
+    destruct IN. subst.
+    exact (⟨ existT (_univ _ ty : syntax.(PF.shp)) p ⟩)%SRF.
+  Defined.
+
+  Definition ex `{IN: @GPF.inG T τ} {n} (ty: T) (p: PF.deg ty (SRFSyn._t n) -> SRFSyn.t n) : SRFSyn.t n.
+    destruct IN. subst.
+    exact (⟨ existT (_ex _ ty : syntax.(PF.shp)) p ⟩)%SRF.
+  Defined.
+
+  Definition empty {n} : SRFSyn.t n.
+    refine ⟨ existT (_empty) _ ⟩%SRF.
+    i. inv X.
+  Defined.
   
-End sPropI.
+  Definition sepconj {n} (p1 p2: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_sepconj) _ ⟩%SRF.
+    i. destruct X.
+    - exact p1.
+    - exact p2.
+  Defined.
 
-Section RED.
-
-  Context `{sub: @HRA.subG Γ Σ}.
-  Context `{β: @GAtom.t Γ Σ τ α}.
+  Definition wand {n} (p1 p2: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_wand) _ ⟩%SRF.
+    i. destruct X.
+    - exact p1.
+    - exact p2.
+  Defined.
   
-  Import sProp.
-  Import sPropI.
+  Definition persistently {n} (p: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_persistently) _ ⟩%SRF.
+    i. inv X; [|inv H1].
+    exact p.
+  Defined.
 
-  Lemma red_sem__ownm n i a :
-    interp n (_ownm i a) = OwnM a.
-  Proof. reflexivity. Qed.
+  Definition plainly {n} (p: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_plainly) _ ⟩%SRF.
+    i. inv X; [|inv H1].
+    exact p.
+  Defined.
 
-  Lemma red_sem_ownm `{@GRA.inG M Γ} n (r: M) :
-    interp n (ownm r) = OwnM r.
+  Definition upd {n} (p: SRFSyn.t n) : SRFSyn.t n.
+    refine ⟨ existT (_upd) _ ⟩%SRF.
+    i. inv X; [|inv H1].
+    exact p.
+  Defined.
+
+  Definition affinely {n} (p : SRFSyn.t n) : SRFSyn.t n :=
+    and empty p.
+
+  End SL.
+
+End SL.
+
+Module SLRed.
+
+  Section RED.
+
+  Context `{τ: gTyp.t}.
+  Context `{@HRA.subG Γ Σ}.
+  Context `{@SRFMSemG.inG _ _ α SL.t β}.
+  
+  Lemma ownm `{@GRA.inG M Γ} n (r: M) :
+    SRFSem.t n (SL.ownm r) = OwnM r.
   Proof.
-    depdes H. subst. unfold ownm, eq_rect_r. ss.
-    rewrite red_sem__ownm.
+    depdes H1. subst. unfold SL.ownm, eq_rect_r. ss.
+    rewrite @SRFRed.cur. ss.
     f_equal. unfold HRA.in_subG, HRA.embed. ss.
     erewrite (UIP _ _ _ _). reflexivity.
   Qed.
   
-  Lemma red_sem__atom n i s p :
-    interp n (_atom i s p) = β i _ s p (interp n ∘ p).
-  Proof. reflexivity. Qed.
+  Lemma pure n P :
+    SRFSem.t n (SL.pure P) = ⌜P⌝%I.
+  Proof. unfold SL.pure. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma red_sem_atom `{@GAtom.inG _ _ _ A α B β} n s p :
-    interp n (atom (existT s p)) = B _ s p (interp n ∘ p).
+  Lemma and n p q :
+    SRFSem.t n (SL.and p q) = (SRFSem.t n p ∧ SRFSem.t n q)%I.
+  Proof. unfold SL.and. rewrite @SRFRed.cur. reflexivity. Qed.
+
+  Lemma or n p q :
+    SRFSem.t n (SL.or p q) = (SRFSem.t n p ∨ SRFSem.t n q)%I.
+  Proof. unfold SL.or. rewrite @SRFRed.cur. reflexivity. Qed.
+
+  Lemma impl n p q :
+    SRFSem.t n (SL.impl p q) = (SRFSem.t n p → SRFSem.t n q)%I.
+  Proof. unfold SL.impl. rewrite @SRFRed.cur. reflexivity. Qed.
+
+  Lemma univ `{@GPF.inG T τ} n ty p :
+    SRFSem.t n (SL.univ ty p) = (∀ x, SRFSem.t n (p x))%I.
   Proof.
-    destruct H eqn: EQ. subst. depdes inG_prf. ss.
-  Qed.
-
-  Lemma red_sem_lift_0 p :
-    interp 0 (lift p) = ⌜False⌝%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_lift n p :
-    interp (S n) (lift p) = interp n p.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_pure n P :
-    interp n (pure P) = ⌜P⌝%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_and n p q :
-    interp n (and p q) = (interp n p ∧ interp n q)%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_or n p q :
-    interp n (or p q) = (interp n p ∨ interp n q)%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_impl n p q :
-    interp n (impl p q) = (interp n p → interp n q)%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem__univ n i ty p :
-    interp n (_univ i ty p) = (∀ x, interp n (p x))%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_univ `{@GPF.inG T τ} n ty p :
-    interp n (univ ty p) = (∀ x, interp n (p x))%I.
-  Proof.
-    destruct H eqn: EQ. subst. ss.
+    destruct H1 eqn: EQ. subst.
+    unfold SL.univ, eq_rect_r. ss.
+    rewrite @SRFRed.cur. reflexivity.
   Qed.
   
-  Lemma red_sem__ex n i ty p :
-    interp n (_ex i ty p) = (∃ x, interp n (p x))%I.
-  Proof. reflexivity. Qed.
-
-  Lemma red_sem_ex `{@GPF.inG T τ} n ty p :
-    interp n (ex ty p) = (∃ x, interp n (p x))%I.
+  Lemma ex `{@GPF.inG T τ} n ty p :
+    SRFSem.t n (SL.ex ty p) = (∃ x, SRFSem.t n (p x))%I.
   Proof.
-    destruct H eqn: EQ. subst. ss.
+    destruct H1 eqn: EQ. subst.
+    unfold SL.ex, eq_rect_r. ss.
+    rewrite @SRFRed.cur. reflexivity.
   Qed.
   
-  Lemma red_sem_empty n :
-    interp n empty = emp%I.
-  Proof. reflexivity. Qed.
+  Lemma empty n :
+    SRFSem.t n SL.empty = emp%I.
+  Proof. unfold SL.empty. rewrite @SRFRed.cur. reflexivity. Qed.
   
-  Lemma red_sem_sepconj n p q :
-    interp n (sepconj p q) = (interp n p ∗ interp n q)%I.
-  Proof. reflexivity. Qed.
+  Lemma sepconj n p q :
+    SRFSem.t n (SL.sepconj p q) = (SRFSem.t n p ∗ SRFSem.t n q)%I.
+  Proof. unfold SL.sepconj. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma red_sem_wand n p q :
-    interp n (wand p q) = (interp n p -∗ interp n q)%I.
-  Proof. reflexivity. Qed.
+  Lemma wand n p q :
+    SRFSem.t n (SL.wand p q) = (SRFSem.t n p -∗ SRFSem.t n q)%I.
+  Proof. unfold SL.wand. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma red_sem_persistently n p :
-    interp n (persistently p) = (<pers> interp n p)%I.
-  Proof. reflexivity. Qed.
+  Lemma persistently n p :
+    SRFSem.t n (SL.persistently p) = (<pers> SRFSem.t n p)%I.
+  Proof. unfold SL.persistently. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma red_sem_plainly n p :
-    interp n (plainly p) = (IProp.Plainly (interp n p))%I.
-  Proof. reflexivity. Qed.
+  Lemma plainly n p :
+    SRFSem.t n (SL.plainly p) = (IProp.Plainly (SRFSem.t n p))%I.
+  Proof. unfold SL.plainly. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma red_sem_upd n p :
-    interp n (upd p) = (#=> interp n p)%I.
-  Proof. reflexivity. Qed.
+  Lemma upd n p :
+    SRFSem.t n (SL.upd p) = (#=> SRFSem.t n p)%I.
+  Proof. unfold SL.upd. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma red_sem_affinely n p :
-    interp n (affinely p) = (<affine> interp n p)%I.
-  Proof. reflexivity. Qed.
+  Lemma affinely n p :
+    SRFSem.t n (SL.affinely p) = (<affine> SRFSem.t n p)%I.
+  Proof. unfold SL.affinely. rewrite ->and, empty. reflexivity. Qed.
 
-  Lemma red_sem_intuitionistically n p :
-    interp n (affinely (persistently p)) = (□ interp n p)%I.
-  Proof. reflexivity. Qed.
+  Lemma intuitionistically n p :
+    SRFSem.t n (SL.affinely (SL.persistently p)) = (□ SRFSem.t n p)%I.
+  Proof. rewrite ->affinely, persistently. reflexivity. Qed.
 
-End RED.
+  End RED.
+End SLRed.
 
-Global Opaque sProp.ownm.
-Global Opaque sProp.univ.
-Global Opaque sProp.ex.
-Global Opaque sPropI.atom.
-Global Opaque sPropI.interp.
-
-(* Simple sProp reduction tactics. *)
-Ltac red_sem_binary_once := (try rewrite ! @red_sem_sepconj;
-                             try rewrite ! @red_sem_and;
-                             try rewrite ! @red_sem_or;
-                             try rewrite ! @red_sem_impl;
-                             try rewrite ! @red_sem_wand
-                            ).
-
-Ltac red_sem_unary_once := (try rewrite ! @red_sem_atom;
-                            try rewrite ! @red_sem_ownm;
-                            try rewrite ! @red_sem_lift;
-                            try rewrite ! @red_sem_pure;
-                            try rewrite ! @red_sem_univ;
-                            try rewrite ! @red_sem_ex;
-                            try rewrite ! @red_sem_empty;
-                            try rewrite ! @red_sem_persistently;
-                            try rewrite ! @red_sem_plainly;
-                            try rewrite ! @red_sem_upd;
-                            try rewrite ! @red_sem_affinely;
-                            try rewrite ! @red_sem_intuitionistically
-                           ).
-
-Ltac red_sem_binary := repeat red_sem_binary_once.
-Ltac red_sem_unary := repeat red_sem_unary_once.
-Ltac red_sem := repeat (red_sem_binary; red_sem_unary).
-
-Ltac red_sem_binary_once_every := (try rewrite ! @red_sem_sepconj in *;
-                                   try rewrite ! @red_sem_and in *;
-                                   try rewrite ! @red_sem_or in *;
-                                   try rewrite ! @red_sem_impl in *;
-                                   try rewrite ! @red_sem_wand in *
-                                  ).
-
-Ltac red_sem_unary_once_every := (try rewrite ! @red_sem_atom in *;
-                                  try rewrite ! @red_sem_ownm in *;
-                                  try rewrite ! @red_sem_lift in *;
-                                  try rewrite ! @red_sem_pure in *;
-                                  try rewrite ! @red_sem_univ in *;
-                                  try rewrite ! @red_sem_ex in *;
-                                  try rewrite ! @red_sem_empty in *;
-                                  try rewrite ! @red_sem_persistently in *;
-                                  try rewrite ! @red_sem_plainly in *;
-                                  try rewrite ! @red_sem_upd in *;
-                                  try rewrite ! @red_sem_affinely in *;
-                                  try rewrite ! @red_sem_intuitionistically in *
-                                 ).
-
-Ltac red_sem_binary_every := repeat red_sem_binary_once.
-Ltac red_sem_unary_every := repeat red_sem_unary_once.
-Ltac red_sem_every := repeat (red_sem_binary_every; red_sem_unary_every).
+Global Opaque SL.ownm.
+Global Opaque SL.pure.
+Global Opaque SL.and.
+Global Opaque SL.or.
+Global Opaque SL.impl.
+Global Opaque SL.univ.
+Global Opaque SL.ex.
+Global Opaque SL.empty.
+Global Opaque SL.sepconj.
+Global Opaque SL.wand.
+Global Opaque SL.persistently.
+Global Opaque SL.plainly.
+Global Opaque SL.upd.
+  
+Global Opaque SRFSem.t.
 
 (** Notations *)
 
-Declare Scope sProp_scope.
-Delimit Scope sProp_scope with F.
-Bind Scope sProp_scope with sProp.sProp.
+Local Open Scope SRF_scope.
 
-Local Open Scope sProp_scope.
+Notation "'⌜' P '⌝'" := (SL.pure P) : SRF_scope.
+Notation "'⊤'" := ⌜True⌝ : SRF_scope.
+Notation "'⊥'" := ⌜False⌝ : SRF_scope.
 
-Notation "'⌜' P '⌝'" := (sProp.pure P) : sProp_scope.
-Notation "'⊤'" := ⌜True⌝ : sProp_scope.
-Notation "'⊥'" := ⌜False⌝ : sProp_scope.
+Notation "'<ownm>' r" := (SL.ownm r) (at level 20) : SRF_scope.
+Notation "'<pers>' P" := (SL.persistently P) : SRF_scope.
+Notation "'<affine>' P" := (SL.affinely P) : SRF_scope.
+Notation "□ P" := (<affine> <pers> P) : SRF_scope.
+Notation "■ P" := (SL.plainly P) : SRF_scope.
+Notation "|==> P" := (SL.upd P) : SRF_scope.
+Infix "∧" := (SL.and) : SRF_scope.
+Infix "∨" := (SL.or) : SRF_scope.
+Infix "→" := (SL.impl) : SRF_scope.
+Notation "¬ P" := (P → False) : SRF_scope.
+Infix "∗" := (SL.sepconj) : SRF_scope.
+Infix "-∗" := (SL.wand) : SRF_scope.
+Notation "P ==∗ Q" := (P -∗ |==> Q) : SRF_scope.
+Notation f_forall A := (SL.univ A).
+Notation "∀'" := (f_forall _) (only parsing) : SRF_scope.
+Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%SRF)) ..)) : SRF_scope.
+Notation f_exist A := (SL.ex A).
+Notation "∃'" := (f_exist _) (only parsing) : SRF_scope.
+Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%SRF)) ..)) : SRF_scope.
+Notation "'emp'" := (SL.empty) : SRF_scope.
 
-Notation "'⟨' A '⟩'" := (sPropI.atom A) : sProp_scope.
-Notation "'<ownm>' r" := (sProp.ownm r) (at level 20) : sProp_scope.
-Notation "'⟨' s ',' p '⟩'" := (sPropI.atom s p) : sProp_scope.
-Notation "⤉ P" := (sProp.lift P) (at level 20) : sProp_scope.
+(* Simple sProp reduction tactics. *)
+Ltac SL_red_binary := (try rewrite ! @SLRed.sepconj;
+                       try rewrite ! @SLRed.and;
+                       try rewrite ! @SLRed.or;
+                       try rewrite ! @SLRed.impl;
+                       try rewrite ! @SLRed.wand
+                       ).
 
-Notation "'<pers>' P" := (sProp.persistently P) : sProp_scope.
-Notation "'<affine>' P" := (sProp.affinely P) : sProp_scope.
-Notation "□ P" := (<affine> <pers> P) : sProp_scope.
-Notation "■ P" := (sProp.plainly P) : sProp_scope.
-Notation "|==> P" := (sProp.upd P) : sProp_scope.
-Infix "∧" := (sProp.and) : sProp_scope.
-Infix "∨" := (sProp.or) : sProp_scope.
-Infix "→" := (sProp.impl) : sProp_scope.
-Notation "¬ P" := (P → False) : sProp_scope.
-Infix "∗" := (sProp.sepconj) : sProp_scope.
-Infix "-∗" := (sProp.wand) : sProp_scope.
-Notation "P ==∗ Q" := (P -∗ |==> Q) : sProp_scope.
-Notation f_forall A := (sProp.univ A).
-Notation "∀'" := (f_forall _) (only parsing) : sProp_scope.
-Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%F)) ..)) : sProp_scope.
-Notation f_exist A := (sProp.ex A).
-Notation "∃'" := (f_exist _) (only parsing) : sProp_scope.
-Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%F)) ..)) : sProp_scope.
-Notation "'emp'" := (sProp.empty) : sProp_scope.
+Ltac SL_red_unary := (try rewrite ! @SLRed.ownm;
+                      try rewrite ! @SLRed.pure;
+                      try rewrite ! @SLRed.univ;
+                      try rewrite ! @SLRed.ex;
+                      try rewrite ! @SLRed.empty;
+                      try rewrite ! @SLRed.persistently;
+                      try rewrite ! @SLRed.plainly;
+                      try rewrite ! @SLRed.upd;
+                      try rewrite ! @SLRed.affinely;
+                      try rewrite ! @SLRed.intuitionistically
+                      ).
+
+Ltac SL_red := repeat (SL_red_binary; SL_red_unary).
+
+Ltac SL_red_binary_all := (try rewrite ! @SLRed.sepconj in *;
+                           try rewrite ! @SLRed.and in *;
+                           try rewrite ! @SLRed.or in *;
+                           try rewrite ! @SLRed.impl in *;
+                           try rewrite ! @SLRed.wand in *
+                           ).
+
+Ltac SL_red_unary_all := (try rewrite ! @SLRed.ownm in *;
+                         try rewrite ! @SLRed.pure in *;
+                         try rewrite ! @SLRed.univ in *;
+                         try rewrite ! @SLRed.ex in *;
+                         try rewrite ! @SLRed.empty in *;
+                         try rewrite ! @SLRed.persistently in *;
+                         try rewrite ! @SLRed.plainly in *;
+                         try rewrite ! @SLRed.upd in *;
+                         try rewrite ! @SLRed.affinely in *;
+                         try rewrite ! @SLRed.intuitionistically in *
+                         ).
+
+Ltac SL_red_all := repeat (SL_red_binary_all; SL_red_unary_all).
 
 (* Module TestLock. *)
   
@@ -490,11 +445,6 @@ Notation "'emp'" := (sProp.empty) : sProp_scope.
 (*   (*     | owni u i p => @OwnI _ sProp.sProp _ u _ i p *) *)
 (*   (*     end *) *)
 (*   (* }. *) *)
-
-
-  
-  
-
 
 (* End TestOwnI. *)
 
