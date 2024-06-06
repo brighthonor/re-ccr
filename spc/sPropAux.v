@@ -329,16 +329,75 @@ Ltac red_tl_binary_every := repeat red_tl_binary_once.
 Ltac red_tl_unary_every := repeat red_tl_unary_once.
 Ltac red_tl_every := repeat (red_tl_binary_every; red_tl_unary_every).
 
+
+
+
+
+(***
+
+  Tests
+
+ ***)
+
+Module QuantTest.
+
+  Section QT.
+
+  Context `{sub: @HRA.subG Γ Σ}.
+  Context `{β: @GAtom.t Γ Σ τ α}.
+    
+  Variant shape : Type :=
+  | _my_univ i (ty: τ i)
+  | _my_ex i (ty: τ i)
+  .
+
+  Definition degree (s: shape) (sProp: Type) : Type :=
+    match s with
+    | _my_univ i ty => PF.deg ty sProp
+    | _my_ex i ty => PF.deg ty sProp
+    end.
+
+  Global Instance quantifiers: PF.t := {
+      shp := shape;
+      deg := degree;
+    }.
+
+  Definition interp n (s: shape) : (degree s (sProp._sProp n) -> sProp.sProp n) -> (degree s (sProp._sProp n) -> iProp) -> iProp :=
+    match s with
+    | _my_univ i ty => fun p P => Univ P
+    | _my_ex i ty => fun p P => Ex P
+    end.
+
+  Global Instance t: SAtom.t := interp.
+
+  Definition my_univ `{@GAtom.inG _ _ _ _ _ t β} {n} i ty p : sProp.sProp n :=
+    (⟨ existT (_my_univ i ty) p ⟩)%F.
+
+  Definition my_ex `{@GAtom.inG _ _ _ _ _ t β} {n} i ty p : sProp.sProp n :=
+    (⟨ existT (_my_ex i ty) p ⟩)%F.
+  
+  End QT.
+
+End QuantTest.
+
+
+
 Section test.
 
   (* System constraints *)
+
   Context `{sub: @HRA.subG Γ Σ}.
   Context `{β: @GAtom.t Γ Σ τ α}.
   Context `{@GPF.inG ST.t τ}.
   Context `{@GRA.inG (OwnIsRA sProp.sProp) Σ}.
   Context `{@GAtom.inG _ _ _ _ _ SA.t β}.
 
-  (* User constraints *)
+  (* User-defined atom constraints *)
+  
+  Context `{@GAtom.inG _ _ _ _ _ QuantTest.t β}.
+    
+  (* User-defined ownm constraints *)
+
   Context `{@GRA.inG OwnEsRA Γ}.
   
   Variable x: sProp.sProp 3.
@@ -347,6 +406,18 @@ Section test.
 
   Definition foo : sProp.sProp 0 :=
     (<ownm> maps_to_res 1%positive (@maps_to_res nat CoPset.t 1 (Some ∅))).
+
+  Lemma red_sem_my_univ n i ty p :
+    sPropI.interp n (QuantTest.my_univ i ty p) = (∀ x, sPropI.interp n (p x))%I.
+  Proof.
+    unfold QuantTest.my_univ. rewrite @red_sem_atom. reflexivity.
+  Qed.
+
+  Lemma red_sem_my_ex `{@GPF.inG T τ} n i ty p :
+    sPropI.interp n (QuantTest.my_ex i ty p) = (∃ x, sPropI.interp n (p x))%I.
+  Proof.
+    unfold QuantTest.my_ex. rewrite @red_sem_atom. reflexivity.
+  Qed.
   
 End test.
 
