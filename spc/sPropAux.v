@@ -8,156 +8,15 @@ Require Import RobustIndexedInvariants.
 
 Local Notation level := nat.
 
-(** Types of TL. *)
-
-Module ST.
-
-  Section TYPES.
-
-  Inductive type : Type :=
-  | baseT (t : Type) : type
-  | sPropT : type
-  | funT : type -> type -> type
-  | prodT : type -> type -> type
-  | sumT : type -> type -> type
-  | listT : type -> type
-  | pgmapT : type -> type
-  | metaT : type
-  .
-
-  Fixpoint interp (ty : type) (sProp : Type) : Type :=
-    match ty with
-    | baseT b => b
-    | sPropT => sProp
-    | funT ty1 ty2 => (interp ty1 sProp -> interp ty2 sProp)
-    | prodT ty1 ty2 => prod (interp ty1 sProp) (interp ty2 sProp)
-    | sumT ty1 ty2 => sum (interp ty1 sProp) (interp ty2 sProp)
-    | listT ty1 => list (interp ty1 sProp)
-    | pgmapT ty1 => gmap positive (interp ty1 sProp)
-    | metaT => Type
-    end.
-
-  Global Instance t : PF.t := {
-      shp := type;
-      deg := interp;
-    }.
-  
-  End TYPES.
-  
-End ST.
-
-(** Notations and Coercions. *)
-Coercion ST.baseT : Sortclass >-> ST.type.
-
-Declare Scope formula_type_scope.
-Delimit Scope formula_type_scope with ftype.
-Bind Scope formula_type_scope with ST.type.
-
-Notation "⇣ T" := (ST.baseT T) (at level 90) : formula_type_scope.
-Notation "'Φ'" := (ST.sPropT) : formula_type_scope.
-Infix "->" := (ST.funT) : formula_type_scope.
-Infix "*" := (ST.prodT) : formula_type_scope.
-Infix "+" := (ST.sumT) : formula_type_scope.
-
-Module BO.
-
-  Section BIGOP.
-
-  Context `{τ: gTyp.t}.
-  Context `{_C0: @HRA.subG Γ Σ}.
-  Context `{_C1: @GPF.inG ST.t τ}.  
-  Context `{_C2: @SRFMSemG.inG _ SL.syntax α (@SL.t Γ Σ sub τ α) β}.
-
-  (* Maybe we can make Syntax as an instance for big_opMs. *)
-  Definition syn_big_sepM
-             (n : level) {K} {H1 : EqDecision K} {H2 : Countable K}
-             {A} (I : @gmap K H1 H2 A)
-             (f : K -> A -> SRFSyn.t n)
-    : SRFSyn.t n :=
-    fold_right (fun hd tl => (uncurry f hd) ∗ tl)%SRF SL.empty (map_to_list I).
-
-  Lemma red_syn_big_sepM n K {H1 : EqDecision K} {H2 : Countable K} A I f :
-    SRFSem.t n (@syn_big_sepM n K _ _ A I f) = ([∗ map] i ↦ a ∈ I, SRFSem.t n (f i a))%I.
-  Proof.
-    ss. unfold big_opM. rewrite seal_eq. unfold big_op.big_opM_def.
-    unfold syn_big_sepM. simpl. remember (map_to_list I) as L.
-    clear HeqL I. induction L.
-    { ss. SL_red_all. eauto. }
-    ss. SL_red_all. rewrite IHL. f_equal.
-    destruct a. ss.
-  Qed.
-
-  Definition syn_big_sepS
-             (n : level) {K} {H1 : EqDecision K} {H2 : Countable K}
-             (I : @gset K H1 H2)
-             (f : K -> SRFSyn.t n)
-    : SRFSyn.t n :=
-    fold_right (fun hd tl => (f hd) ∗ tl)%SRF emp%SRF (elements I).
-
-  Lemma red_syn_big_sepS n K {H1 : EqDecision K} {H2 : Countable K} I f :
-    SRFSem.t n (@syn_big_sepS n K _ _ I f) = ([∗ set] i ∈ I, SRFSem.t n (f i))%I.
-  Proof.
-    ss. unfold big_opS. rewrite seal_eq. unfold big_op.big_opS_def.
-    unfold syn_big_sepS. remember (elements I) as L.
-    clear HeqL I. induction L.
-    { ss. SL_red_all. eauto. }
-    ss. SL_red_all. rewrite IHL. f_equal.
-  Qed.
-
-  Definition syn_big_sepL1
-             (n : level) {A} (I : list A)
-             (f : A -> SRFSyn.t n)
-    : SRFSyn.t n :=
-    fold_right (fun hd tl => (f hd) ∗ tl)%SRF emp%SRF I.
-
-  Lemma red_syn_big_sepL1 n A I f :
-    SRFSem.t n (@syn_big_sepL1 n A I f) = ([∗ list] a ∈ I, SRFSem.t n (f a))%I.
-  Proof.
-    ss. induction I; ss.
-    { SL_red_all. ss. }
-    SL_red_all. rewrite IHI. f_equal.
-  Qed.
-
-  End BIGOP.
-
-End BO.
-  
-(* Notations. *)
-Notation "'[∗' n 'map]' k ↦ x ∈ m , P" :=
-  (BO.syn_big_sepM n m (fun k x => P))
-    (at level 200, n at level 1, m at level 10, k, x at level 1, right associativity,
-      format "[∗  n  map]  k  ↦  x  ∈  m ,  P") : formula_scope.
-Notation "'[∗' n , A 'map]' k ↦ x ∈ m , P" :=
-  (BO.syn_big_sepM n (A:=A) m (fun k x => P))
-    (at level 200, n at level 1, m at level 10, k, x, A at level 1, right associativity,
-      format "[∗  n  ,  A  map]  k  ↦  x  ∈  m ,  P") : formula_scope.
-Notation "'[∗' n 'set]' x ∈ X , P" :=
-  (BO.syn_big_sepS n X (fun x => P))
-    (at level 200, n at level 1, X at level 10, x at level 1, right associativity,
-      format "[∗  n  set]  x  ∈  X ,  P") : formula_scope.
-Notation "'[∗' n 'list]' x ∈ l , P" :=
-  (BO.syn_big_sepL1 n l (fun x => P))
-    (at level 200, n at level 1, l at level 10, x at level 1, right associativity,
-      format "[∗  n  list]  x  ∈  l ,  P") : formula_scope.
-Notation "'[∗' n , A 'list]' x ∈ l , P" :=
-  (BO.syn_big_sepL1 n (A:=A) l (fun x => P))
-    (at level 200, n at level 1, l at level 10, x, A at level 1, right associativity,
-      format "[∗  n ,  A  list]  x  ∈  l ,  P") : formula_scope.
-
-(** Define TL. *)
-
-Require Import RobustIndexedInvariants.
-
 Module WD.
 
   Section WD.
 
-  Context `{τ: gTyp.t}.
+  Context `{τ: GTyp.t}.
   Context `{_C0: @HRA.subG Γ Σ}.
   Context `{_C1: @GPF.inG ST.t τ}.
-  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
-  Context `{_C3: @SRFMSemG.inG _ SL.syntax α (@SL.t Γ Σ sub τ α) β}.
-  Context `{_C4: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
+  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.
+  Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
     
   Variant shape : Type :=
   | _owni (u: positive) (i: positive)
@@ -175,25 +34,19 @@ Module WD.
 
   Definition interp n (s: shape) : (degree s (SRFSyn._t n) -> SRFSyn.t n) -> (degree s (SRFSyn._t n) -> iProp) -> iProp :=
     match s with
-    | _owni u i => fun p P => @OwnI _ SRFSyn.t _ u n i (p 0%fin)
+    | _owni u i => fun p _ => @OwnI _ SRFSyn.t _ u n i (p 0%fin)
     end.
 
   Global Instance t: SRFMSem.t := interp.
 
-  Context `{IN:@SRFMSemG.inG _ _ _ t β}.
+  Context `{_C4: @SRFMSemG.inG _ _ _ t β}.
   
   Definition owni {n} u i (p: SRFSyn.t n) :=
-    ⟨ existT (_owni u i) (fun _ => p) ⟩%SRF.
+    ⟨ _owni u i, fun _ => p ⟩%SRF.
   
   End WD.
 
 End WD.
-
-(** Notations and coercions. *)
-Notation "'τ{' t ',' n '}'" := (PF.deg t (SRFSyn._t n)).
-Notation "'τ{' t '}'" := (PF.deg t (SRFSyn._t _)).
-Notation "'⟦' F ',' n '⟧'" := (SRFSem.t n F).
-Notation "'⟦' F '⟧'" := (SRFSem.t _ F).
 
 (* Section TL_FORMULA. *)
 
@@ -276,7 +129,7 @@ Notation "'⟦' F '⟧'" := (SRFSem.t _ F).
 Module WDRed.
   Section RED.
 
-  Context `{τ: gTyp.t}.
+  Context `{τ: GTyp.t}.
   Context `{_C0: @HRA.subG Γ Σ}.
   Context `{_C1: @GPF.inG ST.t τ}.
   Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
@@ -309,10 +162,10 @@ Section test.
 
   (* System constraints *)
 
-  Context `{τ: gTyp.t}.
+  Context `{τ: GTyp.t}.
   Context `{_C0: @HRA.subG Γ Σ}.
   Context `{_C1: @GPF.inG ST.t τ}.
-  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.  
+  Context `{_C2: @SRFMSemG.inG _ _ α SL.t β}.
   Context `{_C3: @GRA.inG (OwnIsRA SRFSyn.t) Σ}.
   Context `{_C4: @SRFMSemG.inG _ _ α WD.t β}.
   

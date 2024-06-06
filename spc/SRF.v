@@ -12,7 +12,7 @@ Module PF.
   Class t: Type := {
     shp: Type;
     deg: shp -> forall (Prev:Type), Type;
-   }.
+  }.
 
 End PF.
 
@@ -41,15 +41,15 @@ Module SRFSyn.
 
   Context `{α: SRFMSynG.t}.
 
-  Inductive cons {Prev: Type} : Type :=
-  | lift (p: Prev) : cons
-  | _cur i (s: α i) (c: PF.deg s Prev -> cons)
+  Inductive term {Prev: Type} : Type :=
+  | lift (p: Prev) : term
+  | _cur i (op: α i) (args: PF.deg op Prev -> term)
   .
 
   Fixpoint _t (n : level) : Type :=
     match n with
     | O => Empty_set
-    | S m => cons (Prev:=_t m) 
+    | S m => term (Prev:=_t m) 
     end.
 
   Definition t (n : level) : Type := _t (S n).
@@ -82,7 +82,7 @@ Module SRFMSem.
   Context `{A: PF.t}.
 
   Class t : Type := 
-    sem: forall n (s: A) (p: PF.deg s (SRFSyn._t n) -> SRFSyn.t n) (P: PF.deg s (SRFSyn._t n) -> SRFDom.dom), SRFDom.dom
+    sem: forall n (op: A) (args: PF.deg op (SRFSyn._t n) -> SRFSyn.t n) (Args: PF.deg op (SRFSyn._t n) -> SRFDom.dom), SRFDom.dom
   .
 
   End SEM.
@@ -95,7 +95,7 @@ Module SRFMSemG.
 
   Context `{Δ: SRFDom.t}.
     
-  Class t `{α: SRFMSynG.t}: Type := msem : forall i, SRFMSem.t (A:= α i).
+  Class t `{α: SRFMSynG.t}: Type := gsem : forall i, SRFMSem.t (A:= α i).
 
   Class inG (A: PF.t) (α: SRFMSynG.t) (B: @SRFMSem.t _ α A) (β: t) : Type := {
     inG_id: nat;
@@ -115,18 +115,19 @@ Module SRFSem.
   Fixpoint _t n : SRFSyn._t n -> SRFDom.dom :=
     match n with
     | O => fun _ => SRFDom.void
-    | S m => fix _t_aux (syn : SRFSyn._t (S m)) : SRFDom.dom :=
-      match syn with
-      | SRFSyn.lift p => _t m p
-      | SRFSyn._cur i s c => β i m s c (_t_aux ∘ c)
-      end
+    | S m =>
+      fix _t_aux (syn : SRFSyn._t (S m)) : SRFDom.dom :=
+        match syn with
+        | SRFSyn.lift p => _t m p
+        | SRFSyn._cur i op args => β i m op args (_t_aux ∘ args)
+        end
     end.
 
   Definition t n : SRFSyn.t n -> SRFDom.dom := _t (S n).
 
-  Program Definition cur `{IN: @SRFMSemG.inG _ A α B β} {n} (c: {s: A & (PF.deg s (SRFSyn._t n) -> SRFSyn.t n)}) : SRFSyn.t n.
-    destruct c as [s c]. destruct IN. inv inG_prf.
-    exact (SRFSyn._cur inG_id s c).
+  Program Definition cur `{IN: @SRFMSemG.inG _ A α B β} {n} (op: A) (args: PF.deg op (SRFSyn._t n) -> SRFSyn.t n) : SRFSyn.t n.
+    destruct IN. inv inG_prf.
+    exact (SRFSyn._cur inG_id op args).
   Defined.
   
   End SEM.
@@ -139,8 +140,8 @@ Module SRFRed.
 
   Context `{β: @SRFMSemG.t Δ α}.
 
-  Lemma cur `{IN: @SRFMSemG.inG _ A α B β} n s c :
-    SRFSem.t n (SRFSem.cur (existT s c)) = B _ s c (SRFSem.t n ∘ c).
+  Lemma cur `{IN: @SRFMSemG.inG _ A α B β} n op args :
+    SRFSem.t n (SRFSem.cur op args) = B n op args (SRFSem.t n ∘ args).
   Proof.
     destruct IN eqn: EQ. subst. depdes inG_prf. ss.
   Qed.
@@ -168,8 +169,12 @@ Bind Scope SRF_scope with SRFSyn.t.
 
 Local Open Scope SRF_scope.
 
-Notation "'⟨' A '⟩'" := (SRFSem.cur A) : SRF_scope.
+Notation "'⟨' op ',' args '⟩'" := (SRFSem.cur op args) : SRF_scope.
 Notation "⤉ P" := (SRFSyn.lift P) (at level 20) : SRF_scope.
+Notation "'⟦' F ',' n '⟧'" := (SRFSem.t n F).
+Notation "'⟦' F '⟧'" := (SRFSem.t _ F).
+
+
 (* Simple reduction tactics. *)
 
 Ltac SRF_red := (try rewrite ! @SRFRed.cur;
