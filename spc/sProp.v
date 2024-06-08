@@ -1,5 +1,5 @@
 From stdpp Require Import coPset gmap namespaces.
-From sflib Require Import sflib.
+Require Import sflib.
 From iris Require Import bi.big_op.
 From iris Require base_logic.lib.invariants.
 From Coq Require Import Program Arith.
@@ -44,18 +44,72 @@ Module GTyp.
 
 End GTyp.
 
+
+(** Types **)
+
+Module ST.
+
+  Section TYPES.
+
+  Inductive type : Type :=
+  | baseT (t : Type) : type
+  | sPropT : type
+  | funT : type -> type -> type
+  | prodT : type -> type -> type
+  | sumT : type -> type -> type
+  | listT : type -> type
+  | gmapT : type -> type
+  | metaT : type
+  .
+
+  Fixpoint interp (ty : type) (sProp : Type) : Type :=
+    match ty with
+    | baseT b => b
+    | sPropT => sProp
+    | funT ty1 ty2 => (interp ty1 sProp -> interp ty2 sProp)
+    | prodT ty1 ty2 => prod (interp ty1 sProp) (interp ty2 sProp)
+    | sumT ty1 ty2 => sum (interp ty1 sProp) (interp ty2 sProp)
+    | listT ty1 => list (interp ty1 sProp)
+    | gmapT ty1 => gmap positive (interp ty1 sProp)
+    | metaT => Type
+    end.
+
+  Global Instance t : PF.t := {
+      shp := type;
+      deg := interp;
+    }.
+  
+  End TYPES.
+  
+End ST.
+
+Module CtxST.
+
+  Class t `{τ: GTyp.t}
+    `{_C: @GPF.inG ST.t τ}
+    := ctxSL: unit.
+
+End CtxST.
+
+(** Notations and Coercions. *)
+Coercion ST.baseT : Sortclass >-> ST.type.
+
+Notation "⇣ T" := (ST.baseT T) (at level 90) : SRF_scope.
+Notation "'Φ'" := (ST.sPropT) : SRF_scope.
+Infix "->" := (ST.funT) : SRF_scope.
+Infix "*" := (ST.prodT) : SRF_scope.
+Infix "+" := (ST.sumT) : SRF_scope.
+
+Notation "'τ{' t ',' n '}'" := (@PF.deg ST.t t (SRFSyn.t_prev n)) : SRF_scope.
+Notation "'τ{' t '}'" := (@PF.deg ST.t t (SRFSyn.t_prev _)) : SRF_scope.
+
 Module SL.
 
   Section SL.
 
   Context `{τ: GTyp.t}.
-  Context `{_C0: @HRA.subG Γ Σ}.
-
-  Global Instance domain : SRFDom.t := {
-    dom := iProp;
-    void := False%I;
-  }.
-    
+  Context `{Γ: HRA.t}.
+  
   Variant shape : Type :=
     | _ownm i (r : Γ i)
     | _pure (P : Prop)
@@ -95,22 +149,28 @@ Module SL.
     }.
 
   Context `{α: @SRFMSynG.t}.
+  Context `{_C0: @HRA.subG Γ Σ}.
   
-  Definition interp n (s: shape) : (degree s (SRFSyn._t n) -> SRFSyn.t n) -> (degree s (SRFSyn._t n) -> iProp) -> iProp :=
+  Global Instance domain : SRFDom.t := {
+    dom := iProp;
+    void := False%I;
+  }.
+  
+  Definition interp n (s: shape) : (degree s (SRFSyn.t_prev n) -> SRFSyn.t n) -> (degree s (SRFSyn.t_prev n) -> iProp) -> iProp :=
     match s with
     | _ownm i r => fun _ _ => OwnM r
     | _pure P => fun _ _ => Pure P
-    | _and => fun _ P => And (P 0%fin) (P 1%fin)
-    | _or => fun _ P => Or (P 0%fin) (P 1%fin)
-    | _impl => fun _ P => Impl (P 0%fin) (P 1%fin)
-    | _univ i ty => fun _ P => Univ P
-    | _ex   i ty => fun _ P => Ex P
+    | _and => fun _ sem => And (sem 0%fin) (sem 1%fin)
+    | _or => fun _ sem => Or (sem 0%fin) (sem 1%fin)
+    | _impl => fun _ sem => Impl (sem 0%fin) (sem 1%fin)
+    | _univ i ty => fun _ sem => Univ sem
+    | _ex   i ty => fun _ sem => Ex sem
     | _empty => fun _ _ => Emp
-    | _sepconj => fun _ P => Sepconj (P 0%fin) (P 1%fin)
-    | _wand => fun _ P => Wand (P 0%fin) (P 1%fin)
-    | _persistently => fun _ P => Persistently (P 0%fin)
-    | _plainly => fun _ P => IProp.Plainly (P 0%fin)
-    | _upd => fun _ P => Upd (P 0%fin)
+    | _sepconj => fun _ sem => Sepconj (sem 0%fin) (sem 1%fin)
+    | _wand => fun _ sem => Wand (sem 0%fin) (sem 1%fin)
+    | _persistently => fun _ sem => Persistently (sem 0%fin)
+    | _plainly => fun _ sem => IProp.Plainly (sem 0%fin)
+    | _upd => fun _ sem => Upd (sem 0%fin)
     end.
 
   Global Instance t: SRFMSem.t := interp.
@@ -149,12 +209,12 @@ Module SL.
     - exact p2.
   Defined.
   
-  Definition univ `{IN: @GPF.inG T τ} {n} (ty:T) (p: PF.deg ty (SRFSyn._t n) -> SRFSyn.t n) : SRFSyn.t n.
+  Definition univ `{IN: @GPF.inG T τ} {n} (ty:T) (p: PF.deg ty (SRFSyn.t_prev n) -> SRFSyn.t n) : SRFSyn.t n.
     destruct IN. subst.
     exact ⟨ _univ _ ty, p ⟩%SRF.
   Defined.
 
-  Definition ex `{IN: @GPF.inG T τ} {n} (ty: T) (p: PF.deg ty (SRFSyn._t n) -> SRFSyn.t n) : SRFSyn.t n.
+  Definition ex `{IN: @GPF.inG T τ} {n} (ty: T) (p: PF.deg ty (SRFSyn.t_prev n) -> SRFSyn.t n) : SRFSyn.t n.
     destruct IN. subst.
     exact ⟨ _ex _ ty, p ⟩%SRF.
   Defined.
@@ -199,20 +259,89 @@ Module SL.
   Definition affinely {n} (p : SRFSyn.t n) : SRFSyn.t n :=
     and empty p.
 
+  Definition sepM
+             n {K} {H1 : EqDecision K} {H2 : Countable K}
+             {A} (I : @gmap K H1 H2 A)
+             (f : K -> A -> SRFSyn.t n)
+    : SRFSyn.t n :=
+    fold_right (fun hd tl => sepconj (uncurry f hd) tl) empty (map_to_list I).
+
+  Definition sepS
+             n {K} {H1 : EqDecision K} {H2 : Countable K}
+             (I : @gset K H1 H2)
+             (f : K -> SRFSyn.t n)
+    : SRFSyn.t n :=
+    fold_right (fun hd tl => sepconj (f hd) tl) empty (elements I).
+  
+  Definition sepL1
+             n {A} (I : list A)
+             (f : A -> SRFSyn.t n)
+    : SRFSyn.t n :=
+    fold_right (fun hd tl => sepconj (f hd) tl) empty I.
+  
   End SL.
 
 End SL.
 
 Module CtxSL.
 
-  Class t
-    `{τ: GTyp.t} `{Γ: HRA.t} `{Σ: GRA.t}
-    `{α: SRFMSynG.t} `{β: @SRFMSemG.t SL.domain α}
+  Class t `{Γ: HRA.t} `{Σ: GRA.t} `{α: SRFMSynG.t} `{β: @SRFMSemG.t SL.domain α}
+    `{_C: CtxST.t}
     `{_C: @HRA.subG Γ Σ}
     `{_C: @SRFMSemG.inG SL.domain _ α SL.t β}
     := ctxSL: unit.
   
 End CtxSL.
+
+(** Notations *)
+
+Local Open Scope SRF_scope.
+
+Notation "'⌜' P '⌝'" := (SL.pure P) : SRF_scope.
+Notation "'⊤'" := ⌜True⌝ : SRF_scope.
+Notation "'⊥'" := ⌜False⌝ : SRF_scope.
+
+Notation "'<ownm>' r" := (SL.ownm r) (at level 20) : SRF_scope.
+Notation "'<pers>' P" := (SL.persistently P) : SRF_scope.
+Notation "'<affine>' P" := (SL.affinely P) : SRF_scope.
+Notation "□ P" := (<affine> <pers> P) : SRF_scope.
+Notation "■ P" := (SL.plainly P) : SRF_scope.
+Notation "|==> P" := (SL.upd P) : SRF_scope.
+Infix "∧" := (SL.and) : SRF_scope.
+Infix "∨" := (SL.or) : SRF_scope.
+Infix "→" := (SL.impl) : SRF_scope.
+Notation "¬ P" := (P → False) : SRF_scope.
+Infix "∗" := (SL.sepconj) : SRF_scope.
+Infix "-∗" := (SL.wand) : SRF_scope.
+Notation "P ==∗ Q" := (P -∗ |==> Q) : SRF_scope.
+Notation f_forall A := (SL.univ A).
+Notation "∀'" := (f_forall _) (only parsing) : SRF_scope.
+Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%SRF)) ..)) : SRF_scope.
+Notation f_exist A := (SL.ex A).
+Notation "∃'" := (f_exist _) (only parsing) : SRF_scope.
+Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%SRF)) ..)) : SRF_scope.
+Notation "'emp'" := (SL.empty) : SRF_scope.
+
+Notation "'[∗' n 'map]' k ↦ x ∈ m , P" :=
+  (SL.sepM n m (fun k x => P))
+    (at level 200, n at level 1, m at level 10, k, x at level 1, right associativity,
+      format "[∗  n  map]  k  ↦  x  ∈  m ,  P") : SRF_scope.
+Notation "'[∗' n , A 'map]' k ↦ x ∈ m , P" :=
+  (SL.sepM n (A:=A) m (fun k x => P))
+    (at level 200, n at level 1, m at level 10, k, x, A at level 1, right associativity,
+      format "[∗  n  ,  A  map]  k  ↦  x  ∈  m ,  P") : SRF_scope.
+Notation "'[∗' n 'set]' x ∈ X , P" :=
+  (SL.sepS n X (fun x => P))
+    (at level 200, n at level 1, X at level 10, x at level 1, right associativity,
+      format "[∗  n  set]  x  ∈  X ,  P") : SRF_scope.
+Notation "'[∗' n 'list]' x ∈ l , P" :=
+  (SL.sepL1 n l (fun x => P))
+    (at level 200, n at level 1, l at level 10, x at level 1, right associativity,
+      format "[∗  n  list]  x  ∈  l ,  P") : SRF_scope.
+Notation "'[∗' n , A 'list]' x ∈ l , P" :=
+  (SL.sepL1 n (A:=A) l (fun x => P))
+    (at level 200, n at level 1, l at level 10, x, A at level 1, right associativity,
+      format "[∗  n ,  A  list]  x  ∈  l ,  P") : SRF_scope.
 
 Module SLRed.
 
@@ -245,14 +374,14 @@ Module SLRed.
     SRFSem.t n (SL.impl p q) = (SRFSem.t n p → SRFSem.t n q)%I.
   Proof. unfold SL.impl. rewrite @SRFRed.cur. reflexivity. Qed.
 
-  Lemma univ `{@GPF.inG T τ} n ty p :
-    SRFSem.t n (SL.univ ty p) = (∀ x, SRFSem.t n (p x))%I.
+  Lemma univ `{T:PF.t} `{@GPF.inG T τ} n (ty: T) p :
+    SRFSem.t n (SL.univ ty p) = (∀ x: (T.(PF.deg) ty (SRFSyn.t_prev n)), SRFSem.t n (p x))%I.
   Proof.
     destruct H eqn: EQ. subst.
     unfold SL.univ, eq_rect_r. ss.
     rewrite @SRFRed.cur. reflexivity.
   Qed.
-  
+
   Lemma ex `{@GPF.inG T τ} n ty p :
     SRFSem.t n (SL.ex ty p) = (∃ x, SRFSem.t n (p x))%I.
   Proof.
@@ -293,6 +422,35 @@ Module SLRed.
     SRFSem.t n (SL.affinely (SL.persistently p)) = (□ SRFSem.t n p)%I.
   Proof. rewrite ->affinely, persistently. reflexivity. Qed.
 
+  Lemma sepM n K {H1 : EqDecision K} {H2 : Countable K} A I f :
+    SRFSem.t n (SL.sepM n I f (K:=K) (A:=A)) = ([∗ map] i ↦ a ∈ I, SRFSem.t n (f i a))%I.
+  Proof.
+    ss. unfold big_opM. rewrite seal_eq. unfold big_op.big_opM_def.
+    unfold SL.sepM. simpl. remember (map_to_list I) as L.
+    clear HeqL I. induction L.
+    { ss. rewrite empty. eauto. }
+    ss. rewrite sepconj. rewrite IHL. f_equal.
+    destruct a. ss.
+  Qed.
+
+  Lemma sepS n K {H1 : EqDecision K} {H2 : Countable K} I f :
+    SRFSem.t n (SL.sepS n I f (K:=K)) = ([∗ set] i ∈ I, SRFSem.t n (f i))%I.
+  Proof.
+    ss. unfold big_opS. rewrite seal_eq. unfold big_op.big_opS_def.
+    unfold SL.sepS. remember (elements I) as L.
+    clear HeqL I. induction L.
+    { ss. rewrite empty. eauto. }
+    ss. rewrite sepconj. rewrite IHL. f_equal.
+  Qed.
+
+  Lemma sepL1 n A I f :
+    SRFSem.t n (SL.sepL1 n I f (A:=A)) = ([∗ list] a ∈ I, SRFSem.t n (f a))%I.
+  Proof.
+    ss. induction I; ss.
+    { rewrite empty. ss. }
+    rewrite sepconj. rewrite IHI. f_equal.
+  Qed.
+  
   End RED.
 End SLRed.
 
@@ -312,220 +470,43 @@ Global Opaque SL.upd.
   
 Global Opaque SRFSem.t.
 
-(** Notations *)
-
-Local Open Scope SRF_scope.
-
-Notation "'⌜' P '⌝'" := (SL.pure P) : SRF_scope.
-Notation "'⊤'" := ⌜True⌝ : SRF_scope.
-Notation "'⊥'" := ⌜False⌝ : SRF_scope.
-
-Notation "'<ownm>' r" := (SL.ownm r) (at level 20) : SRF_scope.
-Notation "'<pers>' P" := (SL.persistently P) : SRF_scope.
-Notation "'<affine>' P" := (SL.affinely P) : SRF_scope.
-Notation "□ P" := (<affine> <pers> P) : SRF_scope.
-Notation "■ P" := (SL.plainly P) : SRF_scope.
-Notation "|==> P" := (SL.upd P) : SRF_scope.
-Infix "∧" := (SL.and) : SRF_scope.
-Infix "∨" := (SL.or) : SRF_scope.
-Infix "→" := (SL.impl) : SRF_scope.
-Notation "¬ P" := (P → False) : SRF_scope.
-Infix "∗" := (SL.sepconj) : SRF_scope.
-Infix "-∗" := (SL.wand) : SRF_scope.
-Notation "P ==∗ Q" := (P -∗ |==> Q) : SRF_scope.
-Notation f_forall A := (SL.univ A).
-Notation "∀'" := (f_forall _) (only parsing) : SRF_scope.
-Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%SRF)) ..)) : SRF_scope.
-Notation f_exist A := (SL.ex A).
-Notation "∃'" := (f_exist _) (only parsing) : SRF_scope.
-Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%SRF)) ..)) : SRF_scope.
-Notation "'emp'" := (SL.empty) : SRF_scope.
-
 (* Simple sProp reduction tactics. *)
-Ltac SL_red_binary := (try rewrite ! @SLRed.sepconj;
+Ltac SL_red := repeat (try rewrite ! @SLRed.sepconj;
                        try rewrite ! @SLRed.and;
                        try rewrite ! @SLRed.or;
                        try rewrite ! @SLRed.impl;
-                       try rewrite ! @SLRed.wand
-                       ).
+                       try rewrite ! @SLRed.wand;
+                       (* try rewrite ! @SLRed.ownm; *)
+                       try rewrite ! @SLRed.pure;
+                       try rewrite ! @SLRed.univ;
+                       try rewrite ! @SLRed.ex;
+                       try rewrite ! @SLRed.empty;
+                       try rewrite ! @SLRed.persistently;
+                       try rewrite ! @SLRed.plainly;
+                       try rewrite ! @SLRed.upd;
+                       try rewrite ! @SLRed.affinely;
+                       try rewrite ! @SLRed.intuitionistically;
+                       try rewrite ! @SLRed.sepM;
+                       try rewrite ! @SLRed.sepS;
+                       try rewrite ! @SLRed.sepL1
+                 ).
 
-Ltac SL_red_unary := (try rewrite ! @SLRed.ownm;
-                      try rewrite ! @SLRed.pure;
-                      try rewrite ! @SLRed.univ;
-                      try rewrite ! @SLRed.ex;
-                      try rewrite ! @SLRed.empty;
-                      try rewrite ! @SLRed.persistently;
-                      try rewrite ! @SLRed.plainly;
-                      try rewrite ! @SLRed.upd;
-                      try rewrite ! @SLRed.affinely;
-                      try rewrite ! @SLRed.intuitionistically
-                      ).
-
-Ltac SL_red := repeat (SL_red_binary; SL_red_unary).
-
-Ltac SL_red_binary_all := (try rewrite ! @SLRed.sepconj in *;
+Ltac SL_red_all := repeat (try rewrite ! @SLRed.sepconj in *;
                            try rewrite ! @SLRed.and in *;
                            try rewrite ! @SLRed.or in *;
                            try rewrite ! @SLRed.impl in *;
-                           try rewrite ! @SLRed.wand in *
-                           ).
-
-Ltac SL_red_unary_all := (try rewrite ! @SLRed.ownm in *;
-                         try rewrite ! @SLRed.pure in *;
-                         try rewrite ! @SLRed.univ in *;
-                         try rewrite ! @SLRed.ex in *;
-                         try rewrite ! @SLRed.empty in *;
-                         try rewrite ! @SLRed.persistently in *;
-                         try rewrite ! @SLRed.plainly in *;
-                         try rewrite ! @SLRed.upd in *;
-                         try rewrite ! @SLRed.affinely in *;
-                         try rewrite ! @SLRed.intuitionistically in *
-                         ).
-
-Ltac SL_red_all := repeat (SL_red_binary_all; SL_red_unary_all).
-
-Module BO.
-
-  Section BIGOP.
-
-  Context `{_C: CtxSL.t}.
-    
-  (* Maybe we can make Syntax as an instance for big_opMs. *)
-  Definition syn_big_sepM
-             n {K} {H1 : EqDecision K} {H2 : Countable K}
-             {A} (I : @gmap K H1 H2 A)
-             (f : K -> A -> SRFSyn.t n)
-    : SRFSyn.t n :=
-    fold_right (fun hd tl => (uncurry f hd) ∗ tl)%SRF SL.empty (map_to_list I).
-
-  Lemma red_syn_big_sepM n K {H1 : EqDecision K} {H2 : Countable K} A I f :
-    SRFSem.t n (@syn_big_sepM n K _ _ A I f) = ([∗ map] i ↦ a ∈ I, SRFSem.t n (f i a))%I.
-  Proof.
-    ss. unfold big_opM. rewrite seal_eq. unfold big_op.big_opM_def.
-    unfold syn_big_sepM. simpl. remember (map_to_list I) as L.
-    clear HeqL I. induction L.
-    { ss. SL_red_all. eauto. }
-    ss. SL_red_all. rewrite IHL. f_equal.
-    destruct a. ss.
-  Qed.
-
-  Definition syn_big_sepS
-             n {K} {H1 : EqDecision K} {H2 : Countable K}
-             (I : @gset K H1 H2)
-             (f : K -> SRFSyn.t n)
-    : SRFSyn.t n :=
-    fold_right (fun hd tl => (f hd) ∗ tl)%SRF emp%SRF (elements I).
-
-  Lemma red_syn_big_sepS n K {H1 : EqDecision K} {H2 : Countable K} I f :
-    SRFSem.t n (@syn_big_sepS n K _ _ I f) = ([∗ set] i ∈ I, SRFSem.t n (f i))%I.
-  Proof.
-    ss. unfold big_opS. rewrite seal_eq. unfold big_op.big_opS_def.
-    unfold syn_big_sepS. remember (elements I) as L.
-    clear HeqL I. induction L.
-    { ss. SL_red_all. eauto. }
-    ss. SL_red_all. rewrite IHL. f_equal.
-  Qed.
-
-  Definition syn_big_sepL1
-             n {A} (I : list A)
-             (f : A -> SRFSyn.t n)
-    : SRFSyn.t n :=
-    fold_right (fun hd tl => (f hd) ∗ tl)%SRF emp%SRF I.
-
-  Lemma red_syn_big_sepL1 n A I f :
-    SRFSem.t n (@syn_big_sepL1 n A I f) = ([∗ list] a ∈ I, SRFSem.t n (f a))%I.
-  Proof.
-    ss. induction I; ss.
-    { SL_red_all. ss. }
-    SL_red_all. rewrite IHI. f_equal.
-  Qed.
-
-  End BIGOP.
-
-End BO.
-  
-(* Notations. *)
-Notation "'[∗' n 'map]' k ↦ x ∈ m , P" :=
-  (BO.syn_big_sepM n m (fun k x => P))
-    (at level 200, n at level 1, m at level 10, k, x at level 1, right associativity,
-      format "[∗  n  map]  k  ↦  x  ∈  m ,  P") : formula_scope.
-Notation "'[∗' n , A 'map]' k ↦ x ∈ m , P" :=
-  (BO.syn_big_sepM n (A:=A) m (fun k x => P))
-    (at level 200, n at level 1, m at level 10, k, x, A at level 1, right associativity,
-      format "[∗  n  ,  A  map]  k  ↦  x  ∈  m ,  P") : formula_scope.
-Notation "'[∗' n 'set]' x ∈ X , P" :=
-  (BO.syn_big_sepS n X (fun x => P))
-    (at level 200, n at level 1, X at level 10, x at level 1, right associativity,
-      format "[∗  n  set]  x  ∈  X ,  P") : formula_scope.
-Notation "'[∗' n 'list]' x ∈ l , P" :=
-  (BO.syn_big_sepL1 n l (fun x => P))
-    (at level 200, n at level 1, l at level 10, x at level 1, right associativity,
-      format "[∗  n  list]  x  ∈  l ,  P") : formula_scope.
-Notation "'[∗' n , A 'list]' x ∈ l , P" :=
-  (BO.syn_big_sepL1 n (A:=A) l (fun x => P))
-    (at level 200, n at level 1, l at level 10, x, A at level 1, right associativity,
-      format "[∗  n ,  A  list]  x  ∈  l ,  P") : formula_scope.
-
-(** Types of TL. *)
-
-Module ST.
-
-  Section TYPES.
-
-  Inductive type : Type :=
-  | baseT (t : Type) : type
-  | sPropT : type
-  | funT : type -> type -> type
-  | prodT : type -> type -> type
-  | sumT : type -> type -> type
-  | listT : type -> type
-  | pgmapT : type -> type
-  | metaT : type
-  .
-
-  Fixpoint interp (ty : type) (sProp : Type) : Type :=
-    match ty with
-    | baseT b => b
-    | sPropT => sProp
-    | funT ty1 ty2 => (interp ty1 sProp -> interp ty2 sProp)
-    | prodT ty1 ty2 => prod (interp ty1 sProp) (interp ty2 sProp)
-    | sumT ty1 ty2 => sum (interp ty1 sProp) (interp ty2 sProp)
-    | listT ty1 => list (interp ty1 sProp)
-    | pgmapT ty1 => gmap positive (interp ty1 sProp)
-    | metaT => Type
-    end.
-
-  Global Instance t : PF.t := {
-      shp := type;
-      deg := interp;
-    }.
-  
-  End TYPES.
-  
-End ST.
-
-Module CtxSLST.
-
-  Class t
-    `{_C: CtxSL.t}          
-    `{_C: @GPF.inG ST.t τ}
-    := ctxSL: unit.
-
-End CtxSLST.
-
-(** Notations and Coercions. *)
-Coercion ST.baseT : Sortclass >-> ST.type.
-
-Declare Scope formula_type_scope.
-Delimit Scope formula_type_scope with ftype.
-Bind Scope formula_type_scope with ST.type.
-
-Notation "⇣ T" := (ST.baseT T) (at level 90) : formula_type_scope.
-Notation "'Φ'" := (ST.sPropT) : formula_type_scope.
-Infix "->" := (ST.funT) : formula_type_scope.
-Infix "*" := (ST.prodT) : formula_type_scope.
-Infix "+" := (ST.sumT) : formula_type_scope.
-
-Notation "'τ{' t ',' n '}'" := (PF.deg t (SRFSyn._t n)) : formula_type_scope.
-Notation "'τ{' t '}'" := (PF.deg t (SRFSyn._t _)) : formula_type_scope.
-
+                           try rewrite ! @SLRed.wand in *;
+                           (* try rewrite ! @SLRed.ownm in *; *)
+                           try rewrite ! @SLRed.pure in *;
+                           try rewrite ! @SLRed.univ in *;
+                           try rewrite ! @SLRed.ex in *;
+                           try rewrite ! @SLRed.empty in *;
+                           try rewrite ! @SLRed.persistently in *;
+                           try rewrite ! @SLRed.plainly in *;
+                           try rewrite ! @SLRed.upd in *;
+                           try rewrite ! @SLRed.affinely in *;
+                           try rewrite ! @SLRed.intuitionistically in *;
+                           try rewrite ! @SLRed.sepM in *;
+                           try rewrite ! @SLRed.sepS in *;
+                           try rewrite ! @SLRed.sepL1 in *
+                     ).

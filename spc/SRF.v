@@ -1,5 +1,5 @@
 From stdpp Require Import coPset gmap namespaces.
-From sflib Require Import sflib.
+Require Import sflib.
 From iris Require Import bi.big_op.
 From iris Require base_logic.lib.invariants.
 From Coq Require Import Program Arith.
@@ -42,7 +42,7 @@ Module SRFSyn.
   Context `{α: SRFMSynG.t}.
 
   Inductive term {Prev: Type} : Type :=
-  | lift (p: Prev) : term
+  | _lift (p: Prev) : term
   | _cur i (op: α i) (args: PF.deg op Prev -> term)
   .
 
@@ -52,12 +52,16 @@ Module SRFSyn.
     | S m => term (Prev:=_t m) 
     end.
 
-  Definition t (n : level) : Type := _t (S n).
+  Definition t_prev (n: level) : Type := _t n.
+  
+  Definition t (n : level) : Type := t_prev (S n).
 
-  Fixpoint liftn n {m} (p: t m) : t (n+m) :=
-    match n return t (n+m) with
+  Definition lift {n} (p: t n) : t (S n) := _lift p.
+  
+  Fixpoint liftn k {n} (p: t n) : t (k+n) :=
+    match k return t (k+n) with
     | 0 => p
-    | S n' => lift (liftn n' p)
+    | S k' => lift (liftn k' p)
     end.
   
   End SYNTAX.
@@ -82,7 +86,7 @@ Module SRFMSem.
   Context `{A: PF.t}.
 
   Class t : Type := 
-    sem: forall n (op: A) (args: PF.deg op (SRFSyn._t n) -> SRFSyn.t n) (Args: PF.deg op (SRFSyn._t n) -> SRFDom.dom), SRFDom.dom
+    sem: forall n (op: A) (args: PF.deg op (SRFSyn.t_prev n) -> SRFSyn.t n) (Args: PF.deg op (SRFSyn.t_prev n) -> SRFDom.dom), SRFDom.dom
   .
 
   End SEM.
@@ -94,7 +98,7 @@ Module SRFMSemG.
   Section GSEM.
 
   Context `{Δ: SRFDom.t}.
-    
+
   Class t `{α: SRFMSynG.t}: Type := gsem : forall i, SRFMSem.t (A:= α i).
 
   Class inG (A: PF.t) (α: SRFMSynG.t) (B: @SRFMSem.t _ α A) (β: t) : Type := {
@@ -112,20 +116,22 @@ Module SRFSem.
 
   Context `{β: @SRFMSemG.t Δ α}.
 
-  Fixpoint _t n : SRFSyn._t n -> SRFDom.dom :=
+  Fixpoint _t n : SRFSyn.t_prev n -> SRFDom.dom :=
     match n with
     | O => fun _ => SRFDom.void
     | S m =>
-      fix _t_aux (syn : SRFSyn._t (S m)) : SRFDom.dom :=
+      fix _t_aux (syn : SRFSyn.t_prev (S m)) : SRFDom.dom :=
         match syn with
-        | SRFSyn.lift p => _t m p
+        | SRFSyn._lift p => _t m p
         | SRFSyn._cur i op args => β i m op args (_t_aux ∘ args)
         end
     end.
 
-  Definition t n : SRFSyn.t n -> SRFDom.dom := _t (S n).
+  Definition t_prev n : SRFSyn.t_prev n -> SRFDom.dom := _t n.
+  
+  Definition t n : SRFSyn.t n -> SRFDom.dom := t_prev (S n).
 
-  Program Definition cur `{IN: @SRFMSemG.inG _ A α B β} {n} (op: A) (args: PF.deg op (SRFSyn._t n) -> SRFSyn.t n) : SRFSyn.t n.
+  Program Definition cur `{IN: @SRFMSemG.inG _ A α B β} {n} (op: A) (args: PF.deg op (SRFSyn.t_prev n) -> SRFSyn.t n) : SRFSyn.t n.
     destruct IN. inv inG_prf.
     exact (SRFSyn._cur inG_id op args).
   Defined.
@@ -146,12 +152,12 @@ Module SRFRed.
     destruct IN eqn: EQ. subst. depdes inG_prf. ss.
   Qed.
 
-  Lemma lift_0 c :
-    SRFSem.t 0 (SRFSyn.lift c) = SRFDom.void.
+  Lemma lift_0 t :
+    SRFSem.t_prev 1 (SRFSyn._lift t) = SRFDom.void.
   Proof. reflexivity. Qed.
 
-  Lemma lift n c :
-    SRFSem.t (S n) (SRFSyn.lift c) = SRFSem.t n c.
+  Lemma lift n (t: SRFSyn.t n) :
+    SRFSem.t (S n) (SRFSyn.lift t) = SRFSem.t n t.
   Proof. reflexivity. Qed.
 
   End RED.
@@ -174,15 +180,17 @@ Notation "⤉ P" := (SRFSyn.lift P) (at level 20) : SRF_scope.
 Notation "'⟦' F ',' n '⟧'" := (SRFSem.t n F).
 Notation "'⟦' F '⟧'" := (SRFSem.t _ F).
 
-
 (* Simple reduction tactics. *)
 
-Ltac SRF_red := (try rewrite ! @SRFRed.cur;
-                 try rewrite ! @SRFRed.lift_0;
-                 try rewrite ! @SRFRed.lift
-                ).
+Global Opaque SRFSyn.t_prev.
+Global Opaque SRFSyn.t.
 
-Ltac SRF_red_all := (try rewrite ! @SRFRed.cur in *;
-                     try rewrite ! @SRFRed.lift_0 in *;
-                     try rewrite ! @SRFRed.lift in *
-                    ).
+Ltac SRF_red := repeat (
+                 try rewrite ! @SRFRed.cur;
+                 try rewrite ! @SRFRed.lift;
+                 change (SRFSyn.t_prev (S ?n)) with (SRFSyn.t n) in * ).
+
+Ltac SRF_red_all := repeat (
+                     try rewrite ! @SRFRed.cur in *;
+                     try rewrite ! @SRFRed.lift in *;
+                     change (SRFSyn.t_prev (S ?n)) with (SRFSyn.t n) in * ).

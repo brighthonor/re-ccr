@@ -68,10 +68,10 @@ Section PCM_OWN.
   Definition OwnD_authR  (u: univ_id) (D: gset positive) : OwnDRA :=
     maps_to_res u (Auth.black (Some D : Gset.t)).
 
-  Definition OwnD_auth `{@GRA.inG OwnDRA Σ} (u: univ_id) : iProp :=
+  Definition OwnD_auth (u: univ_id) : iProp :=
     (∃ D, OwnM (OwnD_authR u D))%I.
 
-  Lemma OwnE_exploit `{@GRA.inG OwnERA Σ} u (E1 E2 : coPset) :
+  Lemma OwnE_exploit u (E1 E2 : coPset) :
     OwnE u E1 ∗ OwnE u E2 ⊢ ⌜E1 ## E2⌝.
   Proof.
     iIntros "[H1 H2]". iCombine "H1 H2" as "H". iPoseProof (OwnM_valid with "H") as "%WF".
@@ -80,7 +80,7 @@ Section PCM_OWN.
     des_ifs. rewrite /URA.wf /URA.add in WF. unseal "ra". ss; des_ifs.
   Qed.
 
-  Lemma OwnE_union `{@GRA.inG OwnERA Σ} u (E1 E2 : coPset) :
+  Lemma OwnE_union u (E1 E2 : coPset) :
     OwnE u E1 ∗ OwnE u E2 ⊢ OwnE u (E1 ∪ E2).
   Proof.
     iIntros "H". iPoseProof (OwnE_exploit with "H") as "%D".
@@ -90,7 +90,7 @@ Section PCM_OWN.
     repeat (unfold URA.add; unseal "ra"; ss; des_ifs).
   Qed.
 
-  Lemma OwnE_disjoint `{@GRA.inG OwnERA Σ} u (E1 E2 : coPset) :
+  Lemma OwnE_disjoint u (E1 E2 : coPset) :
     E1 ## E2 -> OwnE u (E1 ∪ E2) ⊢ OwnE u E1 ∗ OwnE u E2.
   Proof.
     i. unfold OwnE.
@@ -100,7 +100,7 @@ Section PCM_OWN.
     repeat (unfold URA.add; unseal "ra"; ss; des_ifs).
   Qed.
 
-  Lemma OwnE_subset `{@GRA.inG OwnERA Σ} u (E1 E2 : coPset) :
+  Lemma OwnE_subset u (E1 E2 : coPset) :
     E1 ⊆ E2 -> OwnE u E2 ⊢ OwnE u E1 ∗ (OwnE u E1 -∗ OwnE u E2).
   Proof.
     iIntros (SUB) "E".
