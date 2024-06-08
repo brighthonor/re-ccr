@@ -203,18 +203,27 @@ Module SL.
 
 End SL.
 
+Module CtxSL.
+
+  Class t
+    `{τ: GTyp.t} `{Γ: HRA.t} `{Σ: GRA.t}
+    `{α: SRFMSynG.t} `{β: @SRFMSemG.t SL.domain α}
+    `{_C: @HRA.subG Γ Σ}
+    `{_C: @SRFMSemG.inG SL.domain _ α SL.t β}
+    := ctxSL: unit.
+  
+End CtxSL.
+
 Module SLRed.
 
   Section RED.
 
-  Context `{τ: GTyp.t}.
-  Context `{@HRA.subG Γ Σ}.
-  Context `{@SRFMSemG.inG _ _ α SL.t β}.
-  
+  Context `{_C: CtxSL.t}.
+    
   Lemma ownm `{@GRA.inG M Γ} n (r: M) :
     SRFSem.t n (SL.ownm r) = OwnM r.
   Proof.
-    depdes H1. subst. unfold SL.ownm, eq_rect_r. ss.
+    depdes H. subst. unfold SL.ownm, eq_rect_r. ss.
     rewrite @SRFRed.cur. ss.
     f_equal. unfold HRA.in_subG, HRA.embed. ss.
     erewrite (UIP _ _ _ _). reflexivity.
@@ -239,7 +248,7 @@ Module SLRed.
   Lemma univ `{@GPF.inG T τ} n ty p :
     SRFSem.t n (SL.univ ty p) = (∀ x, SRFSem.t n (p x))%I.
   Proof.
-    destruct H1 eqn: EQ. subst.
+    destruct H eqn: EQ. subst.
     unfold SL.univ, eq_rect_r. ss.
     rewrite @SRFRed.cur. reflexivity.
   Qed.
@@ -247,7 +256,7 @@ Module SLRed.
   Lemma ex `{@GPF.inG T τ} n ty p :
     SRFSem.t n (SL.ex ty p) = (∃ x, SRFSem.t n (p x))%I.
   Proof.
-    destruct H1 eqn: EQ. subst.
+    destruct H eqn: EQ. subst.
     unfold SL.ex, eq_rect_r. ss.
     rewrite @SRFRed.cur. reflexivity.
   Qed.
@@ -375,17 +384,12 @@ Ltac SL_red_unary_all := (try rewrite ! @SLRed.ownm in *;
 
 Ltac SL_red_all := repeat (SL_red_binary_all; SL_red_unary_all).
 
-
-
-
 Module BO.
 
   Section BIGOP.
 
-  Context `{τ: GTyp.t}.
-  Context `{_C0: @HRA.subG Γ Σ}.
-  Context `{_C2: @SRFMSemG.inG _ SL.syntax α (@SL.t τ Γ Σ sub α) β}.
-
+  Context `{_C: CtxSL.t}.
+    
   (* Maybe we can make Syntax as an instance for big_opMs. *)
   Definition syn_big_sepM
              n {K} {H1 : EqDecision K} {H2 : Countable K}
@@ -462,7 +466,6 @@ Notation "'[∗' n , A 'list]' x ∈ l , P" :=
     (at level 200, n at level 1, l at level 10, x, A at level 1, right associativity,
       format "[∗  n ,  A  list]  x  ∈  l ,  P") : formula_scope.
 
-
 (** Types of TL. *)
 
 Module ST.
@@ -501,6 +504,15 @@ Module ST.
   
 End ST.
 
+Module CtxSLST.
+
+  Class t
+    `{_C: CtxSL.t}          
+    `{_C: @GPF.inG ST.t τ}
+    := ctxSL: unit.
+
+End CtxSLST.
+
 (** Notations and Coercions. *)
 Coercion ST.baseT : Sortclass >-> ST.type.
 
@@ -514,180 +526,6 @@ Infix "->" := (ST.funT) : formula_type_scope.
 Infix "*" := (ST.prodT) : formula_type_scope.
 Infix "+" := (ST.sumT) : formula_type_scope.
 
-(** Notations and coercions. *)
 Notation "'τ{' t ',' n '}'" := (PF.deg t (SRFSyn._t n)) : formula_type_scope.
 Notation "'τ{' t '}'" := (PF.deg t (SRFSyn._t _)) : formula_type_scope.
 
-
-
-
-
-
-
-(* Module TestLock. *)
-  
-(* Section TESTLOCK. *)
-
-(*   Context `{τ: sType.t}. *)
-(*   Context `{Σ : GRA.t}. *)
-  
-(*   Variant atm {sProp : Type} : Type := *)
-(*     | lock (p: sProp) : atm *)
-(*     | unlock (p: sProp) : atm *)
-(*   . *)
-  
-(*   Instance t : SAtom.t := { *)
-(*     car sProp := @atm sProp; *)
-(*     interp α n itp p := *)
-(*         match p with *)
-(*         | lock q => itp q -∗ itp q *)
-(*         | unlock q => itp q ∗ itp q *)
-(*         end%I *)
-(*   }. *)
-  
-(* End TESTLOCK. *)
-
-(* End TestLock. *)
-
-(* Require Import RobustIndexedInvariants. *)
-
-(* Module TestOwnI. *)
-  
-(* Section TestOwnI. *)
-
-(*   Context `{τ: sType.t}. *)
-(*   Context `{Σ: GRA.t}. *)
-(*   Context `{@GRA.inG OwnEsRA Σ}. *)
-(*   Context `{@GRA.inG (OwnIsRA sProp.sProp) Σ}. *)
-
-(*   Definition xxx (u: positive) (n: nat) (i: positive) : sProp.sProp 0 := *)
-(*     (⟨∃ p: iProp, p -∗ OwnI u n i ⟨OwnE u n ∅⟩⟩)%F. *)
-
-(*   Check (sPropSem.interp 0 (xxx 1 0 1)). *)
-(*   Check (OwnI 1 0 1 ⟨OwnE 1 0 ∅⟩). *)
-
-(*   Check (∃ p: iProp, p -∗ False)%I. *)
-  
-(*   Lemma foo: sPropSem.interp 0 (xxx 1 0 1) = OwnI 1 0 1 ⟨OwnE 1 0 ∅⟩. *)
-(*     reflexivity. *)
-(*   Qed.   *)
-  
-  
-(*   (* Context `{α: GAtom.t}. *) *)
-   
-(*   (* Variant atom {sProp : Type} : Type := *) *)
-(*   (* | owni (u: positive) (i : positive) (p : sProp.t (sProp:=sProp)) *) *)
-(*   (* . *) *)
-
-(*   (* Context `{@GRA.inG (OwnIsRA sProp) Σ}. *) *)
-  
-(*   (* Program Instance t : SAtom.t := { *) *)
-(*   (*   car sProp := @atom sProp; *) *)
-(*   (* }. *) *)
-(*   (* Next Obligation. *) *)
-(*   (*   intros. destruct X. *) *)
-(*   (*   Set Printing All. *) *)
-(*   (*   exact (@OwnI _ sProp.sProp _ u n i p). *) *)
-  
-(*   (*   interp α n itp p := *) *)
-(*   (*     match p with *) *)
-(*   (*     | owni u i p => @OwnI _ sProp.sProp _ u _ i p *) *)
-(*   (*     end *) *)
-(*   (* }. *) *)
-
-(* End TestOwnI. *)
-
-(* End TestOwnI. *)
-
-  
-  (* Definition embed `{Γ: GRA.t} `{Σ: GRA.t} `{m: @subG Γ Σ} (r: Σ) : Γ := *)
-  (*   fun i => eq_rect _ (@URA.car) (r (m i)) _ (m.(subG_prf) i). *)
-
-  (* Lemma embed_wf `{Γ: GRA.t} `{Σ: GRA.t} `{m: @subG Γ Σ} (r: Σ) *)
-  (*     (WF: URA.wf r): *)
-  (*   URA.wf (embed r). *)
-  (* Proof. *)
-  (*   Local Transparent GRA.to_URA. *)
-  (*   revert WF. unfold URA.wf, embed. unseal "ra". ss. *)
-  (*   i. specialize (WF (m k)). revert WF. *)
-  (*   rewrite <-(m.(subG_prf) k). ss. *)
-  (* Qed. *)
-
-  (* Lemma embed_extends `{Γ: GRA.t} `{Σ: GRA.t} `{m: @subG Γ Σ} (r0 r1: Σ) *)
-  (*     (EXT: URA.extends r0 r1): *)
-  (*   URA.extends (embed r0) (embed r1). *)
-  (* Proof. *)
-  (*   Local Transparent GRA.to_URA. *)
-  (*   rr in EXT. des. subst. exists (embed ctx). extensionality k. *)
-  (*   unfold embed, URA.add. unseal "ra". simpl. *)
-  (*   rewrite <-(m.(subG_prf) k). ss. *)
-  (* Qed. *)
-  
-  (* Program Definition lift `{Γ: GRA.t} `{Σ: GRA.t} `{m: @subG Γ Σ} (P: @iProp Γ): @iProp Σ := *)
-  (*   iProp_intro (fun r => P (embed r)) _. *)
-  (* Next Obligation. *)
-  (*   i. ss. eapply iProp_mono; eauto using embed_wf, embed_extends. *)
-  (* Qed. *)
-
-  (* Lemma iprop_extensionality `{Σ: GRA.t} (P Q: iProp) *)
-  (*     (EQ: iProp_pred P = iProp_pred Q): *)
-  (*   P = Q. *)
-  (* Proof. *)
-  (*   destruct P eqn: EQP. subst. *)
-  (*   destruct Q eqn: EQQ. subst. *)
-  (*   ss. subst. f_equal. eapply proof_irrelevance. *)
-  (* Qed. *)
-  
-  (* Lemma lift_ownM `{Γ: GRA.t} `{Σ: GRA.t} `{sub: @subG Γ Σ} {M: URA.t} {emb: @GRA.inG M Γ} (m: M): *)
-  (*   lift (@OwnM Γ M emb m) = @OwnM Σ M (in_subG sub emb) m. *)
-  (* Proof. *)
-  (*   Local Transparent GRA.to_URA. *)
-  (*   apply iprop_extensionality. ss. *)
-  (*   extensionality i. unfold OwnM, embed, Own, URA.extends. uiprop. *)
-  (*   destruct emb, sub. subst. *)
-  (*   rename i into r. apply propositional_extensionality. split; i; des. *)
-  (*   - exists (fun k => *)
-  (*               match Nat.eq_dec (subG_map0 inG_id) k with *)
-  (*               | left H => *)
-  (*                   eq_rect _ (fun k => @URA.car (Σ k)) *)
-  (*                   (eq_rect_r (@URA.car) (ctx inG_id) (subG_prf0 inG_id)) _ H *)
-  (*               | _ => r k *)
-  (*               end). *)
-  (*     extensionality k. ss. *)
-  (*     assert (EQ:= equal_f_dep H inG_id). clear H. *)
-  (*     unfold URA.add in *. unseal "ra". ss. *)
-  (*     unfold GRA.embed in *. ss. des_ifs; r_solve. ss. *)
-  (*     unfold URA.add in *. unseal "ra". unfold PCM.GRA.cast_ra. clear Heq. *)
-  (*     revert EQ. rewrite (UIP_refl _ _ e). ss. clear e. *)
-  (*     rewrite (UIP_refl _ _ e0). ss. clear e0. *)
-  (*     generalize (in_subG_obligation_1 Γ Σ (Γ inG_id)  *)
-  (*         {| subG_map := subG_map0; subG_prf := subG_prf0 |} *)
-  (*         {| GRA.inG_id := inG_id; GRA.inG_prf := eq_refl |}). *)
-  (*     generalize (subG_prf0 inG_id). ss. *)
-  (*     unfold eq_rect_r. i. rewrite (UIP _ _ _ (eq_sym e) e0). *)
-  (*     revert_until r. generalize (subG_map0 inG_id) as j. *)
-  (*     intros j. generalize (r j) as r'. clear r. *)
-  (*     generalize (Σ j) as A. clear j. clear Σ subG_prf0 subG_map0. *)
-  (*     i. subst. rewrite (UIP_refl _ _ e0). ss. *)
-  (*   - ss.       *)
-  (*     exists (fun k => *)
-  (*               match Nat.eq_dec inG_id k with *)
-  (*               | left H => eq_rect _ (@URA.car) (ctx (subG_map0 k)) _ (subG_prf0 k)  *)
-  (*               | _ => eq_rect _ (@URA.car) (r (subG_map0 k)) _ (subG_prf0 k) *)
-  (*               end). *)
-  (*     extensionality k. *)
-  (*     assert (EQ:= equal_f_dep H (subG_map0 inG_id)). clear H. *)
-  (*     unfold URA.add in *. unseal "ra". ss. *)
-  (*     unfold GRA.embed in *. ss. des_ifs; r_solve. ss. *)
-  (*     unfold URA.add in *. unseal "ra". clear Heq e. *)
-  (*     revert EQ. unfold PCM.GRA.cast_ra. *)
-  (*     rewrite (UIP_refl _ _ e0). ss. clear e0. *)
-  (*     generalize (in_subG_obligation_1 Γ Σ (Γ k) *)
-  (*         {| subG_map := subG_map0; subG_prf := subG_prf0 |} *)
-  (*         {| GRA.inG_id := k; GRA.inG_prf := eq_refl |}). ss. *)
-  (*     generalize (subG_prf0 k). generalize (subG_map0 k). *)
-  (*     intros j. generalize (r j) as r'. clear r. revert m. *)
-  (*     generalize (ctx j). clear ctx. *)
-  (*     generalize (Σ j) as A. clear j. i. subst. *)
-  (*     rewrite (UIP_refl _ _ e0). ss. *)
-  (* Qed. *)
