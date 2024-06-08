@@ -476,7 +476,6 @@ Ltac SL_red := repeat (try rewrite ! @SLRed.sepconj;
                        try rewrite ! @SLRed.or;
                        try rewrite ! @SLRed.impl;
                        try rewrite ! @SLRed.wand;
-                       (* try rewrite ! @SLRed.ownm; *)
                        try rewrite ! @SLRed.pure;
                        try rewrite ! @SLRed.univ;
                        try rewrite ! @SLRed.ex;
@@ -496,7 +495,6 @@ Ltac SL_red_all := repeat (try rewrite ! @SLRed.sepconj in *;
                            try rewrite ! @SLRed.or in *;
                            try rewrite ! @SLRed.impl in *;
                            try rewrite ! @SLRed.wand in *;
-                           (* try rewrite ! @SLRed.ownm in *; *)
                            try rewrite ! @SLRed.pure in *;
                            try rewrite ! @SLRed.univ in *;
                            try rewrite ! @SLRed.ex in *;
@@ -510,3 +508,6 @@ Ltac SL_red_all := repeat (try rewrite ! @SLRed.sepconj in *;
                            try rewrite ! @SLRed.sepS in *;
                            try rewrite ! @SLRed.sepL1 in *
                      ).
+
+Ltac SL_red_ownm := try rewrite ! @SLRed.ownm.
+Ltac SL_red_ownm_all := try rewrite ! @SLRed.ownm in *.
