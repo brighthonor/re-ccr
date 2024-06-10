@@ -780,19 +780,15 @@ Section HPSIM.
     eapply hpsim_frameC_mon, PR; eauto with paco.
   Qed.
 
-
-
-
-
-
-  
-  
+  (* Definition hpsim_fsem: relation (Any.t -> itree hAGEs Any.t) := *)
+  (*   (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε), *)
+  (*               hpsim_body false false (st_src, itr_src) (st_tgt, itr_tgt) ε))%signature. *)
 
   Definition hpsim_fsem: relation (Any.t -> itree hAGEs Any.t) :=
-    (eq ==> (fun itr_src itr_tgt => forall st_src st_tgt (INV: Ist st_src st_tgt ε),
-                hpsim_body false false (st_src, itr_src) (st_tgt, itr_tgt) ε))%signature.
-
-  Definition hpsim_fnsem: relation (string * (Any.t -> itree hAGEs Any.t)) := RelProd eq hpsim_fsem.
+    (eq ==> hpsim_fun)%signature.
+  
+  Definition hpsim_fnsem: relation (string * (Any.t -> itree hAGEs Any.t)) :=
+    RelProd eq hpsim_fsem.
 
   (* Arguments _hpsim {with_dummy} hpsim {R} RR.
 
@@ -814,19 +810,20 @@ Hint Resolve cpn7_wcompat: paco.
 
 
 Lemma hpsim_refl {Σ: GRA.t} fl:
-  forall src tgt fmr (WF: URA.wf fmr) (EQST: Own fmr ⊢ ⌜src = tgt⌝%I),
+  forall src tgt fmr (EQST: Own fmr ⊢ #=> ⌜src = tgt⌝%I),
   hpsim_body fl fl (fun src tgt => ⌜src = tgt⌝%I) false false src tgt fmr.
 Proof.
   ginit. gcofix CIH. i.
+  guclo hpsim_updateC_spec. econs. econs. split; eauto.
   assert (src = tgt); subst.
-  { rr in EQST. uiprop in EQST. rr in EQST. uiprop in EQST.
-    eapply EQST; try refl; eauto. }
+  { eapply own_pure; eauto.
+    iIntros "H". iApply Upd_Pure. iApply EQST. eauto. }
 
   destruct tgt as [st itr].
   gstep. econs. econs. assert (CASE := case_itrH _ itr); des; subst;
     try by repeat (econs; eauto with paco).
   - esplits; eauto. destruct c; econs; eauto.
-    { instantiate (1:= Own fmr). eauto. }
+    { instantiate (1:= Own fmr). iIntros "H". iFrame. eauto. }
     i. do 2 econs; esplits; eauto.
     assert (st_src0 = st_tgt0); subst.
     { uipropall. exploit INV; i; des; try refl; eauto. rr in x2. uipropall.
@@ -859,9 +856,10 @@ Section HPSIMMODSEM.
   Inductive sim: Prop := mk {
     I: Any.t -> Any.t -> iProp;
     hpsim_fnsems: Forall2 (hpsim_fnsem fl_src fl_tgt I) ms_src.(fnsems) ms_tgt.(fnsems);
-    hpsim_initial: ms_src.(initial_cond) ⊢ ms_tgt.(initial_cond) (* ∗ simulation of src/tgt initial_st as iProp. *) 
-    (* src_cond ⊢ tgt_cond ∗ (hpsim init_src init_tgt)*)
-    (* hpsim_initial: I (ms_src.(HModSem.initial_st)) (ms_tgt.(HModSem.initial_st)) ε; *)
+    hpsim_initial: ∃ FMR: iProp,
+                   (ms_src.(initial_cond) ⊢ #=> (ms_tgt.(initial_cond) ∗ FMR)) /\
+                   (∀ fmr (INV: Own fmr ⊢ #=> FMR),
+                      hpsim_body fl_src fl_tgt I false false (tt↑, resum_itr ms_src.(initial_st)) (tt↑, resum_itr ms_tgt.(initial_st)) fmr);
   }.
 
 End HPSIMMODSEM.
@@ -869,15 +867,16 @@ End HPSIMMODSEM.
 Lemma self_sim {Σ: GRA.t} (ms: HModSem.t):
   sim ms ms.
 Proof.
-  econs; et.
-  - instantiate (1:=(fun src tgt => ⌜src = tgt⌝%I)). (* fun p => fst p = snd p *)
+  econs.
+  - instantiate (1:=(fun src tgt => ⌜src = tgt⌝%I)).
     generalize (HModSem.fnsems ms).
     induction a; ii; ss.
     econs; et. econs; ss. ii; clarify.
-    rr in INV. uipropall. clarify.
-    eapply hpsim_refl; eauto.
-    apply URA.wf_unit.
-  (* - rr. uipropall. *)
+    eapply hpsim_refl.
+    iIntros "H". iMod (INV with "H") as "%H".
+    iModIntro. subst. eauto.
+  - exists emp%I. split; eauto.
+    i. eapply hpsim_refl. eauto.
 Qed.
 
 End HModSemPair.
