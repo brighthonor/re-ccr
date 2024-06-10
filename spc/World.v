@@ -900,6 +900,8 @@ Section FANCY_UPDATE.
     - symmetry. eapply leibniz_equiv. eapply union_difference. ss.
   Qed.
 
+  (* Multiverse operations *)
+  
   Theorem FUpd_spawn_world u b A E:
     ⊢ FUpd u b A E E (∃ v, closed_world v 0 ⊤).
   Proof.

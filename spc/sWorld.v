@@ -173,7 +173,9 @@ Module WDRed.
     - SL_red. eauto.
     - SL_red. SRF_red. rewrite IHb. rewrite wsat. eauto.
   Qed.
-    
+
+  (* User Interface *)
+  
   Lemma world u b E :
     SRFSem.t b (WD.world u b E) = world u b E.
   Proof.
@@ -215,10 +217,13 @@ Module WDRed.
 End WDRed.
 
 Global Opaque WD.world.
+Global Opaque world.
 Global Opaque WD.free_worlds.
-Global Opaque WD.closed_world.
+Global Opaque free_worlds.
 Global Opaque WD.inv.
+Global Opaque inv.
 Global Opaque WD.FUpd.
+Global Opaque FUpd.
 
 Ltac WD_red := repeat (
                    try rewrite ! @WDRed.world;
