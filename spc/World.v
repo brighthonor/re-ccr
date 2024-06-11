@@ -789,7 +789,7 @@ Section FANCY_UPDATE.
   Context `{_W1: @GRA.inG OwnERA Γ}.
   Context `{_W2: @GRA.inG OwnDRA Γ}.
 
-  Definition inv u (N : namespace) (n : level) p :=
+  Definition inv u (n : level) (N : namespace) p :=
     (∃ i, ⌜i ∈ (↑N : coPset)⌝ ∧ OwnI u n i p)%I.
 
   Definition FUpd u b (A : iProp) (E1 E2 : coPset) (P : iProp) : iProp :=
@@ -807,7 +807,7 @@ Section FANCY_UPDATE.
 
   Lemma wsats_inv_gen u b E N n p :
     n < b ->
-    wsats u b ∗ OwnE u E ∗ OwnD_auth u -∗ |==> inv u N n p ∗ (⟦p⟧ -∗ wsats u b) ∗ OwnE u E ∗ OwnD_auth u.
+    wsats u b ∗ OwnE u E ∗ OwnD_auth u -∗ |==> inv u n N p ∗ (⟦p⟧ -∗ wsats u b) ∗ OwnE u E ∗ OwnD_auth u.
   Proof.
     iIntros (LT) "(WSAT & EN & DA)".
     iMod (wsats_OwnI_alloc_lt_gen _ _ _ LT p (fun i => i ∈ ↑N) with "[WSAT DA]") as "(I & D & WSAT)".
@@ -817,7 +817,7 @@ Section FANCY_UPDATE.
   Qed.
 
   Lemma FUpd_alloc_gen u b A E N n p :
-    n < b -> (inv u N n p -∗ ⟦p⟧) ⊢ FUpd u b A E E (inv u N n p).
+    n < b -> (inv u n N p -∗ ⟦p⟧) ⊢ FUpd u b A E E (inv u n N p).
   Proof.
     iIntros (LT) "P (A & W & E & D & U)".
     iMod (wsats_inv_gen with "[W E D]") as "(#INV & W & E)"; eauto. iFrame.
@@ -826,13 +826,13 @@ Section FANCY_UPDATE.
   Qed.
 
   Lemma FUpd_alloc u b A E N n p :
-    n < b -> ⟦p⟧ ⊢ FUpd u b A E E (inv u N n p).
+    n < b -> ⟦p⟧ ⊢ FUpd u b A E E (inv u n N p).
   Proof.
     iIntros (LT) "P". iApply FUpd_alloc_gen. auto. iIntros. iFrame.
   Qed.
 
   Lemma FUpd_open u b A n N E (LT : n < b) (IN : ↑N ⊆ E) p :
-    inv u N n p ⊢
+    inv u n N p ⊢
         FUpd u b A E (E∖↑N)
         (⟦p⟧ ∗ ((⟦p⟧) -∗ FUpd u b A (E∖↑N) E emp)).
   Proof.
@@ -917,7 +917,7 @@ Section FANCY_UPDATE.
     :
     ⟦p⟧ ∗ closed_world u0 b0 E0
     ⊢
-    FUpd u b A E E (inv u0 N n p ∗ closed_world u0 b0 E0).
+    FUpd u b A E E (inv u0 n N p ∗ closed_world u0 b0 E0).
   Proof.
     iIntros "(P & F0 & S0 & E0 & D0 & R0) (A & S & E & D & R)".
     iPoseProof (FUpd_alloc with "P") as "Upd"; eauto.
@@ -930,7 +930,7 @@ Section FANCY_UPDATE.
     (LT: n < b0)
     (IN: ↑N ⊆ E0)
     :
-    inv u0 N n p ∗ closed_world u0 b0 E0
+    inv u0 n N p ∗ closed_world u0 b0 E0
     ⊢
     FUpd u b A E E (⟦p⟧ ∗ closed_world u0 b0 (E0 ∖↑N)).
   Proof.
@@ -1009,7 +1009,7 @@ Use [FUpd_mask_frame] and [FUpd_intro_mask]")
   Qed.
 
   Global Instance into_acc_FUpd_inv u b A E n N p :
-    IntoAcc (inv u N n p) (n < b /\ (↑N) ⊆ E) True
+    IntoAcc (inv u n N p) (n < b /\ (↑N) ⊆ E) True
             (FUpd u b A E (E ∖ ↑N))
             (FUpd u b A (E ∖ ↑N) E)
             (fun _ : () => ⟦p⟧) (fun _ : () => ⟦p⟧) (fun _ : () => None).
@@ -1028,7 +1028,7 @@ Use [FUpd_mask_frame] and [FUpd_intro_mask]")
   Qed.
 
   Global Instance into_acc_FUpd_world u b A E n N p :
-    IntoAcc (inv u N n p) (n < b /\ (↑N) ⊆ E) True
+    IntoAcc (inv u n N p) (n < b /\ (↑N) ⊆ E) True
             (FUpd u b A E (E ∖ ↑N))
             (FUpd u b A (E ∖ ↑N) E)
             (fun _ : () => ⟦p⟧) (fun _ : () => ⟦p⟧) (fun _ : () => None).

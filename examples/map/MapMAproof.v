@@ -19,7 +19,10 @@ From ExtLib Require Import
 Require Import ProofMode STB Invariant.
 Require Import Mem1.
 
-Require Import SimModSemFacts IProofMode.
+Require Import SimModSemFacts IProofMode IRed.
+
+Require Import sProp sWorld World SRF.
+From stdpp Require Import coPset gmap namespaces.
 
 Set Implicit Arguments.
 
@@ -28,21 +31,18 @@ Local Open Scope nat_scope.
 
 
 Section SIMMODSEM.
-  Context `{Σ: GRA.t}.
+  Context `{_W: CtxWD.t}.
+  Context `{@GRA.inG MapRA Γ}.
+  Context `{@GRA.inG MapRA0 Γ}.
+  Context `{@GRA.inG memRA Γ}.
 
-  Context `{@GRA.inG MapRA0 Σ}.
-  Context `{@GRA.inG MapRA1 Σ}.
-  Context `{@GRA.inG memRA Σ}.
-
-  Let W: Type := Any.t * Any.t.
-
-  Definition initial_map_r: @URA.car MapRA1 :=
+  Definition initial_map_r: @URA.car MapRA :=
     (Excl.unit, Auth.excl ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra) ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra)).
 
-  Definition black_map_r (f: Z -> Z): @URA.car MapRA1 :=
+  Definition black_map_r (f: Z -> Z): @URA.car MapRA :=
     (Excl.unit, Auth.black ((fun k => Excl.just (f k)): @URA.car (Z ==> (Excl.t Z))%ra)).
 
-  Definition unallocated_r (sz: Z): @URA.car MapRA1 :=
+  Definition unallocated_r (sz: Z): @URA.car MapRA :=
     (Excl.unit, Auth.white ((fun k =>
                                if (Z_gt_le_dec 0 k) then Excl.just 0%Z
                                else if (Z_gt_le_dec sz k) then Excl.unit else Excl.just 0%Z)
@@ -144,7 +144,7 @@ Section SIMMODSEM.
 
   Let Ist: Any.t -> Any.t -> iProp :=
         (fun st_src st_tgt =>
-             ((∃ f sz, ⌜st_src = f↑ /\ st_tgt = (f, sz)↑⌝ ** black_map f ** unallocated sz ** pending1) ∨ (initial_map ** ⌜st_src = (fun (_: Z) => 0%Z)↑ /\ st_tgt = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
+             ((∃ f sz, ⌜st_src = f↑ /\ st_tgt = (f, sz)↑⌝ ** black_map f ** unallocated sz ** pending) ∨ (initial_map ** ⌜st_src = (fun (_: Z) => 0%Z)↑ /\ st_tgt = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
 
   Variable GlobalStbM: Sk.t -> gname -> option fspec.
   Hypothesis STB_setM: forall sk, (GlobalStbM sk) "set" = Some set_specM.
@@ -154,8 +154,8 @@ Section SIMMODSEM.
 
   (* Hypothesis PUREINCL: forall sk, stb_pure_incl (GlobalStbM sk) (GlobalStb sk). *)
 
-  Lemma pending1_unique:
-    pending1 -∗ pending1 -∗ False%I.
+  Lemma pending_unique:
+    pending -∗ pending -∗ False%I.
   Proof.
     iIntros "H0 H1". iCombine "H0 H1" as "H".
     iOwnWf "H". exfalso. clear - H2.
@@ -163,21 +163,115 @@ Section SIMMODSEM.
     rr in H2. ur in H2. unseal "ra". ss.
   Qed.
 
-  Require Import RobustIndexedInvariants.
-  Require Import IRed.
-
   Local Notation universe := positive.
-  Local Notation level := nat.
+  (* Local Notation level := nat. *)
 
-  Context `{sProp : level -> Type}.
-  Context `{Invs : @InvSet Σ}.
-  Context `{@IInvSet Σ sProp}.
-  Context `{@GRA.inG OwnEsRA Σ}.
-  Context `{@GRA.inG OwnDsRA Σ}.
-  Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
 
-  Theorem sim: HModPair.sim (MapA.HMap GlobalStbM) (MapM.HMap GlobalStbM) Ist ∅ 1 0.
+  (* Temporary Tactics which could be deleted or moved to IProofmode.v *)
+  Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs].
+
+  Theorem sim: HModPair.sim (MapA.HMap GlobalStbM) (MapM.HMap GlobalStbM) Ist.
   Proof.
+    econs; eauto. ii. econs; cycle 1.
+    {
+      iIntros "SRC". s. iSplitR; eauto. 
+      steps. iRight. esplits; eauto.
+    }
+    sim_split.
+    {  
+      unfold cfunU, initF, MapM.initF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+
+      (* Make below as a tactic: intro-meta or pairwise choose/take *)
+      iApply isim_take_src; iIntros "%meta"; iApply (@isim_take_tgt _ _ _ _ _ meta _ _ _ _ _ ); destruct meta.
+      iApply isim_take_src; iIntros "%". force. instantiate (1:= x0). 
+      
+      iApply isim_assume_src; iIntros "(W & (%Y & %M & P) & %X)". subst. iApply isim_assume_tgt; iSplitR "IST".
+      { admit. (* not 'pending = pending0 * pending1' anymore *)}
+
+      (* steps. *)
+      admit.
+
+      (* calling APC *) 
+      (* unfold interp_hEs_hAGEs. grind. rewrite interp_trigger. grind.
+      unfold HoareAPC. grind.
+      steps. iApply isim_choose_src.
+      rewrite !unfold_APC.
+      steps. iApply isim_choose_src. instantiate (1:= y). instantiate (1:= y2).
+      destruct y2.
+      { steps. iApply isim_choose_src. iApply isim_guarantee_src. iSplitR "IST".
+        { iDestruct "GRT" as "(CL & _ & %Y2)". 
+          iSplitL "CL"; eauto. iSplit; eauto. iSplit; eauto. admit.
+        }
+        steps. iSplit; eauto. admit.
+      }
+      steps.
+       *)   
+    }
+    {
+      unfold cfunU, getF, MapM.getF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+      iApply isim_take_src; iIntros "%meta". force. destruct meta, x.
+      iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
+      iApply isim_assume_src; iIntros "(W & (%Y & M) & %X)". subst. iApply isim_assume_tgt; iSplitR.
+      { eauto. }
+      steps.
+      destruct (Any.downcast st_src) eqn: EQ; cycle 1.
+      { iExFalso. unfold Ist. iClear "W M".
+        iDestruct "IST" as "[[% [% A]] | B]".
+        - iDestruct "A" as "[[[[% %] B] U] P]".
+          rewrite H2 in EQ. rewrite Any.upcast_downcast in EQ.
+          inv EQ.
+        - iDestruct "B" as "[I [% %]]".
+          rewrite H2 in EQ. rewrite Any.upcast_downcast in EQ.
+          inv EQ.
+      }
+      unfold assume.
+      steps. force. steps.
+      (* APC *)
+      admit. 
+    }
+    {
+      unfold cfunU, setF, MapM.setF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+      iApply isim_take_src; iIntros "%meta". force. destruct meta, x, p.
+      iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
+      iApply isim_assume_src; iIntros "(W & (%Y & M) & %X)". subst. iApply isim_assume_tgt; iSplitR.
+      { eauto. }
+      steps.
+      destruct (Any.downcast st_src) eqn: EQ; cycle 1.
+      { iExFalso. unfold Ist. iClear "W M".
+        iDestruct "IST" as "[[% [% A]] | B]".
+        - iDestruct "A" as "[[[[% %] B] U] P]".
+          rewrite H2 in EQ. rewrite Any.upcast_downcast in EQ.
+          inv EQ.
+        - iDestruct "B" as "[I [% %]]".
+          rewrite H2 in EQ. rewrite Any.upcast_downcast in EQ.
+          inv EQ.
+      }
+      unfold assume.
+      steps. force. steps.
+      (* APC *)
+      admit.
+    }
+    {
+      unfold cfunU, set_by_userF, MapM.set_by_userF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+      iApply isim_take_src; iIntros "%meta". force. destruct meta, x.
+      iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
+      iApply isim_assume_src; iIntros "(W & (%Y & M) & %X)". subst. iApply isim_assume_tgt; iSplitR; [eauto|].
+      steps. unfold ccallU. 
+      steps. unfold HoareCall. prep.
+      iApply isim_choose_tgt; iIntros "%". force. instantiate (1:= x).
+      iApply isim_choose_tgt; iIntros "%". force. instantiate (1:= x0).
+      steps. iApply isim_guarantee_src; iSplitL "GRT"; [eauto|].
+      steps. call. iSplitL "IST"; [eauto|].
+      iIntros "% % % IST". prep. 
+      iApply isim_take_src; iIntros "%". force. instantiate (1:= x1).
+      iApply isim_assume_src; iIntros "POST". force. iSplitL "POST"; [eauto|].
+      steps. iDestruct "GRT" as "%GRT". force. instantiate (1:= y2). force.
+      iSplitL "W M".
+      { iFrame. iSplit; eauto. iSplitR;[|iExists z0; eauto].
+        subst. iPureIntro. admit.
+      } 
+      steps. eauto.
+    }
   Admitted.
 
 

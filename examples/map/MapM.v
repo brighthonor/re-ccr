@@ -9,6 +9,9 @@ Require Import PCM.
 Require Import HoareDef STB IPM.
 Require Import MapHeader.
 
+Require Import sProp sWorld World SRF.
+
+
 Set Implicit Arguments.
 
 
@@ -32,7 +35,8 @@ def set_by_user(k: int) ≡
 ***)
 
 Section M.
-  Context `{@GRA.inG MapRA0 Σ}.
+  Context `{_W: CtxWD.t}.
+  Context `{@GRA.inG MapRA0 Γ}.
 
   (* Let Es := (hAPCE +' Es). *)
 
@@ -76,7 +80,7 @@ Section M.
 
   Definition SMapSem: SModSem.t := {|
     SModSem.fnsems := MapSbtbM;
-    SModSem.initial_cond := Own ε;
+    SModSem.initial_cond := True;
     SModSem.initial_st := Ret (fun (_: Z) => 0%Z, 0%Z)↑;
   |}
   .

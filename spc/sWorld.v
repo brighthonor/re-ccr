@@ -104,7 +104,7 @@ Module WD.
   Definition closed_world u b E : SRFSyn.t b :=
     free_worlds u b ∗ world u b E.
 
-  Definition inv u (N : namespace) (n : level) p :=
+  Definition inv u (n : level) (N : namespace) p :=
     (∃ i: τ{⇣positive}, ⌜i ∈ (↑N : coPset)⌝ ∧ ownI u n i p)%SRF.
 
   Definition FUpd u b (A : SRFSyn.t b) (E1 E2 : coPset) (P : SRFSyn.t b) : SRFSyn.t b :=
@@ -199,8 +199,8 @@ Module WDRed.
     rewrite ->free_worlds, world. eauto.
   Qed.
   
-  Lemma inv u N n p :
-    SRFSem.t n (WD.inv u N n p) = inv u N n p.
+  Lemma inv u n N p :
+    SRFSem.t n (WD.inv u n N p) = inv u n N p.
   Proof.
     unfold WD.inv, inv, WD.ownI. SL_red. f_equal. extensionality i.
     SL_red. SRF_red. eauto.

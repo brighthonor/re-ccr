@@ -13,85 +13,143 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import ProofMode.
 Require Import Mem1 Invariant.
-
+Require Import sProp sWorld World SRF.
+From stdpp Require Import coPset gmap namespaces.
 Set Implicit Arguments.
 
 
-Instance MapRA0: URA.t := Excl.t unit.
-Instance MapRA1: URA.t := URA.prod (Excl.t unit) (Auth.t (Z ==> (Excl.t Z)))%ra.
+Section MOVE.
+  Context `{_W: CtxWD.t}.
 
-Definition map_points_to_r (k: Z) (v: Z): @URA.car MapRA1 :=
-  (Excl.unit, Auth.white ((fun n => if Z.eq_dec n k then Excl.just v else Excl.unit): @URA.car (Z ==> (Excl.t Z))%ra)).
+  (* Definition mk_fspec_inv {X: Type} (DPQ: X -> ord * (Any.t -> iProp) * (Any.t -> iProp)): fspec :=
+    mk_fspec (fst ∘ fst ∘ DPQ)
+             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∧ ⌜y = a⌝)%I)
+             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∧ ⌜z = a⌝)%I)
+  . *)
 
-Definition map_points_to `{@GRA.inG MapRA1 Σ} (k: Z) (v: Z): iProp :=
-  OwnM (map_points_to_r k v).
+  Inductive meta_inv {X: positive -> nat -> Type} : Type :=
+  | mk_meta (u: positive) (n: nat) (x: X u n).  
 
-Definition pending0 `{@GRA.inG MapRA0 Σ}: iProp :=
-  OwnM (Excl.just tt).
+  Definition mk_fspec_inv (k: nat) (fsp: positive -> nat -> fspec): fspec :=
+    @mk_fspec
+      Σ
+      (@meta_inv (fun u n => (fsp u n).(meta)))
+      (fun '(mk_meta u n x) => (fsp u n).(measure) x)
+      (fun '(mk_meta u n x) varg_src varg_tgt =>
+         closed_world u (k+n) ⊤ ∗ (fsp u n).(precond) x varg_src varg_tgt)%I
+      (fun '(mk_meta u n x) vret_src vret_tgt =>
+         closed_world u (k+n) ⊤ ∗ (fsp u n).(postcond) x vret_src vret_tgt)%I.
 
-Definition pending1 `{@GRA.inG MapRA1 Σ}: iProp :=
-  OwnM (Excl.just tt, URA.unit: @URA.car (Auth.t (Z ==> (Excl.t Z)))%ra).
+  Definition fspec_trivial: fspec :=
+    @mk_fspec 
+      _
+      (@meta_inv (fun _ _ => unit)) 
+      (fun _ => ord_top) 
+      (fun _ argh argl => (⌜argh = argl⌝: iProp)%I)
+      (fun _ reth retl => (⌜reth = retl⌝: iProp)%I).
 
-Definition pending `{@GRA.inG MapRA0 Σ} `{@GRA.inG MapRA1 Σ}: iProp :=
-  pending0 ∗ pending1.
 
-Fixpoint initial_points_tos `{@GRA.inG MapRA1 Σ} (sz: nat): iProp :=
-  match sz with
-  | 0 => True%I
-  | S sz' => initial_points_tos sz' ∗ map_points_to sz' 0
-  end.
+End MOVE.
+
+
+Section RESOURCE.
+  Context `{_W: CtxWD.t}.
+
+  Global Instance MapRA: URA.t := URA.prod (Excl.t unit) (Auth.t (Z ==> (Excl.t Z)))%ra.
+  Context `{@GRA.inG MapRA Γ}.
+
+  Definition map_points_to_r (k: Z) (v: Z): @URA.car MapRA :=
+    (Excl.unit, Auth.white ((fun n => if Z.eq_dec n k then Excl.just v else Excl.unit): @URA.car (Z ==> (Excl.t Z))%ra)).
+
+  Definition map_points_to (k: Z) (v: Z): iProp :=
+    OwnM (map_points_to_r k v).
+
+  (* Definition S_map_points_to {n} (k: Z) (v: Z): SRFSyn.t n :=
+    (<ownm> (map_points_to_r k v))%SRF. *)
+
+  Definition pending_r: MapRA :=
+    (Excl.just tt, URA.unit: @URA.car (Auth.t (Z ==> (Excl.t Z)))%ra).
+
+  Definition pending: iProp :=
+    OwnM pending_r.
+    
+  (* Definition S_pending {n}: SRFSyn.t n :=
+    (<ownm> pending_r)%SRF. *)
+
+
+  (* Definition pending `{@GRA.inG MapRA0 Σ} `{@GRA.inG MapRA Σ}: iProp :=
+      pending0 ∗ pending1. *)
+
+  Fixpoint initial_points_tos (sz: nat): iProp :=
+    match sz with
+    | 0 => True%I
+    | S sz' => initial_points_tos sz' ∗ map_points_to sz' 0
+    end.
+
+  Definition MapRA0: URA.t := Excl.t unit.
+  Context `{@GRA.inG MapRA0 Γ}.
+
+  Definition pending0: iProp :=
+    OwnM ((Excl.just tt): MapRA0).
+
+End RESOURCE.
 
 Section SPECS.
-  Context `{@GRA.inG MapRA0 Σ}.
-  Context `{@GRA.inG MapRA1 Σ}.
+  Context `{_W: CtxWD.t}.
+  Context `{@GRA.inG MapRA Γ}.
+  Context `{@GRA.inG MapRA0 Γ}.
 
-  Definition init_specM: fspec :=
-    mk_fspec_inv
-      (mk_simple (fun (sz: nat) =>
-                    (ord_top,
-                      (fun varg => (⌜varg = ([Vint sz]: list val)↑⌝)
-                                     ** (⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝)
-                                     ** pending0),
-                      (fun vret => True%I)))).
+  (* Definition PENDING := (nroot .@ "MAP" .@ "PENDING"). *)
 
   Definition init_spec: fspec :=
-    mk_fspec_inv
-      (mk_simple (fun (sz: nat) =>
+    mk_fspec_inv 0
+      (fun _ _ => mk_simple (fun (sz: nat) =>
                     (ord_top,
-                      (fun varg => (⌜varg = ([Vint sz]: list val)↑⌝)
-                                     ** (⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝)
-                                     ** pending),
-                      (fun vret => ⌜vret = Vundef↑⌝ ** initial_points_tos sz)))).
+                      (fun varg => ( ⌜varg = ([Vint sz]: list val)↑⌝
+                                     ∗ ⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝
+                                     ∗ pending)%I),
+                                     (* exists N, inv u n N S_pending *)
+                                     (* inv u n PENDING S_pending *)
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ initial_points_tos sz)%I)))).
+
+  Definition init_specM: fspec :=
+    mk_fspec_inv 0
+      (fun _ _ => mk_simple (fun (sz: nat) =>
+                    (ord_top,
+                      (fun varg => (⌜varg = ([Vint sz]: list val)↑⌝
+                                     ∗ ⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝
+                                     ∗ pending0)%I),
+                      (fun vret => True%I)))).
 
   Definition get_spec: fspec :=
-    mk_fspec_inv
-      (mk_simple (fun '(k, v) =>
+    mk_fspec_inv 0
+      (fun _ _ => mk_simple (fun '(k, v) =>
                     (ord_top,
-                      (fun varg => (⌜varg = ([Vint k])↑⌝)
-                                     ** (map_points_to k v)),
-                      (fun vret => ⌜vret = (Vint v)↑⌝ ** map_points_to k v)))).
+                      (fun varg => (⌜varg = ([Vint k])↑⌝
+                                     ∗ map_points_to k v)%I),
+                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v)%I)))).
 
-  Definition get_specM: fspec := mk_fspec_inv (fspec_trivial).
+  Definition get_specM: fspec := fspec_trivial.
 
   Definition set_spec: fspec :=
-    mk_fspec_inv
-      (mk_simple (fun '(k, w, v) =>
+    mk_fspec_inv 0
+      (fun _ _ => mk_simple (fun '(k, w, v) =>
                     (ord_top,
-                      (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝)
-                                     ** (map_points_to k w)),
-                      (fun vret => ⌜vret = Vundef↑⌝ ** map_points_to k v)))).
+                      (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝
+                                     ∗ map_points_to k w)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v)%I)))).
 
-  Definition set_specM: fspec := mk_fspec_inv (fspec_trivial).
+  Definition set_specM: fspec := fspec_trivial.
 
   Definition set_by_user_spec: fspec :=
-    mk_fspec_inv
-      (mk_simple (fun '(k, w) =>
+    mk_fspec_inv 0
+      (fun _ _ => mk_simple (fun '(k, w) =>
                     (ord_top,
-                      (fun varg => (⌜varg = ([Vint k])↑⌝)
-                                     ** (map_points_to k w)),
-                      (fun vret => ⌜vret = Vundef↑⌝ ** ∃ v, map_points_to k v)))).
+                      (fun varg => (⌜varg = ([Vint k])↑⌝
+                                     ∗ map_points_to k w)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v)%I)))).
 
-  Definition set_by_user_specM: fspec := mk_fspec_inv (fspec_trivial).
+  Definition set_by_user_specM: fspec := fspec_trivial.
 
   Definition MapStb: alist gname fspec :=
     Seal.sealing "stb" [("init", init_spec); ("get", get_spec); ("set", set_spec); ("set_by_user", set_by_user_spec)].
