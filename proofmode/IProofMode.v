@@ -1736,10 +1736,10 @@ Ltac _step :=
 
   (************ User Tactics **************)
   Ltac steps := try repeat _steps.
-  Ltac force := try force_l; try force_r.
-  Ltac call := _call.
-  Ltac inline_l := _inline_l;[eauto|].
-  Ltac inline_r := _inline_r;[eauto|].
+  Ltac force := prep; try force_l; try force_r.
+  Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"].
+  Ltac inline_l := prep; _inline_l;[eauto|].
+  Ltac inline_r := prep; _inline_r;[eauto|].
   Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs].
   (* Ltac choose := _choose. *)
   (* Ltac take := _take. *)
@@ -1750,11 +1750,9 @@ Ltac _step :=
 
   (********** Notations *********)
   (* TODO: Make notations of
-      P -* sim
-      P ** sim
-      ∀ x, sim
-      ∃ x, sim
-      ...
+      P -∗ sim
+      P ∗ sim
+
   *)
     From iris.proofmode Require Import coq_tactics environments.
 
@@ -1797,7 +1795,24 @@ Ltac _step :=
       (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
         (at level 50,
          format "'------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-   
+
+    (* additional *) 
+    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  P '∗' 'ISIM'"
+    :=
+      (environments.envs_entails (Envs E1 E2 _) (bi_sep P (isim _ _ _ _ _ _ _ _ (st_src, _) (st_tgt, _))))
+        (at level 50,
+         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' P  '∗'  'ISIM' ").
+
+    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  P '-∗' 'ISIM'"
+    :=
+      (environments.envs_entails (Envs E1 E2 _) (bi_wand P (isim _ _ _ _ _ _ _ _ (st_src, _) (st_tgt, _))))
+        (at level 50,
+         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' P  '-∗'  'ISIM' ").
+
+
+
+
+
     (*** wsim ***)
     Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------wsim-------------------------------'  itr_src itr_tgt"
     :=
@@ -1833,10 +1848,9 @@ Ltac _step :=
     Let Ist: Any.t -> Any.t -> iProp := fun _ _ => ⌜True⌝%I.
     Let RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp := fun _ _ => ⌜True⌝%I.
     Variable iP: iProp.
-
-
-    Goal ⊢ ((⌜False⌝**iP) -∗ isim Ist [] [] ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "[#A B]".
+  
+    Goal ⊢ ((⌜False⌝∗iP∗iP) -∗ iP ∗ isim Ist [] [] ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
+    Proof. iIntros "(#A & B & C)". Unset Printing Notations.
     iAssert (iP -* world 1 0 ⊤) as "H". { admit. }
     iPoseProof ("H" with "B") as "B". iRevert "B". Unset Printing Notations. 
     clarify. Admitted.

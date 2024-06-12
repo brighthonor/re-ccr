@@ -57,6 +57,21 @@ Section SIMMODSEM.
   Definition unallocated (sz: Z): iProp :=
     OwnM (unallocated_r sz).
 
+  Lemma unallocated_alloc' sz
+    (POS: Z.to_nat sz > 0)
+    :
+    unallocated sz -∗ (map_points_to sz 0 ** unallocated (Z.succ sz)).
+  Proof.
+    unfold map_points_to, unallocated. iIntros "H".
+    replace (unallocated_r sz) with ((map_points_to_r sz 0) ⋅ (unallocated_r (Z.succ sz))).
+    { ss. iDestruct "H" as "[H0 H1]". iFrame. }
+    unfold unallocated_r, map_points_to_r. ur. f_equal.
+    { ur. auto. }
+    { ur. unfold Auth.white. f_equal. ur. extensionality k.
+      ur. des_ifs; try by (exfalso; lia).
+    }
+  Qed.
+
   Lemma unallocated_alloc (sz: nat)
     :
     unallocated sz -∗ (map_points_to sz 0 ** unallocated (Z.pos (Pos.of_succ_nat sz))).
@@ -167,8 +182,45 @@ Section SIMMODSEM.
   (* Local Notation level := nat. *)
 
 
-  (* Temporary Tactics which could be deleted or moved to IProofmode.v *)
-  Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs].
+(*********)
+  Ltac choose_l := iApply isim_choose_src.
+  Ltac choose_r := iApply isim_choose_tgt; iIntros "%".
+  Ltac take_l := iApply isim_take_src; iIntros "%".
+  Ltac take_r := iApply isim_take_tgt.
+  Ltac choose := prep; choose_r; choose_l.
+  Ltac take := prep; take_l; take_r.
+
+
+  Lemma isim_apc 
+    I fls flt r g ps pt {R} RR st_src st_tgt k_src k_tgt stb
+  :
+    (I st_src st_tgt ∗ (∀st_src0 st_tgt0 vret, (I st_src0 st_tgt0) -∗ isim I fls flt r g RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+  -∗
+    @isim _ I fls flt r g R RR ps pt (st_src, interp_hEs_hAGEs stb ord_top (trigger hAPC) >>= k_src) (st_tgt, interp_hEs_hAGEs stb ord_top (trigger hAPC) >>= k_tgt).
+  Proof.
+    (* iIntros "[IST K]".
+    unfold interp_hEs_hAGEs. rewrite interp_trigger. grind.
+    unfold HoareAPC. grind.
+    choose. instantiate (1:= x).
+    (** Coinduction Hypothesis at here **)
+    rewrite unfold_APC.
+    choose. instantiate (1:= x0).
+    destruct x0 eqn: Eqx.
+    { steps. iApply "K". eauto. }
+    choose. instantiate (1:= x1).
+    unfold guarantee.
+    choose. rewrite! bind_ret_l. choose. instantiate (1:= x3).
+    destruct x3. steps. unfold HoareCall.
+    choose. instantiate (1:= x3).
+    choose. instantiate (1:= x4).
+    steps. force. iSplitL "GRT"; [eauto|].
+    prep. call; eauto.
+    take. instantiate (1:= x5).
+    steps. force. iSplitL "ASM"; [eauto|].
+    steps.  *)
+  Admitted.
+
+  Ltac apc := prep; iApply isim_apc; iSplitL "IST"; [eauto|iIntros "% % %"; iIntrosFresh "IST"].
 
   Theorem sim: HModPair.sim (MapA.HMap GlobalStbM) (MapM.HMap GlobalStbM) Ist.
   Proof.
@@ -178,37 +230,27 @@ Section SIMMODSEM.
       steps. iRight. esplits; eauto.
     }
     sim_split.
-    {  
-      unfold cfunU, initF, MapM.initF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+    - unfold cfunU, initF, MapM.initF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
 
       (* Make below as a tactic: intro-meta or pairwise choose/take *)
       iApply isim_take_src; iIntros "%meta"; iApply (@isim_take_tgt _ _ _ _ _ meta _ _ _ _ _ ); destruct meta.
       iApply isim_take_src; iIntros "%". force. instantiate (1:= x0). 
       
-      iApply isim_assume_src; iIntros "(W & (%Y & %M & P) & %X)". subst. iApply isim_assume_tgt; iSplitR "IST".
+      iApply isim_assume_src. iIntros "(W & (%Y & %M & P) & %X)". subst. iApply isim_assume_tgt. iSplitR "IST".
       { admit. (* not 'pending = pending0 * pending1' anymore *)}
-
-      (* steps. *)
-      admit.
-
-      (* calling APC *) 
-      (* unfold interp_hEs_hAGEs. grind. rewrite interp_trigger. grind.
-      unfold HoareAPC. grind.
-      steps. iApply isim_choose_src.
-      rewrite !unfold_APC.
-      steps. iApply isim_choose_src. instantiate (1:= y). instantiate (1:= y2).
-      destruct y2.
-      { steps. iApply isim_choose_src. iApply isim_guarantee_src. iSplitR "IST".
-        { iDestruct "GRT" as "(CL & _ & %Y2)". 
-          iSplitL "CL"; eauto. iSplit; eauto. iSplit; eauto. admit.
-        }
-        steps. iSplit; eauto. admit.
-      }
       steps.
-       *)   
-    }
-    {
-      unfold cfunU, getF, MapM.getF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+      apc.
+
+      { admit. }
+      (* iDestruct "A" as (f0 sz0) "(((%F & B) & U) & P)". *)
+      steps. choose_l. instantiate (1:= y).
+      force. iSplitL "GRT". 
+      { iDestruct "GRT" as "(W & _ & %Y)". iFrame.
+        iSplit; eauto. iSplit; eauto. admit.
+      }
+      steps. iFrame. eauto.
+      
+    - unfold cfunU, getF, MapM.getF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
       iApply isim_take_src; iIntros "%meta". force. destruct meta, x.
       iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
       iApply isim_assume_src; iIntros "(W & (%Y & M) & %X)". subst. iApply isim_assume_tgt; iSplitR.
@@ -227,10 +269,15 @@ Section SIMMODSEM.
       unfold assume.
       steps. force. steps.
       (* APC *)
-      admit. 
-    }
-    {
-      unfold cfunU, setF, MapM.setF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+      apc. steps. 
+      choose_l. instantiate (1:= y).
+      force. iDestruct "GRT" as "%GRT". iSplitL "W M".
+      { iFrame. rewrite <- GRT.
+        iSplit; iPureIntro. admit.
+      }
+      steps. eauto.
+
+    - unfold cfunU, setF, MapM.setF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
       iApply isim_take_src; iIntros "%meta". force. destruct meta, x, p.
       iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
       iApply isim_assume_src; iIntros "(W & (%Y & M) & %X)". subst. iApply isim_assume_tgt; iSplitR.
@@ -249,10 +296,14 @@ Section SIMMODSEM.
       unfold assume.
       steps. force. steps.
       (* APC *)
-      admit.
-    }
-    {
-      unfold cfunU, set_by_userF, MapM.set_by_userF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
+      apc. { admit. }
+      steps. choose_l. instantiate (1:= y).
+      force. iDestruct "GRT" as "%GRT".
+      iSplitL "W M".
+      { iFrame. subst. iSplit; eauto. iSplit; eauto. admit. }
+      steps. eauto.
+
+    - unfold cfunU, set_by_userF, MapM.set_by_userF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s.
       iApply isim_take_src; iIntros "%meta". force. destruct meta, x.
       iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
       iApply isim_assume_src; iIntros "(W & (%Y & M) & %X)". subst. iApply isim_assume_tgt; iSplitR; [eauto|].
@@ -261,9 +312,8 @@ Section SIMMODSEM.
       iApply isim_choose_tgt; iIntros "%". force. instantiate (1:= x).
       iApply isim_choose_tgt; iIntros "%". force. instantiate (1:= x0).
       steps. iApply isim_guarantee_src; iSplitL "GRT"; [eauto|].
-      steps. call. iSplitL "IST"; [eauto|].
-      iIntros "% % % IST". prep. 
-      iApply isim_take_src; iIntros "%". force. instantiate (1:= x1).
+      steps. call; [eauto|]. 
+      prep. take. instantiate (1:= x1). prep. 
       iApply isim_assume_src; iIntros "POST". force. iSplitL "POST"; [eauto|].
       steps. iDestruct "GRT" as "%GRT". force. instantiate (1:= y2). force.
       iSplitL "W M".
@@ -271,7 +321,6 @@ Section SIMMODSEM.
         subst. iPureIntro. admit.
       } 
       steps. eauto.
-    }
   Admitted.
 
 
