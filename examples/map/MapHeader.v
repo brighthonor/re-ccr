@@ -58,8 +58,8 @@ Section RESOURCE.
   Global Instance MapRA: URA.t := URA.prod (Excl.t unit) (Auth.t (Z ==> (Excl.t Z)))%ra.
   Context `{@GRA.inG MapRA Γ}.
 
-  Definition map_points_to_r (k: Z) (v: Z): @URA.car MapRA :=
-    (Excl.unit, Auth.white ((fun n => if Z.eq_dec n k then Excl.just v else Excl.unit): @URA.car (Z ==> (Excl.t Z))%ra)).
+  Definition map_points_to_r (k: Z) (v: Z): MapRA :=
+    (ε, Auth.white ((fun n => if Z.eq_dec n k then Excl.just v else ε): @URA.car (Z ==> (Excl.t Z))%ra)).
 
   Definition map_points_to (k: Z) (v: Z): iProp :=
     OwnM (map_points_to_r k v).
@@ -68,7 +68,7 @@ Section RESOURCE.
     (<ownm> (map_points_to_r k v))%SRF. *)
 
   Definition pending_r: MapRA :=
-    (Excl.just tt, URA.unit: @URA.car (Auth.t (Z ==> (Excl.t Z)))%ra).
+    (Excl.just tt, ε).
 
   Definition pending: iProp :=
     OwnM pending_r.
@@ -89,8 +89,34 @@ Section RESOURCE.
   Definition MapRA0: URA.t := Excl.t unit.
   Context `{@GRA.inG MapRA0 Γ}.
 
+  Definition pending0_r: MapRA0 := Excl.just tt.
+
   Definition pending0: iProp :=
-    OwnM ((Excl.just tt): MapRA0).
+    OwnM pending0_r.
+
+  
+  Definition initial_r: (Z ==> (Excl.t Z))%ra := (fun _ => Excl.just 0%Z).
+  
+  Definition initial_map_r: MapRA :=
+    (ε, (Auth.black initial_r) ⋅ (Auth.white initial_r)).
+
+  Definition black_map_r (f: Z -> Z): MapRA :=
+    (Excl.unit, Auth.black ((fun k => Excl.just (f k)): (Z ==> (Excl.t Z))%ra)).
+
+  Definition unallocated_r (sz: Z): MapRA :=
+    (Excl.unit, Auth.white ((fun k =>
+                               if (Z_gt_le_dec 0 k) then Excl.just 0%Z
+                               else if (Z_gt_le_dec sz k) then Excl.unit else Excl.just 0%Z)
+                             : (Z ==> (Excl.t Z))%ra)).
+
+  Definition initial_map: iProp :=
+    OwnM initial_map_r.
+
+  Definition black_map (f: Z -> Z): iProp :=
+    OwnM (black_map_r f).
+
+  Definition unallocated (sz: Z): iProp :=
+    OwnM (unallocated_r sz).
 
 End RESOURCE.
 
@@ -150,6 +176,10 @@ Section SPECS.
                       (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v)%I)))).
 
   Definition set_by_user_specM: fspec := fspec_trivial.
+
+  Definition Map_initial_cond : iProp := initial_map ∗ pending0.
+  
+  Definition Map0_initial_cond : iProp := emp.
 
   Definition MapStb: alist gname fspec :=
     Seal.sealing "stb" [("init", init_spec); ("get", get_spec); ("set", set_spec); ("set_by_user", set_by_user_spec)].

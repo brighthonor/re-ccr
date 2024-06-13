@@ -80,7 +80,7 @@ Section M.
 
   Definition SMapSem: SModSem.t := {|
     SModSem.fnsems := MapSbtbM;
-    SModSem.initial_cond := True;
+    SModSem.initial_cond := Map0_initial_cond;
     SModSem.initial_st := Ret (fun (_: Z) => 0%Z, 0%Z)↑;
   |}
   .
