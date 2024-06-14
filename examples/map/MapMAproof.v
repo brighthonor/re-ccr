@@ -36,6 +36,7 @@ Section SIMMODSEM.
   Context `{@GRA.inG MapRA0 Γ}.
   Context `{@GRA.inG memRA Γ}. 
 (* 
+
   Definition initial_r: (Z ==> (Excl.t Z))%ra := (fun _ => Excl.just 0%Z).
   
   Definition initial_map_r: MapRA :=
@@ -235,6 +236,19 @@ Section SIMMODSEM.
     steps.  *)
   Admitted.
 
+  (* TODO: Handle impure HoareCall (src/tgt meta variables have different types) *)
+
+  Lemma isim_call_impure
+    I fls flt r g ps pt {R} RR st_src st_tgt k_src k_tgt 
+    fn args stb_src stb_tgt
+  :
+    (I st_src st_tgt ∗ (∀st_src0 st_tgt0 vret, (I st_src0 st_tgt0) -∗ isim I fls flt r g RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+  -∗
+    @isim _ I fls flt r g R RR ps pt (st_src, HoareCall false ord_top stb_src fn args >>= k_src) (st_tgt, HoareCall false ord_top stb_tgt fn args >>= k_tgt).
+  Proof.
+  
+  Admitted.
+
   Ltac apc := prep; iApply isim_apc; iSplitL "IST"; [eauto|iIntros "% % %"; iIntrosFresh "IST"].
 
   Theorem sim: HModPair.sim (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist.
@@ -362,13 +376,27 @@ Section SIMMODSEM.
       des. subst.
       iCombine "P BLACK UNALLOC" as "IST".
 
-      steps. unfold ccallU. steps.  
+      steps. unfold ccallU. steps.        
       rewrite STB_set. steps.
+
+      (* iApply isim_call_impure. *)
+
       specialize (STB_setM sk). rewrite STB_setM in G0. inv G0.
       unfold HoareCall.
-      choose. instantiate (1:= x).
+
+      steps. iDestruct "GRT" as "[[% _] _]".
+      force. force. instantiate (2:= y1).
+      prep. iApply isim_guarantee_src; iSplitR.
+      { admit. }
+
+(*       
+
+      choose.
+      choose.
+
+      instantiate (1:= x).
       choose. instantiate (1:= x0).
-      steps. iApply isim_guarantee_src; iSplitL "GRT"; [eauto|].
+      steps. iApply isim_guarantee_src; iSplitL "GRT"; [eauto|]. *)
 
       call.
       {
@@ -382,8 +410,8 @@ Section SIMMODSEM.
       }
       iDestruct "IST" as (? ?) "(P & % & BLACK & UNALLOC)". *)
       des. subst.
-      take. instantiate (1:= x1). prep. 
-      iApply isim_assume_src; iIntros "POST". force. iSplitL "POST"; [eauto|].
+      take. instantiate (1:= x). prep. 
+      iApply isim_assume_src; iIntros "POST". force. iSplitL "POST"; [eauto|]. { admit. }
       steps. iDestruct "GRT" as "%GRT". force. instantiate (1:= y2). force.
       subst.
       iSplitL "WORLD MAP".

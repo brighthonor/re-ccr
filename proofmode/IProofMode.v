@@ -1741,6 +1741,7 @@ Ltac _step :=
   Ltac inline_l := prep; _inline_l;[eauto|].
   Ltac inline_r := prep; _inline_r;[eauto|].
   Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs].
+  Ltac sim_init := econs; eauto; ii; econs; cycle 1; [s|sim_split].
   (* Ltac choose := _choose. *)
   (* Ltac take := _take. *)
 

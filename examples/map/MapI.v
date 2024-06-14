@@ -9,6 +9,10 @@ Require Import MapHeader.
 Require Import PCM.
 Require Import HoareDef STB IPM.
 
+
+Require Import sProp sWorld World SRF.
+From stdpp Require Import coPset gmap namespaces.
+
 Set Implicit Arguments.
 
 
@@ -30,8 +34,8 @@ def set_by_user(k: int) ≡
 
 Section I.
   Local Open Scope string_scope.
-  Context `{Σ: GRA.t}.
-  Context `{@GRA.inG MapRA0 Σ}.
+  Context `{_W: CtxWD.t}.
+  Context `{@GRA.inG MapRA0 Γ}.
   (* Context `{@GRA.inG MapRA1 Σ}. *)
   Definition initF: list val -> itree hAGEs val :=
     fun varg =>

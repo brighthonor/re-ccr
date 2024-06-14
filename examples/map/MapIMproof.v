@@ -19,6 +19,12 @@ Require Import HTactics ProofMode IPM.
 Require Import OpenDef.
 Require Import Mem1 MemOpen STB Invariant.
 
+Require Import SimModSemFacts IProofMode IRed.
+
+
+Require Import sProp sWorld World SRF.
+From stdpp Require Import coPset gmap namespaces.
+
 Set Implicit Arguments.
 
 Local Open Scope nat_scope.
@@ -27,20 +33,20 @@ Local Open Scope nat_scope.
 
 
 Section SIMMODSEM.
-  Context `{Σ: GRA.t}.
-  Context `{@GRA.inG memRA Σ}.
-  Context `{@GRA.inG MapRA0 Σ}.
+  Context `{_W: CtxWD.t}.
+  Context `{@GRA.inG MapRA0 Γ}.
+  Context `{@GRA.inG memRA Γ}. 
 
-  Let W: Type := Any.t * Any.t.
-
-  Let wf: _ -> W -> Prop :=
+  (* Let wf: _ -> W -> Prop :=
         @inv_wf
           _ _
           unit
           (fun _ st_src st_tgt =>
              ((∃ blk ofs l (f: Z -> Z) (sz: Z), ⌜st_src = (f, sz)↑ /\ (length l = Z.to_nat sz) /\ (forall k (SZ: (0 <= k < sz)%Z), nth_error l (Z.to_nat k) = Some (f k)) /\ st_tgt = (Vptr blk ofs)↑⌝ ** OwnM ((blk, ofs) |-> (List.map Vint l)) ** pending0) ∨ (⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I)
-  .
+  . *)
 
+
+        
   Variable GlobalStbM: Sk.t -> gname -> option fspec.
   Hypothesis STBINCLM: forall sk, stb_incl (to_stb MemStb) (GlobalStbM sk).
   Hypothesis STB_setM: forall sk, (GlobalStbM sk) "set" = Some set_specM.
@@ -216,30 +222,84 @@ Section SIMMODSEM.
     }
   Qed.
 
-  Lemma OwnM_combine M `{@GRA.inG M Σ} a0 a1
+  Lemma OwnM_combine M `{@GRA.inG M Γ} a0 a1
     :
     (OwnM a0 ** OwnM a1) -∗ OwnM (a0 ⋅ a1).
   Proof.
     iIntros "[H0 H1]". iCombine "H0 H1" as "H". auto.
   Qed.
 
-  (* Require Import ModSemFacts.  *)
-  
-  (* hy this line affects 'rewrite unfold_iter' ??? *)
 
-  Require Import IProofMode.
-  Require Import RobustIndexedInvariants.
-  Require Import IRed.
+  (***** Move and rename: APC & HoareCall LEMMAS *****)
+
+
+  (* Try to match bind pattern *)
+  Lemma APC_start_clo
+    I fls flt r g ps pt {R} RR st_src k_src sti_tgt  
+    at_most o stb 
+  :
+    @isim _ I fls flt r g R RR true pt (st_src, _APC stb at_most o >>= (fun x => tau;; Ret x) >>= k_src) sti_tgt
+  -∗  
+    @isim _ I fls flt r g R RR ps pt (st_src, interp_hEs_hAGEs stb o (trigger hAPC) >>= k_src) sti_tgt.
+  Proof.
+    unfold interp_hEs_hAGEs. rewrite! interp_trigger. grind.
+    destruct sti_tgt. unfold HoareAPC.
+    iIntros "K". 
+    force. instantiate (1:= at_most).
+    iApply "K".
+  Qed.
+
+  Lemma APC_stop_clo
+    I fls flt r g ps pt {R} RR st_src k_src sti_tgt  
+    at_most o stb
+  :
+    @isim _ I fls flt r g R RR true pt (st_src, k_src tt) sti_tgt
+  -∗  
+    @isim _ I fls flt r g R RR ps pt (st_src, _APC stb at_most o >>= (fun x => tau;; Ret x) >>= k_src) sti_tgt.
+  Proof.
+    destruct sti_tgt.
+    iIntros "K".
+    rewrite unfold_APC. 
+    force. instantiate (1:= true). steps. eauto.
+  Qed.
+  
+  Lemma APC_step_clo
+    I fls flt r g ps pt {R} RR st_src k_src sti_tgt  
+    at_most o stb next fn vargs fsp
+    (SPEC: stb fn = Some fsp)
+    (NEXT: (next < at_most)%ord)
+  :
+    @isim _ I fls flt r g R RR true pt (st_src, HoareCall true o fsp fn vargs >>= (fun _ => _APC stb next o) >>= (fun x => tau;; Ret x) >>= k_src) sti_tgt
+  -∗  
+    @isim _ I fls flt r g R RR ps pt (st_src, _APC stb at_most o >>= (fun x => tau;; Ret x) >>= k_src) sti_tgt.
+  Proof.
+    destruct sti_tgt.
+    iIntros "K".
+    iEval (rewrite unfold_APC).
+    force. instantiate (1:= false). steps.
+    force. instantiate (1:= next). unfold guarantee.
+    force. steps.
+    force. instantiate (1:= (fn, vargs)). steps.
+    rewrite SPEC. steps. grind.
+    Unshelve. eauto.
+  Qed.
+
+  Lemma hcall_clo
+    I fls flt r g ps pt {R} RR st_src st_tgt k_src k_tgt
+    fn vargs o fsp
+    (* PURE, ... *)
+  :
+    (I st_src st_tgt ∗ (∀st_src0 st_tgt0 vret_src vret_tgt, (I st_src0 st_tgt0) -∗ @isim _ I fls flt r g R RR true pt (st_src0, k_src vret_src) (st_tgt0, k_tgt vret_tgt)))
+  -∗  
+    @isim _ I fls flt r g R RR ps pt (st_src, HoareCall true o fsp fn vargs >>= k_src) (st_tgt, trigger (Call fn vargs) >>= k_tgt).
+  Proof.
+  Admitted.
+
+
+  (****************************)
 
   Local Notation universe := positive.
   Local Notation level := nat.
-
-  Context `{sProp : level -> Type}.
-  Context `{Invs : @InvSet Σ}.
-  Context `{@IInvSet Σ sProp}.
-  Context `{@GRA.inG OwnEsRA Σ}.
-  Context `{@GRA.inG OwnDsRA Σ}.
-  Context `{INVSETRA : @GRA.inG (OwnIsRA sProp) Σ}.
 
   Let Ist: Any.t -> Any.t -> iProp := 
     (fun st_src st_tgt =>
@@ -247,26 +307,33 @@ Section SIMMODSEM.
              ⌜st_src = (f, sz)↑ /\ (length l = Z.to_nat sz) /\ (forall k (SZ: (0 <= k < sz)%Z), nth_error l (Z.to_nat k) = Some (f k)) /\ st_tgt = (Vptr blk ofs)↑⌝ 
              ∗ OwnM ((blk, ofs) |-> (List.map Vint l)) ∗ pending0) 
              ∨ (⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
-
-  Theorem sim: HModPair.sim (MapM.HMap GlobalStbM) (MapI.Map) Ist ∅ 1 0.
+             
+  Theorem sim: HModPair.sim (MapM.HMap GlobalStbM) (MapI.Map) Ist.
   Proof.
-    econs; eauto.
-    i. r. econs; cycle 1.
-    { 
-      iIntros "H". ss. iSplitL "H"; eauto.
-      rewrite !resum_itr_ret. steps.
-      { admit. }
-      iSplits.
-      { iRight. eauto. }
-    }
-    econs.
-    {
-      econs; eauto. grind.
-      iIntros. unfold cfunU, initF, MapI.initF, lift_Es_fun, interp_Es_hAGEs, interp_sb_hp, HoareFun. s. 
-      steps.
-      iAssert (⌜True⌝%I) as "H". admit.
+    econs; eauto; ii; econs; cycle 1; [s|sim_split].
+    - iIntros "_". iSplitR; eauto. 
+      steps. iRight. iFrame. esplits; eauto.
+    - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
+      iApply isim_take_src; iIntros "%meta". destruct meta.
+      iApply isim_take_src; iIntros "%".  
+      iApply isim_assume_src. iIntros "(W & (%Y & %M & P0) & %X)". subst. 
+      unfold Ist. iDestruct "IST" as "[IST|%]".
+      {
+        iDestruct "IST" as (? ? ? ? ?) "(_ & _ & P)".
+        iExFalso. iApply (pending0_unique with "P P0").
+      }
+      subst.
+      steps. 
+      iApply APC_start_clo. instantiate (1:= 1 + x).
+      iApply APC_step_clo.
+      { eapply STBINCLM. instantiate (2:= "alloc"). stb_tac. ss.  }
+      { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. }
 
-    }
+      (*** TODO: Make a lemma for < HoareCall / Call >***)
+      prep. iApply hcall_clo.
+      iSplitL "P0". { admit. }
+      iIntros (? ? ?).
+      
      
   Admitted.
 
