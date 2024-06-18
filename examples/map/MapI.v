@@ -80,7 +80,7 @@ Section I.
   Definition MapSem: HModSem.t := {|
     HModSem.fnsems := [("init", cfunU initF); ("get", cfunU getF); ("set", cfunU setF); ("set_by_user", cfunU set_by_userF)];
     HModSem.initial_st := Ret Vnullptr↑;
-    HModSem.initial_cond := ⌜True⌝%I
+    HModSem.initial_cond := emp
   |}
   .
 

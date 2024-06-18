@@ -289,6 +289,7 @@ Section SIMMODSEM.
     fn vargs o fsp
     (* PURE, ... *)
   :
+    (* ((∀st_src0 st_tgt0 vret_src vret_tgt, (I st_src0 st_tgt0) -∗ @isim _ I fls flt r g R RR true pt (st_src0, k_src vret_src) (st_tgt0, k_tgt vret_tgt))) *)
     (I st_src st_tgt ∗ (∀st_src0 st_tgt0 vret_src vret_tgt, (I st_src0 st_tgt0) -∗ @isim _ I fls flt r g R RR true pt (st_src0, k_src vret_src) (st_tgt0, k_tgt vret_tgt)))
   -∗  
     @isim _ I fls flt r g R RR ps pt (st_src, HoareCall true o fsp fn vargs >>= k_src) (st_tgt, trigger (Call fn vargs) >>= k_tgt).
@@ -330,10 +331,66 @@ Section SIMMODSEM.
       { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. }
 
       (*** TODO: Make a lemma for < HoareCall / Call >***)
-      prep. iApply hcall_clo.
-      iSplitL "P0". { admit. }
-      iIntros (? ? ?).
-      
+      instantiate (1:= Any.upcast [Vint x]).
+      unfold HoareCall. steps.
+      force. instantiate (1:= x).
+      force. instantiate (1:= Any.upcast [Vint x]). 
+      force. iSplitR; [eauto|].
+      iRename "P0" into "IST". call.
+      { iLeft. admit. }
+      (* iDestruct "IST" as "[IST|%]"; cycle 1.
+      { admit. }
+      iDestruct "IST" as (? ? ? ? ?) "(% & MAP & P0)".
+      des. subst. *)
+      steps.
+      iDestruct "ASM" as "[ASM %]".
+      iDestruct "ASM" as ( ? ) "[% ASM]". subst.
+      (* iPoseProof () *)
+      steps. 
+      admit.
+
+    - unfold cfunU, getF, MapI.getF, interp_sb_hp, HoareFun, ccallU. s.
+      iApply isim_take_src; iIntros "%meta". destruct meta.
+      iApply isim_take_src; iIntros "%".  
+      iApply isim_assume_src. iIntros "%". subst.
+      steps.
+      iDestruct "IST" as "[IST|%]"; cycle 1.
+      { subst. unfold assume. steps. exfalso. lia. }
+      iDestruct "IST" as (? ? ? ? ?) "(% & MAP & P0)".
+      des. subst.
+      unfold assume. steps. 
+      unfold scale_int. des_ifs; cycle 1.
+      { exfalso. eapply n0. eapply Z.divide_factor_r. }
+      steps. iApply APC_start_clo. instantiate (1:= 1).
+      iApply APC_step_clo.
+      { eapply STBINCLM. instantiate (2:= "load"). stb_tac. ss. }
+      { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. }
+      iPoseProof (points_to_get_split with "MAP") as "[A B]".
+      { eapply map_nth_error. eauto. }
+      replace (ofs + (y1 * 8) `div` 8)%Z with (ofs + Z.to_nat y1)%Z. 
+      2: { rewrite Z_div_mult; ss. lia. }
+      instantiate (1:= (Any.upcast [Vptr blk (ofs + Z.to_nat y1)])).
+      prep. unfold HoareCall.
+      force. instantiate (1:= (blk, (ofs + Z.to_nat y1)%Z, _)).
+      force. force. iSplitR.
+      { iFrame. iSplit; eauto. admit. }
+      iCombine "P0 A B" as "IST".
+      call.
+      { 
+        iLeft. iDestruct "IST" as "(P0 & A & B)"; iFrame.
+        iExists blk, ofs, l, f, sz.
+        iPoseProof ("B" with "A") as "A".
+        iFrame. eauto. 
+      }
+      steps. 
+      rewrite unfold_APC. 
+      force. instantiate (1:= true). steps. 
+      force. force. iSplitR.
+      { eauto. }
+      iDestruct "ASM" as "[[A %] %]". subst.
+      instantiate (1:= Vint (f y1)). steps.
+      eauto.
+
      
   Admitted.
 
