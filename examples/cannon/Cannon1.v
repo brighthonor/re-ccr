@@ -32,7 +32,7 @@ Section CANNON.
                    ord_top,
                    (fun varg =>
                       (⌜varg = ([]: list val)↑⌝)
-                        ** (OwnM (Ball))
+                        ∗ (OwnM (Ball))%I
                    ),
                    (fun vret =>
                       (⌜vret = (1: Z)%Z↑⌝)%I

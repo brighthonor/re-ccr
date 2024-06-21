@@ -218,7 +218,7 @@ Definition ord_eval (tbr: bool) (o: ord): Prop :=
     (*** precondition ***)
     varg_tgt <- trigger (Choose Any_tgt);;
     let ord_next := fsp.(measure) x in
-    trigger (Guarantee ((fsp.(precond) x varg_src varg_tgt) ** ⌜ord_lt ord_next ord_cur⌝%I ** (⌜ord_eval tbr ord_next⌝%I)));;;
+    trigger (Guarantee ((fsp.(precond) x varg_src varg_tgt) ∗ ⌜ord_lt ord_next ord_cur⌝%I ∗ (⌜ord_eval tbr ord_next⌝%I)));;;
 
     (*** call ***)
     vret_tgt <- trigger (Call fn varg_tgt);; 
@@ -229,6 +229,44 @@ Definition ord_eval (tbr: bool) (o: ord): Prop :=
 
     Ret vret_src
   .  
+
+
+  Definition HoareCallPre
+        (tbr: bool)
+        (ord_cur: ord)
+        (fsp: fspec): gname -> Any.t -> (itree hAGEs) _ :=
+  fun fn varg_src =>
+  
+    x <- trigger (Choose fsp.(meta));; 
+  
+    (*** precondition ***)
+    varg_tgt <- trigger (Choose Any.t);;
+    let ord_next := fsp.(measure) x in
+    trigger (Guarantee ((fsp.(precond) x varg_src varg_tgt) ∗ ⌜ord_lt ord_next ord_cur⌝%I ∗ (⌜ord_eval tbr ord_next⌝%I)));;;
+    Ret (x, varg_tgt).
+
+  Definition HoareCallPost
+        (tbr: bool) (ord_cur: ord) (fsp: fspec) vret_tgt x : (itree hAGEs) Any.t :=
+    vret_src <- trigger (Take Any.t);;
+    trigger (Assume (fsp.(postcond) x vret_src vret_tgt));;;
+    Ret vret_src
+  .
+
+  Lemma HoareCall_parse
+        (tbr: bool)
+        (ord_cur: ord)
+        (fsp: fspec)
+        (fn: gname)
+        (varg_src: Any.t)
+    :
+      HoareCall tbr ord_cur fsp fn varg_src =
+      '(x, varg_tgt) <- HoareCallPre tbr ord_cur fsp fn varg_src;;
+      vret_tgt <- trigger (Call fn varg_tgt);;
+      HoareCallPost tbr ord_cur fsp vret_tgt x
+  .
+  Proof.
+    unfold HoareCall, HoareCallPre, HoareCallPost. grind.
+  Qed.
 
   Variable stb: gname -> option fspec.
 
@@ -1348,6 +1386,26 @@ Lemma interp_hAGEs_triggere
     r <- trigger i;; tau;; Ret r.
 Proof.
   unfold interp_hEs_hAGEs. rewrite interp_trigger. grind.
+Qed.
+
+Lemma interp_hAGEs_assume
+      stb o P
+  :
+    interp_hEs_hAGEs stb o (assume P)
+    =
+    r <- assume P;; tau;; Ret r.
+Proof.
+  unfold assume. rewrite interp_hAGEs_bind. rewrite interp_hAGEs_triggere. grind. rewrite interp_hAGEs_ret. refl.
+Qed. 
+
+Lemma interp_hAGEs_guarantee
+      stb o P
+  :
+    interp_hEs_hAGEs stb o (guarantee P)
+    =
+    r <- guarantee P;; tau;; Ret r.
+Proof.
+  unfold guarantee. rewrite interp_hAGEs_bind. rewrite interp_hAGEs_triggere. grind. rewrite interp_hAGEs_ret. refl.
 Qed.
 
 Lemma interp_hAGEs_triggerUB

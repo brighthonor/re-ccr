@@ -25,6 +25,12 @@ Set Implicit Arguments.
 #[export] Hint Resolve _hpsim_mon: paco.
 #[export] Hint Resolve cpn7_wcompat: paco.
 
+
+
+
+(********************************* DEPRECATED *******************************************)
+
+
 Section SIM.
   Context `{Σ: GRA.t}.
 
@@ -45,10 +51,10 @@ Section SIM.
   | safe_hpsim_call
       p_src p_tgt st_src st_tgt fmr
       fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (I st_src st_tgt ** FR))
+      (INV: Own fmr ⊢ #=> (I st_src st_tgt ∗ FR))
       (K: forall vret st_src0 st_tgt0 fmr0 
           (WF: URA.wf fmr0)
-          (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ** FR)),
+          (INV: Own fmr0 ⊢ #=> (I st_src0 st_tgt0 ∗ FR)),
           hpsim _ RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
       _safe_hpsim hpsim p_src p_tgt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
@@ -110,7 +116,7 @@ Section SIM.
       p_src p_tgt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ∗ FMR)),
           hpsim _ RR true p_tgt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
       _safe_hpsim hpsim p_src p_tgt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
@@ -119,7 +125,7 @@ Section SIM.
       p_src p_tgt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (K: forall fmr0 (WF: URA.wf fmr0) (NEW: Own fmr0 ⊢ #=> (iP ∗ FMR)),
           hpsim _ RR p_src true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
     _safe_hpsim hpsim p_src p_tgt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
@@ -407,7 +413,7 @@ Section TEST.
       rewrite interp_hAGEs_bind. rewrite interp_hAGEs_call. 
       unfold handle_callE_hAGEs. grind.
       unfold unwrapN. des_ifs; hsteps.
-      unfold HoareCall. hsteps. grind. { instantiate (1:= ⌜True⌝ ** ⌜Any.upcast Vundef = Any.upcast Vundef⌝). et. }
+      unfold HoareCall. hsteps. grind. { instantiate (1:= ⌜True⌝ ∗ ⌜Any.upcast Vundef = Any.upcast Vundef⌝). et. }
       hforce_l. hsteps. hforce_l. grind. hforce_l; et. 
       hsteps; et.
       hforce_r. hforce_r; et. i. hsteps.

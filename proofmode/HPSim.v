@@ -79,10 +79,10 @@ Section HPSIM.
       (HPSIM_CALL: True)
       ps pt st_src st_tgt fmr
       fn varg k_src k_tgt FR
-      (INV: Own fmr ⊢ #=> (Ist st_src st_tgt ** FR))
+      (INV: Own fmr ⊢ #=> (Ist st_src st_tgt ∗ FR))
       (K: forall vret st_src0 st_tgt0 fmr0 
                  (* (WF: URA.wf fmr0) *)
-                 (INV: Own fmr0 ⊢ #=> (Ist st_src0 st_tgt0 ** FR)),
+                 (INV: Own fmr0 ⊢ #=> (Ist st_src0 st_tgt0 ∗ FR)),
           hpsimi true true (st_src0, k_src vret) (st_tgt0, k_tgt vret) fmr0)				
     :
     _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt) fmr
@@ -186,7 +186,7 @@ Section HPSIM.
       ps pt st_src st_tgt fmr
       iP k_src i_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (* (WF: URA.wf fmr0) *) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (K: forall fmr0 (* (WF: URA.wf fmr0) *) (NEW: Own fmr0 ⊢ #=> (iP ∗ FMR)),
           hpsimi true pt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
     _hpsim' hpsimc hpsimi ps pt (st_src, trigger (Assume iP) >>= k_src) (st_tgt, i_tgt) fmr
@@ -196,7 +196,7 @@ Section HPSIM.
       ps pt st_src st_tgt fmr
       iP i_src k_tgt FMR
       (CUR: Own fmr ⊢ #=> FMR)
-      (K: forall fmr0 (* (WF: URA.wf fmr0) *) (NEW: Own fmr0 ⊢ #=> (iP ** FMR)),
+      (K: forall fmr0 (* (WF: URA.wf fmr0) *) (NEW: Own fmr0 ⊢ #=> (iP ∗ FMR)),
           hpsimi ps true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
     _hpsim' hpsimc hpsimi ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt) fmr
@@ -205,7 +205,7 @@ Section HPSIM.
       (HPSIM_GUARANTEE_SRC: True)
       ps pt st_src st_tgt fmr
       iP k_src i_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
+      (CUR: Own fmr ⊢ #=> (iP ∗ FMR))
       (K: forall fmr0 (* (WF: URA.wf fmr0) *) (NEW: Own fmr0 ⊢ #=> FMR),
           hpsimi true pt (st_src, k_src tt) (st_tgt, i_tgt) fmr0)
     :
@@ -215,7 +215,7 @@ Section HPSIM.
       (HPSIM_ASSUME_TGT: True)
       ps pt st_src st_tgt fmr
       iP i_src k_tgt FMR
-      (CUR: Own fmr ⊢ #=> (iP ** FMR))
+      (CUR: Own fmr ⊢ #=> (iP ∗ FMR))
       (K: forall fmr0 (* (WF: URA.wf fmr0) *) (NEW: Own fmr0 ⊢ #=> FMR),
           hpsimi ps true (st_src, i_src) (st_tgt, k_tgt tt) fmr0)
     :
@@ -292,7 +292,7 @@ Section HPSIM.
   Hint Resolve cpn7_wcompat: paco.
 
   Definition hpsim_tail : Any.t*Any.t -> Any.t*Any.t -> iProp :=
-    fun '(st_src, v_src) '(st_tgt, v_tgt) => Ist st_src st_tgt ** ⌜v_src = v_tgt⌝.
+    fun '(st_src, v_src) '(st_tgt, v_tgt) => (Ist st_src st_tgt ∗ ⌜v_src = v_tgt⌝)%I.
 
   Definition hpsim_body := @hpsim Any.t hpsim_tail.
 
@@ -657,7 +657,7 @@ Section HPSIM.
   | hpsim_frameC_intro
       ps pt R RR sti_src sti_tgt fmr fmrc (CTX: iProp)
       (SIM: r R (fun s t => CTX -* RR s t) ps pt sti_src sti_tgt fmr)
-      (UPD: Own fmrc ⊢ #=> (Own fmr ** CTX))
+      (UPD: Own fmrc ⊢ #=> (Own fmr ∗ CTX))
      :
     hpsim_frameC r R RR ps pt sti_src sti_tgt fmrc
   .
@@ -684,7 +684,7 @@ Section HPSIM.
     { eapply own_wf in H; eauto.
       iIntros "H". iPoseProof (UPD with "H") as "[H _]". eauto. }
     i. des.
-    assert (Own fmrc ⊢ #=> (Own fmr1 ** CTX)).
+    assert (Own fmrc ⊢ #=> (Own fmr1 ∗ CTX)).
     { iIntros "H". iPoseProof (UPD with "H") as "H". iMod "H" as "[F C]".
       iFrame. iApply x1. eauto. }
     
@@ -695,7 +695,7 @@ Section HPSIM.
       iPoseProof (RET with "HO") as "HO". iMod "HO".
       iApply "HO". eauto.
     - econs; eauto.
-      + instantiate (1:= FR ** CTX).
+      + instantiate (1:= (FR ∗ CTX)%I).
         iIntros "H". iPoseProof (UPD with "H") as "H". iMod "H" as "[H HCTX]".
         iFrame. iPoseProof (x1 with "H") as "H". iMod "H".
         iPoseProof (INV with "H") as "H". eauto.
@@ -753,7 +753,7 @@ Section HPSIM.
         { iApply x6. eauto. }
       }
     - econs; eauto.
-      { instantiate (1:= FMR ** CTX).
+      { instantiate (1:= (FMR ∗ CTX)%I).
         iIntros "H". iPoseProof (H0 with "H") as "H". iMod "H" as "[F C]".
         iFrame. iStopProof; eauto. }
       i. eapply iProp_sepconj_upd in NEW. des.
@@ -762,7 +762,7 @@ Section HPSIM.
       { iIntros "H". iPoseProof (NEW with "H") as "H". iMod "H" as "[HP HQ]".
         iFrame. iApply NEW1. eauto. }
     - econs; eauto.
-      { instantiate (1:= FMR ** CTX).
+      { instantiate (1:= (FMR ∗ CTX)%I).
         iIntros "H". iPoseProof (H0 with "H") as "H". iMod "H" as "[F C]".
         iFrame. iStopProof; eauto. }
       i. eapply iProp_sepconj_upd in NEW. des.
@@ -795,7 +795,7 @@ Section HPSIM.
   Definition hpsim {R} RR := paco7 (@_hpsim false) bot7 R RR.
 
   Definition hpsim_tail : Any.t*Any.t -> Any.t*Any.t -> iProp :=
-    fun '(st_src, v_src) '(st_tgt, v_tgt) => I st_src st_tgt ** ⌜v_src = v_tgt⌝. *)
+    fun '(st_src, v_src) '(st_tgt, v_tgt) => I st_src st_tgt ∗ ⌜v_src = v_tgt⌝. *)
 
 End HPSIM.
 

@@ -43,11 +43,11 @@ Section PROOF.
   Context `{@GRA.inG hRA Σ}.
 
   Definition f_spec0: fspec := mk_simple (fun (_: unit) => (ord_top,
-                                                            (fun varg => (OwnM f1 ** OwnM gpre)%I),
-                                                           (fun vret => (OwnM f2 ** OwnM gpost)%I))).
+                                                            (fun varg => (OwnM f1 ∗ OwnM gpre)%I),
+                                                           (fun vret => (OwnM f2 ∗ OwnM gpost)%I))).
   Definition f_spec1: fspec := mk_simple (fun (_: unit) => (ord_top,
-                                                            (fun varg => (OwnM f0 ** OwnM gpre ** OwnM hpre)%I),
-                                                           (fun vret => (OwnM f3 ** OwnM gpost ** OwnM hpost)%I))).
+                                                            (fun varg => (OwnM f0 ∗ OwnM gpre ∗ OwnM hpre)%I),
+                                                           (fun vret => (OwnM f3 ∗ OwnM gpost ∗ OwnM hpost)%I))).
   Definition g_spec: fspec := mk_simple (fun (_: unit) => (ord_top,
                                                            (fun varg => (OwnM gpre)%I),
                                                            (fun vret => (OwnM gpost)%I))).

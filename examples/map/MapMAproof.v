@@ -19,7 +19,7 @@ From ExtLib Require Import
 Require Import ProofMode STB Invariant.
 Require Import Mem1.
 
-Require Import SimModSemFacts IProofMode IRed.
+Require Import SimModSemFacts IProofMode IRed ITactics.
 
 Require Import sProp sWorld World SRF.
 From stdpp Require Import coPset gmap namespaces.
@@ -35,130 +35,133 @@ Section SIMMODSEM.
   Context `{@GRA.inG MapRA Γ}.
   Context `{@GRA.inG MapRA0 Γ}.
   Context `{@GRA.inG memRA Γ}. 
-(* 
 
-  Definition initial_r: (Z ==> (Excl.t Z))%ra := (fun _ => Excl.just 0%Z).
-  
-  Definition initial_map_r: MapRA :=
-    (ε, (Auth.black initial_r) ⋅ (Auth.white initial_r)).
+  Section LEMMA. 
+    Local Transparent unallocated map_points_to initial_map black_map pending pending0.
 
-  Definition black_map_r (f: Z -> Z): MapRA :=
-    (Excl.unit, Auth.black ((fun k => Excl.just (f k)): (Z ==> (Excl.t Z))%ra)).
-
-  Definition unallocated_r (sz: Z): MapRA :=
-    (Excl.unit, Auth.white ((fun k =>
-                               if (Z_gt_le_dec 0 k) then Excl.just 0%Z
-                               else if (Z_gt_le_dec sz k) then Excl.unit else Excl.just 0%Z)
-                             : (Z ==> (Excl.t Z))%ra)).
-
-  Definition initial_map: iProp :=
-    OwnM initial_map_r.
-
-  Definition black_map (f: Z -> Z): iProp :=
-    OwnM (black_map_r f).
-
-  Definition unallocated (sz: Z): iProp :=
-    OwnM (unallocated_r sz). *)
-
-  Lemma unallocated_alloc' sz
-    (POS: Z.to_nat sz > 0)
-    :
-    unallocated sz -∗ (map_points_to sz 0 ∗ unallocated (Z.succ sz)).
-  Proof.
-    unfold map_points_to, unallocated. iIntros "H".
-    replace (unallocated_r sz) with ((map_points_to_r sz 0) ⋅ (unallocated_r (Z.succ sz))).
-    { ss. iDestruct "H" as "[H0 H1]". iFrame. }
-    unfold unallocated_r, map_points_to_r. ur. f_equal.
-    { ur. auto. }
-    { ur. unfold Auth.white. f_equal. ur. extensionality k.
-      ur. des_ifs; try by (exfalso; lia).
-    }
-  Qed.
-
-  Lemma unallocated_alloc (sz: nat)
-    :
-    unallocated sz -∗ (map_points_to sz 0 ∗ unallocated (Z.pos (Pos.of_succ_nat sz))).
-  Proof.
-    unfold map_points_to, unallocated. iIntros "H".
-    replace (unallocated_r sz) with ((map_points_to_r sz 0) ⋅ (unallocated_r (S sz))).
-    { ss. iDestruct "H" as "[H0 H1]". iFrame. }
-    unfold unallocated_r, map_points_to_r. ur. f_equal.
-    { ur. auto. }
-    { ur. unfold Auth.white. f_equal. ur. extensionality k.
-      ur. des_ifs; try by (exfalso; lia).
-    }
-  Qed.
-
-  Lemma initial_map_initialize sz
-    :
-    initial_map -∗ (black_map (fun _ => 0%Z) ∗ initial_points_tos sz ∗ unallocated sz).
-  Proof.
-    induction sz.
-    { ss. iIntros "H". unfold initial_map.
-      replace initial_map_r with ((black_map_r (fun _ => 0%Z)) ⋅ (unallocated_r 0)).
+    Lemma unallocated_alloc' sz
+      (POS: Z.to_nat sz > 0)
+      :
+      unallocated sz -∗ (map_points_to sz 0 ∗ unallocated (Z.succ sz)).
+    Proof.
+      unfold map_points_to, unallocated. iIntros "H".
+      replace (unallocated_r sz) with ((map_points_to_r sz 0) ⋅ (unallocated_r (Z.succ sz))).
       { iDestruct "H" as "[H0 H1]". iFrame. }
-      { unfold initial_map_r, black_map_r, unallocated_r. ur. f_equal.
-        { ur. auto. }
-        { ur. f_equal. ur. extensionality k. ur. des_ifs. }
+      unfold unallocated_r, map_points_to_r. ur. f_equal.
+      { ur. auto. }
+      { ur. unfold Auth.white. f_equal. ur. extensionality k.
+        ur. des_ifs; try by (exfalso; lia).
       }
-    }
-    { iIntros "H". iPoseProof (IHsz with "H") as "H". ss.
-      iDes. iPoseProof (unallocated_alloc with "A0") as "A0". iFrame. auto.
-    }
-  Qed.
+    Qed.
 
-  Lemma initial_map_no_points_to k v
-    :
-    initial_map -∗ map_points_to k v -∗ ⌜False⌝.
-  Proof.
-    unfold initial_map, map_points_to.
-    iIntros "H0 H1". iCombine "H0 H1" as "H".
-    iOwnWf "H". exfalso. rr in H2. ur in H2. unseal "ra". des.
-    rr in H3. ur in H3. unseal "ra". des.
-    rr in H3. des. ur in H3. eapply equal_f with (x:=k) in H3.
-    ur in H3. des_ifs.
-  Qed.
-
-  Lemma unallocated_range sz k v
-    :
-    unallocated sz -∗ map_points_to k v -∗ ⌜(0 <= k < sz)%Z⌝.
-  Proof.
-    unfold unallocated, map_points_to.
-    iIntros "H0 H1". iCombine "H0 H1" as "H".
-    iOwnWf "H". iPureIntro. rr in H2. ur in H2. unseal "ra". des.
-    rr in H3. ur in H3. unseal "ra".
-    rr in H3. ur in H3. unseal "ra". specialize (H3 k).
-    rr in H3. ur in H3. unseal "ra". des_ifs. lia.
-  Qed.
-
-  Lemma black_map_get f k v
-    :
-    black_map f -∗ map_points_to k v -∗ (⌜f k = v⌝).
-  Proof.
-    unfold black_map, map_points_to.
-    iIntros "H0 H1". iCombine "H0 H1" as "H".
-    iOwnWf "H". iPureIntro. rr in H2. ur in H2. unseal "ra". des.
-    rr in H3. ur in H3. unseal "ra". des.
-    rr in H3. des. ur in H3. eapply equal_f with (x:=k) in H3.
-    ur in H3. des_ifs.
-  Qed.
-
-  Lemma black_map_set f k w v
-    :
-    black_map f -∗ map_points_to k w -∗ #=> (black_map (fun n => if Z.eq_dec n k then v else f n) ∗ map_points_to k v).
-  Proof.
-    iIntros "H0 H1". iCombine "H0 H1" as "H".
-    iPoseProof (OwnM_Upd with "H") as "H".
-    { instantiate (1:=black_map_r (fun n => if Z.eq_dec n k then v else f n) ⋅ map_points_to_r k v).
-      rr. i. ur in H2. ur. unseal "ra". des_ifs. des. split; auto.
-      ur in H3. ur. des_ifs. des. rr in H3. des. split.
-      { rr. exists ctx. ur in H3. ur. extensionality n.
-        eapply equal_f with (x:=n) in H3. ur in H3. ur. des_ifs.
+    Lemma unallocated_alloc (sz: nat)
+      :
+      unallocated sz -∗ (map_points_to sz 0 ∗ unallocated (Z.pos (Pos.of_succ_nat sz))).
+    Proof.
+      unfold map_points_to, unallocated. iIntros "H".
+      replace (unallocated_r sz) with ((map_points_to_r sz 0) ⋅ (unallocated_r (S sz))).
+      { ss. iDestruct "H" as "[H0 H1]". iFrame. }
+      unfold unallocated_r, map_points_to_r. ur. f_equal.
+      { ur. auto. }
+      { ur. unfold Auth.white. f_equal. ur. extensionality k.
+        ur. des_ifs; try by (exfalso; lia).
       }
-      { ur. i. rr. ur. unseal "ra". ss. }
-    }
-    iMod "H". iDestruct "H" as "[H0 H1]". iFrame. auto.
-  Qed.
+    Qed.
+
+    Lemma initial_map_initialize sz
+      :
+      initial_map -∗ (black_map (fun _ => 0%Z) ∗ initial_points_tos sz ∗ unallocated sz).
+    Proof.
+      induction sz.
+      { ss. iIntros "H". unfold initial_map.
+        replace initial_map_r with ((black_map_r (fun _ => 0%Z)) ⋅ (unallocated_r 0)).
+        { iDestruct "H" as "[H0 H1]". iFrame. }
+        { unfold initial_map_r, black_map_r, unallocated_r. ur. f_equal.
+          { ur. auto. }
+          { ur. f_equal. ur. extensionality k. ur. des_ifs. }
+        }
+      }
+      { iIntros "H". iPoseProof (IHsz with "H") as "H". ss.
+        iDes. iPoseProof (unallocated_alloc with "A0") as "A0". iFrame. auto.
+      }
+    Qed.
+
+    Lemma initial_map_no_points_to k v
+      :
+      initial_map -∗ map_points_to k v -∗ ⌜False⌝.
+    Proof.
+      unfold initial_map, map_points_to.
+      iIntros "H0 H1". iCombine "H0 H1" as "H".
+      iOwnWf "H". exfalso. rr in H2. ur in H2. unseal "ra". des.
+      rr in H3. ur in H3. unseal "ra". des.
+      rr in H3. des. ur in H3. eapply equal_f with (x:=k) in H3.
+      ur in H3. des_ifs.
+    Qed.
+
+    Lemma unallocated_range sz k v
+      :
+      unallocated sz -∗ map_points_to k v -∗ ⌜(0 <= k < sz)%Z⌝.
+    Proof.
+      unfold unallocated, map_points_to.
+      iIntros "H0 H1". iCombine "H0 H1" as "H".
+      iOwnWf "H". iPureIntro. rr in H2. ur in H2. unseal "ra". des.
+      rr in H3. ur in H3. unseal "ra".
+      rr in H3. ur in H3. unseal "ra". specialize (H3 k).
+      rr in H3. ur in H3. unseal "ra". des_ifs. lia.
+    Qed.
+
+    Lemma black_map_get f k v
+      :
+      black_map f -∗ map_points_to k v -∗ (⌜f k = v⌝).
+    Proof.
+      unfold black_map, map_points_to.
+      iIntros "H0 H1". iCombine "H0 H1" as "H".
+      iOwnWf "H". iPureIntro. rr in H2. ur in H2. unseal "ra". des.
+      rr in H3. ur in H3. unseal "ra". des.
+      rr in H3. des. ur in H3. eapply equal_f with (x:=k) in H3.
+      ur in H3. des_ifs.
+    Qed.
+
+    Lemma black_map_set f k w v
+      :
+      black_map f -∗ map_points_to k w -∗ #=> (black_map (fun n => if Z.eq_dec n k then v else f n) ∗ map_points_to k v).
+    Proof.
+      iIntros "H0 H1". iCombine "H0 H1" as "H".
+      iPoseProof (OwnM_Upd with "H") as "H".
+      { instantiate (1:=black_map_r (fun n => if Z.eq_dec n k then v else f n) ⋅ map_points_to_r k v).
+        rr. i. ur in H2. ur. unseal "ra". des_ifs. des. split; auto.
+        ur in H3. ur. des_ifs. des. rr in H3. des. split.
+        { rr. exists ctx. ur in H3. ur. extensionality n.
+          eapply equal_f with (x:=n) in H3. ur in H3. ur. des_ifs.
+        }
+        { ur. i. rr. ur. unseal "ra". ss. }
+      }
+      iMod "H". iDestruct "H" as "[H0 H1]". iFrame. auto.
+    Qed.
+
+
+    Lemma pending_unique:
+      pending -∗ pending -∗ False%I.
+    Proof.
+      iIntros "H0 H1". iCombine "H0 H1" as "H".
+      iOwnWf "H". exfalso. clear - H2.
+      rr in H2. ur in H2. unseal "ra". des.
+      rr in H2. ur in H2. unseal "ra". ss.
+    Qed.
+  End LEMMA.
+
+  Local Notation universe := positive.
+  (* Local Notation level := nat. *)
+
+  (* 
+    isim_apc_src : src hAPC, tgt HoareCall true(pure)
+  *)
+
+  Definition is_possibly_pure (fsp: fspec): Prop := exists x, is_pure (fsp.(measure) x).
+
+  Definition stb_pure_incl (stb_tgt stb_src: string -> option fspec): Prop :=
+    forall fn fsp (FIND: stb_tgt fn = Some fsp) (PURE: is_possibly_pure fsp), stb_src fn = Some fsp
+  .
 
   Let Ist: Any.t -> Any.t -> iProp :=
         (fun st_src st_tgt =>
@@ -173,37 +176,6 @@ Section SIMMODSEM.
 
   (* Hypothesis PUREINCL: forall sk, stb_pure_incl (GlobalStbM sk) (GlobalStb sk). *)
 
-  Lemma pending_unique:
-    pending -∗ pending -∗ False%I.
-  Proof.
-    iIntros "H0 H1". iCombine "H0 H1" as "H".
-    iOwnWf "H". exfalso. clear - H2.
-    rr in H2. ur in H2. unseal "ra". des.
-    rr in H2. ur in H2. unseal "ra". ss.
-  Qed.
-
-  Local Notation universe := positive.
-  (* Local Notation level := nat. *)
-
-
-(*********)
-  Ltac choose_l := iApply isim_choose_src.
-  Ltac choose_r := iApply isim_choose_tgt; iIntros "%".
-  Ltac take_l := iApply isim_take_src; iIntros "%".
-  Ltac take_r := iApply isim_take_tgt.
-  Ltac choose := prep; choose_r; choose_l.
-  Ltac take := prep; take_l; take_r.
-
-
-  (* 
-    isim_apc_src : src hAPC, tgt HoareCall true(pure)
-  *)
-
-  Definition is_possibly_pure (fsp: fspec): Prop := exists x, is_pure (fsp.(measure) x).
-
-  Definition stb_pure_incl (stb_tgt stb_src: string -> option fspec): Prop :=
-    forall fn fsp (FIND: stb_tgt fn = Some fsp) (PURE: is_possibly_pure fsp), stb_src fn = Some fsp
-  .
 
   Lemma isim_apc 
     I fls flt r g ps pt {R} RR st_src st_tgt k_src k_tgt stb_src stb_tgt
@@ -236,45 +208,6 @@ Section SIMMODSEM.
     steps.  *)
   Admitted.
 
-  (* TODO: Handle impure HoareCall *)
-
-  Definition HoareCallPre
-        (tbr: bool)
-        (ord_cur: ord)
-        (fsp: fspec): gname -> Any.t -> (itree hAGEs) _ :=
-  fun fn varg_src =>
-  
-    x <- trigger (Choose fsp.(meta));; 
-  
-    (*** precondition ***)
-    varg_tgt <- trigger (Choose Any.t);;
-    let ord_next := fsp.(measure) x in
-    trigger (Guarantee ((fsp.(precond) x varg_src varg_tgt) ** ⌜ord_lt ord_next ord_cur⌝%I ** (⌜ord_eval tbr ord_next⌝%I)));;;
-    Ret (x, varg_tgt).
-
-  Definition HoareCallPost
-        (tbr: bool) (ord_cur: ord) (fsp: fspec) vret_tgt x : (itree hAGEs) Any.t :=
-    vret_src <- trigger (Take Any.t);;
-    trigger (Assume (fsp.(postcond) x vret_src vret_tgt));;;
-    Ret vret_src
-  .
-
-  Lemma HoareCall_parse
-        (tbr: bool)
-        (ord_cur: ord)
-        (fsp: fspec)
-        (fn: gname)
-        (varg_src: Any.t)
-    :
-      HoareCall tbr ord_cur fsp fn varg_src =
-      '(x, varg_tgt) <- HoareCallPre tbr ord_cur fsp fn varg_src;;
-      vret_tgt <- trigger (Call fn varg_tgt);;
-      HoareCallPost tbr ord_cur fsp vret_tgt x
-  .
-  Proof.
-    unfold HoareCall, HoareCallPre, HoareCallPost. grind.
-  Qed.
-
   (* Lemma isim_call_impure
     I fls flt r g ps pt {R} RR st_src st_tgt k_src k_tgt 
     fn args stb_src stb_tgt
@@ -291,7 +224,7 @@ Section SIMMODSEM.
   Admitted. *)
 
 (* TODO: Try spawn & consume a dummy world *)
-  Ltac apc := prep; iApply isim_apc; iSplitL "IST"; [eauto|iIntros "% % %"; iIntrosFresh "IST"].
+  Ltac apc := prep; iApply isim_apc; iSplitL "IST"; [eauto|iIntros "% % %"; iIntros "IST"].
 
   Theorem sim: HModPair.sim (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist.
   Proof.
@@ -299,12 +232,9 @@ Section SIMMODSEM.
     - iIntros "[IST P]"; s. iSplitR; eauto. 
       steps. iRight. iFrame. eauto.
     - unfold cfunU, initF, MapM.initF, interp_sb_hp, HoareFun. s.
-
-      (* Make below as a tactic: intro-meta or pairwise choose/take *)
-      iApply isim_take_src; iIntros "%meta"; iApply (@isim_take_tgt _ _ _ _ _ meta _ _ _ _ _ ); destruct meta.
-      iApply isim_take_src; iIntros "%". force. instantiate (1:= x0). 
-      
-      iApply isim_assume_src. iIntros "(W & (%Y & %M & P) & %X)". subst. iApply isim_assume_tgt.
+      take. instantiate (1:= x). destruct x. 
+      take. instantiate (1:= x0).
+      asm. iDestruct "ASM" as "(W & (%Y & %M & P) & %X)". subst.
       iDestruct "IST" as "[IST|[P0 [% INIT]]]".
       (* Precondition *)
       { 
@@ -317,7 +247,6 @@ Section SIMMODSEM.
       { iFrame. esplits; eauto. }  
       steps. 
       des. subst. rewrite Any.upcast_downcast in G. inv G.
-
       apc.
       { (* Invariant *)
         iLeft. iExists (λ _ : Z, 0%Z), x. iDestruct "IST" as "(P & BLACK & UNALLOC)". 
@@ -332,21 +261,18 @@ Section SIMMODSEM.
       steps. eauto. 
 
     - unfold cfunU, getF, MapM.getF, interp_sb_hp, HoareFun. s.
-      iApply isim_take_src; iIntros "%meta". force. destruct meta, x.
-      iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
-      iApply isim_assume_src; iIntros "(WORLD & (% & MAP) & %)". subst. iApply isim_assume_tgt; iSplitR.
-      { eauto. }
-      steps.
-      unfold Ist. iDestruct "IST" as "[IST|IST]"; cycle 1.
+      take. destruct x, x.
+      take. instantiate (1:= x).
+      asm. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst. iSplitR; [eauto|].
+      steps. iDestruct "IST" as "[IST|IST]"; cycle 1.
       {
         iExFalso. iDestruct "IST" as "(_ & _ & INIT)".
         iApply (initial_map_no_points_to with "INIT MAP").
       }
-      
       iDestruct "IST" as (? ?) "(P & % & BLACK & UNALLOC)". 
       des. subst. rewrite Any.upcast_downcast in G.
       iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
-      unfold assume. steps. force. steps.
+      steps. force. steps. 
       iPoseProof (black_map_get with "BLACK MAP") as "%".      
       (* APC *)
       iCombine "P BLACK UNALLOC" as "IST".
@@ -371,9 +297,8 @@ Section SIMMODSEM.
       iExists f0, sz0. iFrame. esplits; eauto. 
 
     - unfold cfunU, setF, MapM.setF, interp_sb_hp, HoareFun. s.
-      iApply isim_take_src; iIntros "%meta". force. destruct meta, x, p.
-      iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
-      iApply isim_assume_src; iIntros "(WORLD & (% & MAP) & %)". subst. iApply isim_assume_tgt; iSplitR; [eauto|].
+      take. destruct x, x, p. take. instantiate (1:= x).  
+      asm. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst. iSplitR; [eauto|].
       steps.
       iDestruct "IST" as "[IST|IST]"; cycle 1.
       {
@@ -382,7 +307,7 @@ Section SIMMODSEM.
       }
       iDestruct "IST" as (? ?) "(P & % & BLACK & UNALLOC)". 
       des. subst. rewrite Any.upcast_downcast in G. 
-      unfold assume. steps.
+      steps.
       iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
       force. steps.
       iPoseProof (black_map_set with "BLACK MAP") as ">(BLACK & MAP)". instantiate (1:= z).
@@ -405,9 +330,8 @@ Section SIMMODSEM.
       steps. iSplit; eauto. iLeft. eauto.
 
     - unfold cfunU, set_by_userF, MapM.set_by_userF, interp_sb_hp, HoareFun. s.
-      iApply isim_take_src; iIntros "%meta". force. destruct meta, x. 
-      iApply isim_take_src; iIntros "%". force. instantiate (1:= x). 
-      iApply isim_assume_src; iIntros "(WORLD & (% & MAP) & %)". subst. iApply isim_assume_tgt; iSplitR; [eauto|].
+      take. destruct x, x. take. instantiate (1:= x).
+      asm. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst. iSplitR; [eauto|].
 
       iDestruct "IST" as "[IST|IST]"; cycle 1.
       {
@@ -425,7 +349,7 @@ Section SIMMODSEM.
 
       specialize (STB_setM sk). rewrite STB_setM in G0. inv G0.
       rewrite! HoareCall_parse. unfold HoareCallPre.
-      steps. iDestruct "GRT" as "[[% _] _]". subst.
+      steps. iDestruct "GRT" as "(% & _)". subst.
       force. instantiate (1:= mk_meta u n (z, z0, y)).
        (* Unshelve. 2: { destruct y0. econs; [eapply u| eapply n| eapply (z, z0, y)]. } *)
       force. instantiate (1:= Any.upcast [Vint z; Vint y]). 
@@ -446,24 +370,14 @@ Section SIMMODSEM.
       steps. iFrame.
 
       Unshelve.
-      2: { inv G. eauto. }
-      3: { inv G. eauto. }
-      all:  destruct meta; econs; eauto.
+      2, 4: inv G; eauto.
+      all: destruct x; econs; eauto.
     Qed.
 
 
 
 
-
-
-
-
-
-
-
-
-
-
+End SIMMODSEM.
 
 
 (* 

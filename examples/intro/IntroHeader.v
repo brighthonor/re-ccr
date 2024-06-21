@@ -128,16 +128,16 @@ Section PROOF.
     mk_simple (fun (n: nat) =>
                  (f_measure n,
                   (fun varg => (⌜varg = [Vint (Z.of_nat n)]↑ /\ n < max⌝
-                                  ** OwnM (IRA.client true: IRA.t))),
+                                  ∗ OwnM (IRA.client true: IRA.t))),
                   (fun vret => (⌜vret = (Vint (Z.of_nat (5 * n)))↑⌝
-                                 ** OwnM (IRA.client false: IRA.t))))).
+                                 ∗ OwnM (IRA.client false: IRA.t)))))%I.
   Definition g_spec: fspec :=
     mk_simple (fun (n: nat) =>
                  (g_measure n,
                   (fun varg => (⌜varg = [Vint (Z.of_nat n)]↑ /\ 1 <= n < max⌝
-                                   ** OwnM (IRA.client true: IRA.t))),
+                                   ∗ OwnM (IRA.client true: IRA.t))),
                   (fun vret => (⌜vret = (Vint (Z.of_nat (5 * n - 2)))↑⌝
-                                   ** OwnM (IRA.client false: IRA.t))))).
+                                   ∗ OwnM (IRA.client false: IRA.t)))))%I.
   Definition GlobalStb: gname -> option fspec := to_stb [("f", f_spec); ("g", g_spec)].
 
 End PROOF.

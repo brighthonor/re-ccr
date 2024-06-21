@@ -32,7 +32,42 @@ Ltac hred_r := try (prw _red_gen 1 1 1 0).
 Ltac hred := try (prw _red_gen 1 1 0).
 
 
+
 Section SPEC.
+  Context `{_W: CtxWD.t}.
+
+  (* Definition mk_fspec_inv {X: Type} (DPQ: X -> ord * (Any.t -> iProp) * (Any.t -> iProp)): fspec :=
+    mk_fspec (fst ∘ fst ∘ DPQ)
+             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∧ ⌜y = a⌝)%I)
+             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∧ ⌜z = a⌝)%I)
+  . *)
+
+  Inductive meta_inv {X: positive -> nat -> Type} : Type :=
+  | mk_meta (u: positive) (n: nat) (x: X u n).  
+
+  Definition mk_fspec_inv (k: nat) (fsp: positive -> nat -> fspec): fspec :=
+    @mk_fspec
+      Σ
+      (@meta_inv (fun u n => (fsp u n).(meta)))
+      (fun '(mk_meta u n x) => (fsp u n).(measure) x)
+      (fun '(mk_meta u n x) varg_src varg_tgt =>
+         closed_world u (k+n) ⊤ ∗ (fsp u n).(precond) x varg_src varg_tgt)%I
+      (fun '(mk_meta u n x) vret_src vret_tgt =>
+         closed_world u (k+n) ⊤ ∗ (fsp u n).(postcond) x vret_src vret_tgt)%I.
+
+  Definition fspec_trivial: fspec :=
+    @mk_fspec 
+      _
+      (@meta_inv (fun _ _ => unit)) 
+      (fun _ => ord_top) 
+      (fun _ argh argl => (⌜argh = argl⌝: iProp)%I)
+      (fun _ reth retl => (⌜reth = retl⌝: iProp)%I).
+
+
+End SPEC.
+
+(*** Move ***)
+(* Section SPEC.
   Context `{Σ: GRA.t}.
   Variable stb: gname -> option fspec.
   Variable o: ord.
@@ -82,7 +117,7 @@ Section SPEC.
     }
   Qed.
 
-End SPEC.
+End SPEC. *)
 
 (* Don't want variable stb, o in isim *)
 Section SIM.
@@ -245,7 +280,7 @@ Section SIM.
     :
       bi_entails
         ((∀ st_src ret_src st_tgt ret_tgt,
-            ((RR' (st_src, ret_src) (st_tgt, ret_tgt)) -∗ (RR (st_src, ret_src) (st_tgt, ret_tgt)))) ** (@isim r g R RR' ps pt sti_src sti_tgt))
+            ((RR' (st_src, ret_src) (st_tgt, ret_tgt)) -∗ (RR (st_src, ret_src) (st_tgt, ret_tgt)))) ∗ (@isim r g R RR' ps pt sti_src sti_tgt))
         (isim r g RR ps pt sti_src sti_tgt).
   Proof.
     rr. rewrite Seal.sealing_eq. i.
@@ -271,8 +306,8 @@ Section SIM.
     P
   :
     bi_entails
-      (P ** @isim r g R RR ps pt sti_src sti_tgt)
-      (isim r g (fun str_src str_tgt => P ** RR str_src str_tgt) ps pt sti_src sti_tgt).
+      (P ∗ @isim r g R RR ps pt sti_src sti_tgt)
+      (isim r g (fun str_src str_tgt => P ∗ RR str_src str_tgt) ps pt sti_src sti_tgt)%I.
   Proof.
     iIntros "[H0 H1]". iApply isim_wand. iFrame. eauto.
   Qed.
@@ -311,7 +346,7 @@ Section SIM.
     r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg
   :
     bi_entails
-      ((Ist st_src st_tgt) ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -∗ @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+      ((Ist st_src st_tgt) ∗ (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -∗ @isim r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
       (isim r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt)).
   Proof. 
     remember (∀ st_src0 st_tgt0 vret : Any.t, Ist st_src0 st_tgt0 -∗ isim r g RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret))%I as FR.
@@ -511,7 +546,7 @@ Section SIM.
     r g ps pt {R} RR iP st_src st_tgt k_src i_tgt 
   :
     bi_entails
-      (iP ** (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
+      (iP ∗ (@isim r g R RR true pt (st_src, k_src tt) (st_tgt, i_tgt)))
       (@isim r g R RR ps pt (st_src, trigger (Guarantee iP) >>= k_src) (st_tgt, i_tgt)).
   Proof.
     uiprop. i. des. subst.
@@ -529,7 +564,7 @@ Section SIM.
     r g ps pt {R} RR iP st_src st_tgt i_src k_tgt 
   :
     bi_entails
-      (iP ** (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
+      (iP ∗ (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
       (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt)).
   Proof.
     uiprop. i. des. subst. 
@@ -899,7 +934,7 @@ Section WSIM.
   Proof.
     Local Transparent FUpd.
     unfold wsim. destruct sti_src, sti_tgt. iIntros "F WD".
-    iAssert (emp ** world u b E0) with "[WD]" as "WD". { iFrame. }
+    iAssert (emp ∗ world u b E0)%I with "[WD]" as "WD". { iFrame. }
     iApply isim_upd.
     iMod ("F" with "WD") as "(_ & W & SIM)".
     iApply "SIM"; iFrame. eauto.
@@ -999,7 +1034,7 @@ Section WSIM.
   Lemma wsim_call 
     E r g ps pt {R} RR st_src st_tgt k_src k_tgt fn varg
   :
-    ((Ist st_src st_tgt) ** (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -∗ @wsim E r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
+    ((Ist st_src st_tgt) ∗ (∀ st_src0 st_tgt0 vret, (Ist st_src0 st_tgt0) -∗ @wsim E r g R RR true true (st_src0, k_src vret) (st_tgt0, k_tgt vret)))
   -∗  
     (wsim E r g RR ps pt (st_src, trigger (Call fn varg) >>= k_src) (st_tgt, trigger (Call fn varg) >>= k_tgt)).
   Proof.
@@ -1398,7 +1433,7 @@ Section WSIMMODSEM.
   Let cond_tgt := ms_tgt.(initial_cond).
 
   Let RR {R}: Any.t * R -> Any.t * R -> iProp :=
-     fun '(st_src, v_src) '(st_tgt, v_tgt) => (Ist st_src st_tgt ** ⌜v_src = v_tgt⌝)%I.   
+     fun '(st_src, v_src) '(st_tgt, v_tgt) => (Ist st_src st_tgt ∗ ⌜v_src = v_tgt⌝)%I.   
  
   Inductive sim: Prop := mk {
     isim_fnsems: Forall2 (isim_fnsem Ist fl_src fl_tgt RR) fl_src fl_tgt;
@@ -1486,473 +1521,3 @@ End IModPair. *)
 
 
   (*** Simply switching isim -> wsim? ***)
-  Ltac ired_l := try Red.prw ltac:(IRed._red_gen) 1 2 1 0.
-  Ltac ired_r := try Red.prw ltac:(IRed._red_gen) 1 1 1 0.
-  Ltac ired_both := ired_l; ired_r.
-  Ltac prep := cbn; ired_both.
-
-  Ltac force_l :=
-    prep;
-    match goal with
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _)) ] =>
-      unfold guarantee; grind; iApply isim_choose_src
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Choose _) >>= _) (_, _)) ] =>
-      iApply isim_choose_src
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, trigger (Guarantee _) >>= _) (_, _)) ] =>
-      iApply isim_guarantee_src
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _)) ] =>
-      unfold guarantee; grind; iApply wsim_guarantee_src
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (Choose _) >>= _) (_, _)) ] =>
-      iApply wsim_choose_src
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, trigger (Guarantee _) >>= _) (_, _)) ] =>
-      iApply wsim_guarantee_src
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, unwrapN ?ox >>= _) (_, _)) ] =>
-        (* let tvar := fresh "tmp" in *)
-        (* let thyp := fresh "TMP" in *)
-        (* remember (unwrapN ox) as tvar eqn:thyp; unfold unwrapN in thyp; subst tvar; *)
-        (* let name := fresh "G" in *)
-        (* destruct (ox) eqn:name; [|exfalso]; cycle 1 *)
-        idtac
-        (* let name := fresh "y" in *)
-        (* iApply isim_unwrapN_src; iIntros (name) "%"; *)
-        (* match goal with *)
-        (* | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in * *)
-        (* end *)
-    end
-  .
-
-Ltac force_r :=
-  prep;
-  match goal with
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _)) ] =>
-      unfold assume; grind; iApply isim_assume_tgt
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, trigger (Take _) >>= _)) ] =>
-      iApply isim_take_tgt
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, trigger (Assume _) >>= _)) ] =>
-      iApply isim_assume_tgt
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, guarantee ?P >>= _)) ] =>
-      unfold assume; grind; iApply wsim_assume_tgt
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, _) (_, trigger (Take _) >>= _)) ] =>
-      iApply wsim_take_tgt
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, _) (_, trigger (Assume _) >>= _)) ] =>
-      iApply wsim_assume_tgt
-
-  (* | [ |- environments.envs_entails _ (@wsim _ _ _ _ _ _ _ _ _ _ (_, _) (_, unwrapU ?ox >>= _)) ] =>
-      idtac
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _)) ] =>
-      let name := fresh "G" in
-      cut (P); [intros name; iApply wsim_assume_tgt; iSplitR; [iPureIntro; exact name|]|]; cycle 1 *)
-  end
-.
-
-Ltac iIntrosFresh H := iIntros H || iIntrosFresh (H ++ "'")%string.
-
-Ltac _step := 
-  match goal with
-  (******* isim ******)
-  (** src **)
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, unwrapU ?ox >>= _) (_, _)) ] =>
-      let name := fresh "y" in
-      iApply isim_unwrapU_src; iIntros (name) "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in *
-      end
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, assume ?P >>= _) (_, _)) ] =>
-      unfold assume; grind; iApply isim_take_src; iIntros "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
-      end
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, tau;; _) (_, _)) ] =>
-      iApply isim_tau_src
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (SUpdate _) >>= _) (_, _)) ] =>
-      iApply isim_supdate_src
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (sPut _) >>= _) (_, _)) ] =>
-      unfold sPut; iApply isim_supdate_src
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger sGet >>= _) (_, _)) ] =>
-      unfold sGet; iApply isim_supdate_src
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Take _) >>= _) (_, _)) ] =>
-      let name := fresh "y" in
-      iApply isim_take_src; iIntros (name)
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, trigger (Assume _) >>= _) (_, _)) ] =>
-      iApply isim_assume_src; iIntrosFresh "ASM"
-  (** tgt **)
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, unwrapN ?ox >>= _)) ] =>
-      let name := fresh "y" in
-      iApply isim_unwrapN_tgt; iIntros (name) "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in *
-      end
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, guarantee ?P >>= _)) ] =>
-      unfold guarantee; grind; iApply isim_choose_tgt; iIntros "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
-      end
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, tau;; _)) ] =>
-      iApply isim_tau_tgt
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (SUpdate _) >>= _)) ] =>
-      iApply isim_supdate_tgt
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (sPut _) >>= _)) ] =>
-      unfold sPut; iApply isim_supdate_tgt
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger sGet >>= _)) ] =>
-      unfold sGet; iApply isim_supdate_tgt
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (Choose _) >>= _)) ] =>
-      let name := fresh "y" in
-      iApply isim_choose_tgt; iIntros (name)
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (Guarantee _) >>= _)) ] =>
-      iApply isim_guarantee_tgt; iIntrosFresh "GRT"  
-  (** both **)
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, Ret _) (_, Ret _)) ] =>
-      iApply isim_ret
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Syscall _ _ _) >>= _) (_, trigger (Syscall _ _ _) >>= _)) ] =>
-      iApply isim_syscall; iIntros "%"
-
-  (******* wsim ******)
-  (** src **)
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, unwrapU ?ox >>= _) (_, _)) ] =>
-      let name := fresh "y" in
-      iApply wsim_unwrapU_src; iIntros (name) "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in *
-      end
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, assume ?P >>= _) (_, _)) ] =>
-      unfold assume; grind; iApply wsim_take_src; iIntros "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
-      end
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, tau;; _) (_, _)) ] =>
-      iApply wsim_tau_src
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (SUpdate _) >>= _) (_, _)) ] =>
-      iApply wsim_supdate_src
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (Take _) >>= _) (_, _)) ] =>
-      let name := fresh "y" in
-      iApply wsim_take_src; iIntros (name)
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, trigger (Assume _) >>= _) (_, _)) ] =>
-      iApply wsim_assume_src; iIntrosFresh "ASM"
-  (** tgt **)
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, unwrapN ?ox >>= _)) ] =>
-      let name := fresh "y" in
-      iApply wsim_unwrapN_tgt; iIntros (name) "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in *
-      end
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, guarantee ?P >>= _)) ] =>
-      unfold guarantee; grind; iApply wsim_choose_tgt; iIntros "%";
-      match goal with
-      | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
-      end
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, tau;; _)) ] =>
-      iApply wsim_tau_tgt
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, trigger (SUpdate _) >>= _)) ] =>
-      iApply wsim_supdate_tgt
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, trigger (Choose _) >>= _)) ] =>
-      let name := fresh "y" in
-      iApply wsim_choose_tgt; iIntros (name)
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, trigger (Guarantee _) >>= _)) ] =>
-      iApply wsim_guarantee_tgt; iIntrosFresh "GRT"  
-  (** both **)
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, Ret _) (_, Ret _)) ] =>
-      iApply wsim_ret
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (Syscall _ _ _) >>= _) (_, trigger (Syscall _ _ _) >>= _)) ] =>
-      iApply wsim_syscall; iIntros "%"
-
-  end.
-
-  Ltac _call :=
-    match goal with
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Call ?x0 ?y0) >>= _) (_, trigger (Call ?x1 ?y1) >>= _)) ] =>
-      iApply isim_call
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (Call ?x0 ?y0) >>= _) (_, trigger (Call ?x1 ?y1) >>= _)) ] =>
-      iApply wsim_call
-    end.
-
-  Ltac _inline_l := 
-    match goal with
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Call ?x0 ?y0) >>= _) (_, _)) ] =>
-      iApply isim_inline_src
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (Call ?x0 ?y0) >>= _) (_, _)) ] =>
-      iApply wsim_inline_src
-    end.
-
-  Ltac _inline_r := 
-    match goal with
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (Call ?x0 ?y0) >>= _)) ] =>
-      iApply isim_inline_tgt
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, trigger (Call ?x0 ?y0) >>= _)) ] =>
-      iApply wsim_inline_tgt
-    end.     
-  
-  Ltac des_pairs :=
-    repeat match goal with
-           | [H: context[let (_, _) := ?x in _] |- _] =>
-               let n0 := fresh x in let n1 := fresh x in destruct x as [n0 n1]
-           | |- context[let (_, _) := ?x in _] =>
-               let n0 := fresh x in let n1 := fresh x in destruct x as [n0 n1]
-           end.
-  
-  Ltac step :=
-    repeat (prep; try _step; simpl; des_pairs).
-
-  (* Tactic Notation "steps!" := repeat (prep; try _step; try call; des_pairs). *)
-
-  (* Try to add on red database*)
-  Tactic Notation "ired_" := repeat (
-    unfold fun_spec_hp, body_spec_hp;
-    try rewrite interp_hAGEs_bind;
-    try rewrite interp_hAGEs_tau;
-    try rewrite interp_hAGEs_ret;
-    try rewrite interp_hAGEs_call;
-    try rewrite interp_hAGEs_triggere;
-    try rewrite interp_hAGEs_triggerp;
-    try rewrite interp_hAGEs_triggerUB;
-    try rewrite interp_hAGEs_triggerNB;
-    try rewrite interp_hAGEs_unwrapU;
-    try rewrite interp_hAGEs_unwrapN;
-    try rewrite interp_hAGEs_Assume;
-    try rewrite interp_hAGEs_Guarantee;
-    try rewrite interp_hAGEs_ext
-  ).
-
-  Ltac _steps :=
-    match goal with
-    | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (interp_hEs_hAGEs _ _ _) >>= _) (_, _)) ] =>
-      ired_; step
-      | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (interp_hEs_hAGEs _ _ _) >>= _)) ] =>
-      ired_; step
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, (interp_hEs_hAGEs _ _ _) >>= _) (_, _)) ] =>
-      ired_; step
-    | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, (interp_hEs_hAGEs _ _ _) >>= _)) ] =>
-      ired_; step
-    | _ => step
-    end.
-
-
-  (* iApply (@...) doesn't work in this way *)
-  (* Ltac _take := 
-    let name := fresh "x" in  
-    iApply isim_take_src; iIntros "%name"; iApply (@isim_take_tgt _ _ _ _ _ name _ _ _ _ _ ).
-  Ltac _choose :=
-    let name := fresh "x" in  
-    iApply isim_choose_tgt; iIntros "%name"; iApply (@isim_choose_src _ _ _ _ _ name _ _ _ _ _ ). *)
-
-  (************ User Tactics **************)
-  Ltac steps := try repeat _steps.
-  Ltac force := prep; try force_l; try force_r.
-  Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"].
-  Ltac inline_l := prep; _inline_l;[eauto|].
-  Ltac inline_r := prep; _inline_r;[eauto|].
-  Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs].
-  Ltac sim_init := econs; eauto; ii; econs; cycle 1; [s|sim_split].
-  (* Ltac choose := _choose. *)
-  (* Ltac take := _take. *)
-
-
-
-
-
-  (********** Notations *********)
-  (* TODO: Make notations of
-      P -∗ sim
-      P ∗ sim
-
-  *)
-    From iris.proofmode Require Import coq_tactics environments.
-
-    Global Arguments Envs _ _%proof_scope _%proof_scope _.
-    Global Arguments Enil {_}.
-    Global Arguments Esnoc {_} _%proof_scope _%string _%I.
-    
-    Local Notation world_id := positive.
-    Local Notation level := nat.
-  
-
-
-    (*** TODO: What else should be displayed? ***)
-
-    (*** isim ***)
-    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs E1 E2 _) (isim _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
-        (at level 50,
-         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    Notation "E1 '------------------------------------------------------------------□' st_src st_tgt '-------------------------------isim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs E1 Enil _) (isim _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
-        (at level 50,
-         format "E1 '------------------------------------------------------------------□' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    Notation "E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs Enil E2 _) (isim _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
-        (at level 50,
-         format "E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    Notation "'------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs Enil Enil _) (isim _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-      (* (_ _ (isim Ist _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
-        (at level 50,
-         format "'------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    (* additional *) 
-    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  P '∗' 'ISIM'"
-    :=
-      (environments.envs_entails (Envs E1 E2 _) (bi_sep P (isim _ _ _ _ _ _ _ _ (st_src, _) (st_tgt, _))))
-        (at level 50,
-         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' P  '∗'  'ISIM' ").
-
-    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------isim-------------------------------'  P '-∗' 'ISIM'"
-    :=
-      (environments.envs_entails (Envs E1 E2 _) (bi_wand P (isim _ _ _ _ _ _ _ _ (st_src, _) (st_tgt, _))))
-        (at level 50,
-         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------isim-------------------------------' '//' P  '-∗'  'ISIM' ").
-
-
-
-
-
-    (*** wsim ***)
-    Notation "E1 '------------------------------------------------------------------□' E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------wsim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs E1 E2 _) (wsim _ _ _ _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-        (at level 50,
-         format "E1 '------------------------------------------------------------------□' '//' E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------wsim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    Notation "E1 '------------------------------------------------------------------□' st_src st_tgt '-------------------------------wsim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs E1 Enil _) (wsim _ _ _ _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-        (at level 50,
-         format "E1 '------------------------------------------------------------------□' '//' st_src '//' st_tgt '//' '-------------------------------wsim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    Notation "E2 '------------------------------------------------------------------∗' st_src st_tgt '-------------------------------wsim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs Enil E2 _) (wsim _ _ _ _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-        (at level 50,
-         format "E2 '------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------wsim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-
-    Notation "'------------------------------------------------------------------∗' st_src st_tgt '-------------------------------wsim-------------------------------'  itr_src itr_tgt"
-    :=
-      (environments.envs_entails (Envs Enil Enil _) (wsim _ _ _ _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt)))
-      (* (environments.envs_entails (Envs Enil _) (world _ _ _ -* isim _ _ _ _ _ _ _ _ (st_src, itr_src) (st_tgt, itr_tgt))) *)
-        (at level 50,
-         format "'------------------------------------------------------------------∗' '//' st_src '//' st_tgt '//' '-------------------------------wsim-------------------------------' '//' itr_src '//' '//' '//' itr_tgt '//' ").
-   
-
-
-
-  Section TEST.
-    Context `{CtxWD.t}.
-
-    Let Ist: Any.t -> Any.t -> iProp := fun _ _ => ⌜True⌝%I.
-    Let RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp := fun _ _ => ⌜True⌝%I.
-    Variable iP: iProp.
-  
-    Goal ⊢ ((⌜False⌝∗iP∗iP) -∗ iP ∗ isim Ist [] [] ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "(#A & B & C)". Unset Printing Notations.
-    iAssert (iP -* world 1 0 ⊤) as "H". { admit. }
-    iPoseProof ("H" with "B") as "B". iRevert "B". Unset Printing Notations. 
-    clarify. Admitted.
-    Goal ⌜False⌝%I ⊢ (isim Ist [] [] ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "#H". Admitted.
-    Goal ⊢ (iP -∗ isim Ist [] [] ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "H". Admitted.
-    Goal ⊢ (isim Ist [] [] ibot ibot RR false false (tt↑, trigger (Assume (⌜False⌝%I));;; Ret tt↑ >>= (fun r => Ret r)) (tt↑, Ret tt↑)).
-    Proof. iIntros. steps. Admitted.
-
-
-
-    Goal ⊢ ((⌜False⌝**iP) -∗ wsim Ist [] [] 1 0 ⊤ ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "[#A B]". clarify. Qed.
-    Goal ⌜False⌝%I ⊢ (wsim Ist [] [] 1 0 ⊤ ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "#H". Admitted.
-    Goal ⊢ (iP -∗ wsim Ist [] [] 1 0 ⊤ ibot ibot RR false false (tt↑, Ret tt↑) (tt↑, Ret tt↑)).
-    Proof. iIntros "H". Admitted.
-    Goal ⊢ (wsim Ist [] [] 1 0 ⊤ ibot ibot RR false false (tt↑, trigger (Assume (⌜False⌝%I));;; Ret tt↑ >>= (fun r => Ret r)) (tt↑, Ret tt↑)).
-    Proof. iIntros. steps. Admitted.
-
-
-
-  End TEST.
-
-
-  Section TEST.
-    Import HModSem HMod.
-    Local Notation world_id := positive.
-    Local Notation level := nat.
-
-    Context `{CtxWD.t}.
-
-    Definition mss0: HModSem.t := {|
-      fnsems := [("f0", (fun _ => Ret tt↑))];
-      initial_st := Ret tt↑;
-      initial_cond := ⌜True⌝%I;
-    |}.
-
-    Definition mss1: HModSem.t := {|
-      fnsems := [("f1", (fun _ => Ret tt↑)); ("main", (fun _ => trigger (Call "f0" tt↑) >>= (fun _ => trigger (Call "f1" tt↑))))];
-      initial_st := Ret tt↑;
-      initial_cond := ⌜True⌝%I;
-    |}.
-
-    Definition mtt0: HModSem.t := {|
-      fnsems := [("f0", (fun _ => Ret tt↑))];
-      initial_st := Ret tt↑;
-      initial_cond := ⌜True⌝%I;
-    |}.
-
-    Definition mtt1: HModSem.t := {|
-      fnsems := [("f1", (fun _ => Ret tt↑)); ("main", (fun _ => trigger (Call "f0" tt↑) >>= (fun _ => trigger (Call "f1" tt↑))))];
-      initial_st := Ret tt↑;
-      initial_cond := ⌜True⌝%I;
-    |}.
-
-    Definition ms0 := {|
-      get_modsem := fun _ => mss0;
-      sk := Sk.unit;
-    |}.
-
-    Definition ms1 := {|
-      get_modsem := fun _ => mss1;
-      sk := Sk.unit;
-    |}.
-
-    Definition mt0 := {|
-      get_modsem := fun _ => mtt0;
-      sk := Sk.unit;
-    |}.
-
-    Definition mt1 := {|
-      get_modsem := fun _ => mtt1;
-      sk := Sk.unit;
-    |}.
-
-    Definition Ist: Any.t -> Any.t -> iProp := fun _ _ => ⌜True⌝%I.
-    Definition RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp := fun _ _ => ⌜True⌝%I.
-
-    Goal HModPair.sim (HMod.add ms0 ms1) (HMod.add mt0 mt1) Ist.
-    Proof.
-      (* econs; ss.
-      ii. econs. 
-      { econs.
-        { econs; ss.  
-          grind. iIntros. steps. eauto. 
-        }
-        econs.
-        { econs; ss. grind.
-          iIntros. steps; et. 
-        }
-        econs; ss. econs; ss. grind.
-        iIntros. steps!. iSplitL; et. iIntros.
-        steps. inline_l. inline_r. steps; eauto.
-      }
-      ss. iIntros.
-      iSplitL; eauto. steps; eauto. *)
-    Admitted.
-    (* Qed. *)
-
-
-  End TEST.
-

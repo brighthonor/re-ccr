@@ -747,7 +747,7 @@ Section OWN.
   Qed.
 
   Lemma iProp_sepconj_upd_aux P Q r 
-      (SAT: Own r ⊢ #=> (P ** Q))
+      (SAT: Own r ⊢ #=> (P ∗ Q))
     :
       exists rp rq, (URA.updatable r (rp ⋅ rq)) /\ 
                     (Own rp ⊢ P) /\ 
@@ -781,7 +781,7 @@ Section OWN.
   Qed.
 
   Lemma iProp_sepconj_upd P Q r 
-      (SAT: Own r ⊢ #=> (P ** Q))
+      (SAT: Own r ⊢ #=> (P ∗ Q))
     :
       exists rp rq, (Own r ⊢ #=> Own (rp ⋅ rq)) /\ 
                     (Own rp ⊢ P) /\ 
@@ -795,7 +795,7 @@ Section OWN.
 
   Lemma iProp_Own (P: iProp) a (A: P a): Own a ⊢ P. Proof. uiprop. i. eauto using iProp_mono. Qed.
   Lemma Own_iProp (P: iProp) a (OWN: Own a ⊢ P) (WF: URA.wf a) : P a. Proof. uiprop in OWN. eapply OWN; eauto. refl. Qed.
-  Lemma iProp_sepconj (P Q: iProp) r (OWN: Own r ⊢ P ** Q) (WF: URA.wf r): 
+  Lemma iProp_sepconj (P Q: iProp) r (OWN: Own r ⊢ P ∗ Q) (WF: URA.wf r): 
     exists p q, r = p ⋅ q /\ P p /\ Q q.
   Proof.
     uiprop in OWN. edestruct OWN; eauto; try refl.

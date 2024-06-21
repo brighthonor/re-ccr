@@ -11,46 +11,11 @@ From ExtLib Require Import
      Core.RelDec
      Structures.Maps
      Data.Map.FMapAList.
-Require Import ProofMode.
-Require Import Mem1 Invariant.
+Require Import ProofMode IProofMode.
+Require Import Mem1.
 Require Import sProp sWorld World SRF.
 From stdpp Require Import coPset gmap namespaces.
 Set Implicit Arguments.
-
-
-Section MOVE.
-  Context `{_W: CtxWD.t}.
-
-  (* Definition mk_fspec_inv {X: Type} (DPQ: X -> ord * (Any.t -> iProp) * (Any.t -> iProp)): fspec :=
-    mk_fspec (fst ∘ fst ∘ DPQ)
-             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∧ ⌜y = a⌝)%I)
-             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∧ ⌜z = a⌝)%I)
-  . *)
-
-  Inductive meta_inv {X: positive -> nat -> Type} : Type :=
-  | mk_meta (u: positive) (n: nat) (x: X u n).  
-
-  Definition mk_fspec_inv (k: nat) (fsp: positive -> nat -> fspec): fspec :=
-    @mk_fspec
-      Σ
-      (@meta_inv (fun u n => (fsp u n).(meta)))
-      (fun '(mk_meta u n x) => (fsp u n).(measure) x)
-      (fun '(mk_meta u n x) varg_src varg_tgt =>
-         closed_world u (k+n) ⊤ ∗ (fsp u n).(precond) x varg_src varg_tgt)%I
-      (fun '(mk_meta u n x) vret_src vret_tgt =>
-         closed_world u (k+n) ⊤ ∗ (fsp u n).(postcond) x vret_src vret_tgt)%I.
-
-  Definition fspec_trivial: fspec :=
-    @mk_fspec 
-      _
-      (@meta_inv (fun _ _ => unit)) 
-      (fun _ => ord_top) 
-      (fun _ argh argl => (⌜argh = argl⌝: iProp)%I)
-      (fun _ reth retl => (⌜reth = retl⌝: iProp)%I).
-
-
-End MOVE.
-
 
 Section RESOURCE.
   Context `{_W: CtxWD.t}.
@@ -117,6 +82,8 @@ Section RESOURCE.
 
   Definition unallocated (sz: Z): iProp :=
     OwnM (unallocated_r sz).
+
+  Global Opaque map_points_to pending pending0 initial_map black_map unallocated.
 
 End RESOURCE.
 

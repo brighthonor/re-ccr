@@ -19,7 +19,7 @@ Require Import HTactics ProofMode IPM.
 Require Import OpenDef.
 Require Import Mem1 MemOpen STB Invariant.
 
-Require Import SimModSemFacts IProofMode IRed.
+Require Import SimModSemFacts IProofMode IRed ITactics.
 
 
 Require Import sProp sWorld World SRF.
@@ -51,184 +51,187 @@ Section SIMMODSEM.
   Hypothesis STBINCLM: forall sk, stb_incl (to_stb MemStb) (GlobalStbM sk).
   Hypothesis STB_setM: forall sk, (GlobalStbM sk) "set" = Some set_specM.
 
-  Lemma pending0_unique:
-    pending0 -∗ pending0 -∗ False%I.
-  Proof.
-    iIntros "H0 H1". iCombine "H0 H1" as "H".
-    iOwnWf "H". exfalso. clear - H1.
-    rr in H1. ur in H1. unseal "ra". ss.
-  Qed.
+  Section LEMMA. 
+    Lemma pending0_unique:
+      pending0 -∗ pending0 -∗ False%I.
+    Proof.
+      Local Transparent pending0.
+      iIntros "H0 H1". iCombine "H0 H1" as "H".
+      iOwnWf "H". exfalso. clear - H1.
+      rr in H1. ur in H1. unseal "ra". ss.
+    Qed.
 
-  Lemma points_to_get_split blk ofs l k v
-        (GET: nth_error l k = Some v)
-    :
-    OwnM((blk, ofs) |-> l) -∗ (OwnM((blk, (ofs + k)%Z) |-> [v])) ** ((OwnM((blk, (ofs + k)%Z) |-> [v]) -* OwnM((blk, ofs) |-> l))).
-  Proof.
-    revert blk ofs k v GET. induction l; ss; i.
-    { destruct k; ss. }
-    destruct k; ss.
-    { clarify. iIntros "H". rewrite points_to_split.
-      iDestruct "H" as "[H0 H1]". iSplitL "H0".
-      { rewrite Z.add_0_r. ss. }
-      iIntros "H". iSplitL "H".
-      { rewrite Z.add_0_r. ss. }
-      { ss. }
-    }
-    { iIntros "H". rewrite points_to_split.
-      iDestruct "H" as "[H0 H1]".
-      iPoseProof (IHl with "H1") as "H1"; eauto.
-      iDestruct "H1" as "[H1 H2]".
-      replace (ofs + Z.pos (Pos.of_succ_nat k))%Z with (ofs + 1 + k)%Z by lia.
-      iSplitL "H1"; auto. iIntros "H1". iSplitL "H0"; auto.
-      iApply "H2". auto.
-    }
-  Qed.
+    Lemma points_to_get_split blk ofs l k v
+          (GET: nth_error l k = Some v)
+      :
+      OwnM((blk, ofs) |-> l) -∗ (OwnM((blk, (ofs + k)%Z) |-> [v])) ** ((OwnM((blk, (ofs + k)%Z) |-> [v]) -* OwnM((blk, ofs) |-> l))).
+    Proof.
+      revert blk ofs k v GET. induction l; ss; i.
+      { destruct k; ss. }
+      destruct k; ss.
+      { clarify. iIntros "H". rewrite points_to_split.
+        iDestruct "H" as "[H0 H1]". iSplitL "H0".
+        { rewrite Z.add_0_r. ss. }
+        iIntros "H". iSplitL "H".
+        { rewrite Z.add_0_r. ss. }
+        { ss. }
+      }
+      { iIntros "H". rewrite points_to_split.
+        iDestruct "H" as "[H0 H1]".
+        iPoseProof (IHl with "H1") as "H1"; eauto.
+        iDestruct "H1" as "[H1 H2]".
+        replace (ofs + Z.pos (Pos.of_succ_nat k))%Z with (ofs + 1 + k)%Z by lia.
+        iSplitL "H1"; auto. iIntros "H1". iSplitL "H0"; auto.
+        iApply "H2". auto.
+      }
+    Qed.
 
-  Lemma set_nth_success A (l: list A) (k: nat) v
-        (SZ: k < length l)
-    :
-    exists l', set_nth k l v = Some l'.
-  Proof.
-    revert k v SZ. induction l; ss; i.
-    { exfalso. lia. }
-    { destruct k; ss; eauto.
-      hexploit IHl; eauto.
-      { instantiate (1:=k). lia. }
-      i. des. rewrite H1. eauto.
-    }
-  Qed.
+    Lemma set_nth_success A (l: list A) (k: nat) v
+          (SZ: k < length l)
+      :
+      exists l', set_nth k l v = Some l'.
+    Proof.
+      revert k v SZ. induction l; ss; i.
+      { exfalso. lia. }
+      { destruct k; ss; eauto.
+        hexploit IHl; eauto.
+        { instantiate (1:=k). lia. }
+        i. des. rewrite H1. eauto.
+      }
+    Qed.
 
-  Lemma points_to_set_split blk ofs l k v l'
-        (GET: set_nth k l v = Some l')
-    :
-    OwnM((blk, ofs) |-> l) -∗ (∃ v', OwnM((blk, (ofs + k)%Z) |-> [v'])) ** ((OwnM((blk, (ofs + k)%Z) |-> [v]) -* OwnM((blk, ofs) |-> l'))).
-  Proof.
-    revert blk ofs k v l' GET. induction l; ss; i.
-    { destruct k; ss. }
-    destruct k; ss.
-    { clarify. iIntros "H". rewrite points_to_split.
-      iDestruct "H" as "[H0 H1]". iSplitL "H0".
-      { rewrite Z.add_0_r. iExists _. ss. }
-      iIntros "H". iEval (rewrite points_to_split). iSplitL "H".
-      { rewrite Z.add_0_r. ss. }
-      { ss. }
-    }
-    { iIntros "H". rewrite points_to_split.
-      iDestruct "H" as "[H0 H1]".
-      unfold option_map in GET. des_ifs.
-      iPoseProof (IHl with "H1") as "H1"; eauto.
-      iDestruct "H1" as "[H1 H2]". iDestruct "H1" as (v') "H1".
-      replace (ofs + Z.pos (Pos.of_succ_nat k))%Z with (ofs + 1 + k)%Z by lia.
-      iSplitL "H1"; auto. iIntros "H1".
-      iEval (rewrite points_to_split). iSplitL "H0"; auto.
-      iApply "H2". auto.
-    }
-  Qed.
+    Lemma points_to_set_split blk ofs l k v l'
+          (GET: set_nth k l v = Some l')
+      :
+      OwnM((blk, ofs) |-> l) -∗ (∃ v', OwnM((blk, (ofs + k)%Z) |-> [v'])) ** ((OwnM((blk, (ofs + k)%Z) |-> [v]) -* OwnM((blk, ofs) |-> l'))).
+    Proof.
+      revert blk ofs k v l' GET. induction l; ss; i.
+      { destruct k; ss. }
+      destruct k; ss.
+      { clarify. iIntros "H". rewrite points_to_split.
+        iDestruct "H" as "[H0 H1]". iSplitL "H0".
+        { rewrite Z.add_0_r. iExists _. ss. }
+        iIntros "H". iEval (rewrite points_to_split). iSplitL "H".
+        { rewrite Z.add_0_r. ss. }
+        { ss. }
+      }
+      { iIntros "H". rewrite points_to_split.
+        iDestruct "H" as "[H0 H1]".
+        unfold option_map in GET. des_ifs.
+        iPoseProof (IHl with "H1") as "H1"; eauto.
+        iDestruct "H1" as "[H1 H2]". iDestruct "H1" as (v') "H1".
+        replace (ofs + Z.pos (Pos.of_succ_nat k))%Z with (ofs + 1 + k)%Z by lia.
+        iSplitL "H1"; auto. iIntros "H1".
+        iEval (rewrite points_to_split). iSplitL "H0"; auto.
+        iApply "H2". auto.
+      }
+    Qed.
 
-  Lemma set_nth_map A B (f: A -> B) k l v
-    :
-    set_nth k (List.map f l) (f v) = option_map (List.map f) (set_nth k l v).
-  Proof.
-    revert k v. induction l; ss; i.
-    { destruct k; ss. }
-    { destruct k; ss. rewrite IHl. unfold option_map. des_ifs. }
-  Qed.
+    Lemma set_nth_map A B (f: A -> B) k l v
+      :
+      set_nth k (List.map f l) (f v) = option_map (List.map f) (set_nth k l v).
+    Proof.
+      revert k v. induction l; ss; i.
+      { destruct k; ss. }
+      { destruct k; ss. rewrite IHl. unfold option_map. des_ifs. }
+    Qed.
 
-  Lemma nth_error_map A B (f: A -> B) k l
-    :
-    nth_error (List.map f l) k = option_map f (nth_error l k).
-  Proof.
-    revert k. induction l; ss; i.
-    { destruct k; ss. }
-    { destruct k; ss. }
-  Qed.
+    Lemma nth_error_map A B (f: A -> B) k l
+      :
+      nth_error (List.map f l) k = option_map f (nth_error l k).
+    Proof.
+      revert k. induction l; ss; i.
+      { destruct k; ss. }
+      { destruct k; ss. }
+    Qed.
 
-  Lemma repeat_nth A (a: A) n k
-        (RANGE: k < n)
-    :
-    nth_error (List.repeat a n) k = Some a.
-  Proof.
-    revert k RANGE. induction n; ss; i.
-    { lia. }
-    { destruct k; ss. rewrite IHn; eauto. lia. }
-  Qed.
+    Lemma repeat_nth A (a: A) n k
+          (RANGE: k < n)
+      :
+      nth_error (List.repeat a n) k = Some a.
+    Proof.
+      revert k RANGE. induction n; ss; i.
+      { lia. }
+      { destruct k; ss. rewrite IHn; eauto. lia. }
+    Qed.
 
-  Lemma set_nth_length A k (a: A) l l'
-        (SET: set_nth k l a = Some l')
-    :
-    length l' = length l.
-  Proof.
-    revert l l' SET. induction k; ss; i.
-    { destruct l; ss. clarify. }
-    { destruct l; ss. unfold option_map in *. des_ifs.
-      ss. f_equal. eauto.
-    }
-  Qed.
+    Lemma set_nth_length A k (a: A) l l'
+          (SET: set_nth k l a = Some l')
+      :
+      length l' = length l.
+    Proof.
+      revert l l' SET. induction k; ss; i.
+      { destruct l; ss. clarify. }
+      { destruct l; ss. unfold option_map in *. des_ifs.
+        ss. f_equal. eauto.
+      }
+    Qed.
 
-  Lemma set_nth_error A k (a: A) l l' k'
-        (SET: set_nth k l a = Some l')
-    :
-    nth_error l' k' = if Nat.eq_dec k' k then Some a else nth_error l k'.
-  Proof.
-    revert a l l' k' SET. induction k; ss; i.
-    { destruct l; ss. clarify. des_ifs. destruct k'; ss. }
-    { destruct l; ss. unfold option_map in *. des_ifs; ss.
-      { erewrite IHk; eauto. des_ifs. }
-      { destruct k'; ss. erewrite IHk; eauto. des_ifs. }
-    }
-  Qed.
+    Lemma set_nth_error A k (a: A) l l' k'
+          (SET: set_nth k l a = Some l')
+      :
+      nth_error l' k' = if Nat.eq_dec k' k then Some a else nth_error l k'.
+    Proof.
+      revert a l l' k' SET. induction k; ss; i.
+      { destruct l; ss. clarify. des_ifs. destruct k'; ss. }
+      { destruct l; ss. unfold option_map in *. des_ifs; ss.
+        { erewrite IHk; eauto. des_ifs. }
+        { destruct k'; ss. erewrite IHk; eauto. des_ifs. }
+      }
+    Qed.
 
-  Lemma repeat_map A B (f: A -> B) (a: A) n
-    :
-    map f (repeat a n) = repeat (f a) n.
-  Proof.
-    induction n; ss. f_equal; auto.
-  Qed.
+    Lemma repeat_map A B (f: A -> B) (a: A) n
+      :
+      map f (repeat a n) = repeat (f a) n.
+    Proof.
+      induction n; ss. f_equal; auto.
+    Qed.
 
-  Lemma unfold_iter (E : Type -> Type) (A B : Type) (f : A -> itree E (A + B)) (x : A)
-    :
-    ITree.iter f x = lr <- f x;;
-                     match lr with
-                     | inl l => tau;; ITree.iter f l
-                     | inr r => Ret r
-                     end.
-  Proof.
-    eapply bisim_is_eq. eapply unfold_iter.
-  Qed.
+    Lemma unfold_iter (E : Type -> Type) (A B : Type) (f : A -> itree E (A + B)) (x : A)
+      :
+      ITree.iter f x = lr <- f x;;
+                       match lr with
+                       | inl l => tau;; ITree.iter f l
+                       | inr r => Ret r
+                       end.
+    Proof.
+      eapply bisim_is_eq. eapply unfold_iter.
+    Qed.
 
-  Lemma points_to_nil blk ofs
-    :
-    ((blk, ofs) |-> []) = ε.
-  Proof.
-    Local Transparent URA.unit.
-    ss. unfold points_to, Auth.white. f_equal.
-    rewrite unfold_points_to.
-    extensionality _blk. extensionality _ofs. unfold andb. des_ifs.
-    exfalso. ss. lia.
-  Qed.
+    Lemma points_to_nil blk ofs
+      :
+      ((blk, ofs) |-> []) = ε.
+    Proof.
+      Local Transparent URA.unit.
+      ss. unfold points_to, Auth.white. f_equal.
+      rewrite unfold_points_to.
+      extensionality _blk. extensionality _ofs. unfold andb. des_ifs.
+      exfalso. ss. lia.
+    Qed.
 
-  Lemma points_to_app blk ofs l0 l1
-    :
-    (blk, ofs) |-> (l0 ++ l1) = ((blk, ofs) |-> l0) ⋅ ((blk, (ofs + strings.length l0)%Z) |-> l1).
-  Proof.
-    revert ofs l1. induction l0; i; ss.
-    { rewrite points_to_nil. rewrite URA.unit_idl. ss.
-      replace (ofs + 0)%Z with ofs; ss. lia.
-    }
-    { rewrite points_to_split. rewrite (points_to_split blk ofs a l0).
-      erewrite IHl0. rewrite URA.add_assoc. f_equal; ss.
-      replace (ofs + Z.pos (Pos.of_succ_nat (strings.length l0)))%Z with
-        (ofs + 1 + strings.length l0)%Z; ss. lia.
-    }
-  Qed.
+    Lemma points_to_app blk ofs l0 l1
+      :
+      (blk, ofs) |-> (l0 ++ l1) = ((blk, ofs) |-> l0) ⋅ ((blk, (ofs + strings.length l0)%Z) |-> l1).
+    Proof.
+      revert ofs l1. induction l0; i; ss.
+      { rewrite points_to_nil. rewrite URA.unit_idl. ss.
+        replace (ofs + 0)%Z with ofs; ss. lia.
+      }
+      { rewrite points_to_split. rewrite (points_to_split blk ofs a l0).
+        erewrite IHl0. rewrite URA.add_assoc. f_equal; ss.
+        replace (ofs + Z.pos (Pos.of_succ_nat (strings.length l0)))%Z with
+          (ofs + 1 + strings.length l0)%Z; ss. lia.
+      }
+    Qed.
 
-  Lemma OwnM_combine M `{@GRA.inG M Γ} a0 a1
-    :
-    (OwnM a0 ** OwnM a1) -∗ OwnM (a0 ⋅ a1).
-  Proof.
-    iIntros "[H0 H1]". iCombine "H0 H1" as "H". auto.
-  Qed.
+    Lemma OwnM_combine M `{@GRA.inG M Γ} a0 a1
+      :
+      (OwnM a0 ** OwnM a1) -∗ OwnM (a0 ⋅ a1).
+    Proof.
+      iIntros "[H0 H1]". iCombine "H0 H1" as "H". auto.
+    Qed.
 
+  End LEMMA.
 
   (***** Move and rename: APC & HoareCall LEMMAS *****)
 
@@ -296,11 +299,10 @@ Section SIMMODSEM.
   Proof.
   Admitted.
 
-
   (****************************)
 
   Local Notation universe := positive.
-  Local Notation level := nat.
+  (* Local Notation level := nat. *)
 
   Let Ist: Any.t -> Any.t -> iProp := 
     (fun st_src st_tgt =>
@@ -308,22 +310,21 @@ Section SIMMODSEM.
              ⌜st_src = (f, sz)↑ /\ (length l = Z.to_nat sz) /\ (forall k (SZ: (0 <= k < sz)%Z), nth_error l (Z.to_nat k) = Some (f k)) /\ st_tgt = (Vptr blk ofs)↑⌝ 
              ∗ OwnM ((blk, ofs) |-> (List.map Vint l)) ∗ pending0) 
              ∨ (⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
-             
+            
   Theorem sim: HModPair.sim (MapM.HMap GlobalStbM) (MapI.Map) Ist.
   Proof.
     econs; eauto; ii; econs; cycle 1; [s|sim_split].
     - iIntros "_". iSplitR; eauto. 
       steps. iRight. iFrame. esplits; eauto.
     - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
-      iApply isim_take_src; iIntros "%meta". destruct meta.
-      iApply isim_take_src; iIntros "%".  
-      iApply isim_assume_src. iIntros "(W & (%Y & %M & P0) & %X)". subst. 
-      unfold Ist. iDestruct "IST" as "[IST|%]".
+      steps. iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)". subst.
+      iDestruct "IST" as "[IST|%]".
       {
         iDestruct "IST" as (? ? ? ? ?) "(_ & _ & P)".
         iExFalso. iApply (pending0_unique with "P P0").
       }
-      subst.
+      rewrite Any.upcast_downcast in G. inv G. simpl in G0. inv G0.
+      des. subst. 
       steps. 
       iApply APC_start_clo. instantiate (1:= 1 + x).
       iApply APC_step_clo.
@@ -332,16 +333,24 @@ Section SIMMODSEM.
 
       (*** TODO: Make a lemma for < HoareCall / Call >***)
       instantiate (1:= Any.upcast [Vint x]).
-      unfold HoareCall. steps.
-      force. instantiate (1:= x).
+      rewrite HoareCall_parse. prep. 
+      unfold HoareCallPre. steps.
+      force. instantiate (1:= x). 
       force. instantiate (1:= Any.upcast [Vint x]). 
       force. iSplitR; [eauto|].
       iRename "P0" into "IST". call.
-      { iLeft. admit. }
-      (* iDestruct "IST" as "[IST|%]"; cycle 1.
-      { admit. }
-      iDestruct "IST" as (? ? ? ? ?) "(% & MAP & P0)".
-      des. subst. *)
+      {  
+        iLeft. iExists _, _, (repeat 0 x)%Z, (λ _ : Z, 0%Z), x.
+        iFrame. iSplit.
+        { 
+          iPureIntro. esplits; eauto.
+          { rewrite repeat_length. lia. }
+          { i. rewrite repeat_nth; eauto. lia. }
+          admit.
+        }
+        admit. 
+      }
+      unfold HoareCallPost.
       steps.
       iDestruct "ASM" as "[ASM %]".
       iDestruct "ASM" as ( ? ) "[% ASM]". subst.
@@ -350,15 +359,13 @@ Section SIMMODSEM.
       admit.
 
     - unfold cfunU, getF, MapI.getF, interp_sb_hp, HoareFun, ccallU. s.
-      iApply isim_take_src; iIntros "%meta". destruct meta.
-      iApply isim_take_src; iIntros "%".  
-      iApply isim_assume_src. iIntros "%". subst.
-      steps.
+      steps. destruct y0. iDestruct "ASM" as "%". des_ifs.
       iDestruct "IST" as "[IST|%]"; cycle 1.
-      { subst. unfold assume. steps. exfalso. lia. }
+      { des. subst. steps. exfalso. lia. }
       iDestruct "IST" as (? ? ? ? ?) "(% & MAP & P0)".
       des. subst.
-      unfold assume. steps. 
+      rewrite G. steps.
+      rewrite G0. steps. 
       unfold scale_int. des_ifs; cycle 1.
       { exfalso. eapply n0. eapply Z.divide_factor_r. }
       steps. iApply APC_start_clo. instantiate (1:= 1).
@@ -367,14 +374,16 @@ Section SIMMODSEM.
       { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. }
       iPoseProof (points_to_get_split with "MAP") as "[A B]".
       { eapply map_nth_error. eauto. }
-      replace (ofs + (y1 * 8) `div` 8)%Z with (ofs + Z.to_nat y1)%Z. 
+      replace (ofs + (y3 * 8) `div` 8)%Z with (ofs + Z.to_nat y3)%Z. 
       2: { rewrite Z_div_mult; ss. lia. }
-      instantiate (1:= (Any.upcast [Vptr blk (ofs + Z.to_nat y1)])).
+      instantiate (1:= (Any.upcast [Vptr blk (ofs + Z.to_nat y3)])).
       prep. unfold HoareCall.
-      force. instantiate (1:= (blk, (ofs + Z.to_nat y1)%Z, _)).
-      force. force. iSplitR.
-      { iFrame. iSplit; eauto. admit. }
-      iCombine "P0 A B" as "IST".
+      force. instantiate (1:= (blk, (ofs + Z.to_nat y3)%Z, _)).
+      force. force. 
+      iSplitL "A". { iFrame. repeat iSplit; eauto. }
+      (* iSplitR. { iFrame. repeat iSplit; eauto. admit. } *)
+      iCombine "P0 B" as "IST".
+      (* iCombine "P0 A B" as "IST". *)
       call.
       { 
         iLeft. iDestruct "IST" as "(P0 & A & B)"; iFrame.
@@ -388,9 +397,46 @@ Section SIMMODSEM.
       force. force. iSplitR.
       { eauto. }
       iDestruct "ASM" as "[[A %] %]". subst.
-      instantiate (1:= Vint (f y1)). steps.
+      instantiate (1:= Vint (f y3)). steps.
       eauto.
-
+    
+    - unfold cfunU, setF, MapI.setF, interp_sb_hp, HoareFun, ccallU. s.
+      steps. destruct y0. iDestruct "ASM" as "%". des_ifs.
+      iDestruct "IST" as "[IST|%]"; cycle 1.
+      { subst. steps. exfalso. lia. }
+      iDestruct "IST" as (? ? ? ? ?) "(% & MAP & P0)".
+      des. subst.
+      rewrite G. steps.
+      rewrite Heq. rewrite Heq0. steps.
+      unfold scale_int. des_ifs; cycle 1.
+      { exfalso. eapply n0. eapply Z.divide_factor_r. }
+      steps. iApply APC_start_clo. instantiate (1:= 1).
+      iApply APC_step_clo.
+      { eapply STBINCLM. instantiate (2:= "store"). stb_tac. ss. }
+      { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. }
+      instantiate (1:= Any.upcast [Vptr blk (ofs + (y4 * 8) `div` 8); Vint y5]).
+      hexploit set_nth_success.
+      { rewrite H2. instantiate (1:= Z.to_nat y4). lia. }
+      i. des.
+      iPoseProof (points_to_set_split with "MAP") as "[A B]".
+      { rewrite set_nth_map. rewrite H1. ss.  }
+      iDestruct "A" as ( ? ) "A".
+      replace (ofs + (y4 * 8) `div` 8)%Z with (ofs + Z.to_nat y4)%Z. 
+      2: { rewrite Z_div_mult; ss. lia. }
+      unfold HoareCall.
+      force. instantiate (1:= ((blk, ofs), v')).
+      force. instantiate (1:= Any.upcast [Vptr blk (ofs + Z.to_nat y4); Vint y5]).
+      force. iSplitL "A". { iFrame. admit.  }
+      iCombine "P0 B" as "IST".
+      call.
+      { admit. }
+      steps.
+      rewrite unfold_APC.
+      force. instantiate (1:= true). steps.
+      force. force. iSplitR.
+      { eauto. }
+      iDestruct "ASM" as "[[A %] %]". subst.
+      steps. eauto.
      
   Admitted.
 
