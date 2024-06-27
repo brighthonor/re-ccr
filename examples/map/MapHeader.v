@@ -51,14 +51,25 @@ Section RESOURCE.
     | S sz' => initial_points_tos sz' ∗ map_points_to sz' 0
     end.
 
-  Definition MapRA0: URA.t := Excl.t unit.
+  Definition MapRA0: URA.t := URA.prod (Excl.t unit) (Excl.t Z).
   Context `{@GRA.inG MapRA0 Γ}.
 
-  Definition pending0_r: MapRA0 := Excl.just tt.
+  Definition pending0_r: MapRA0 := (Excl.just tt, ε).
 
   Definition pending0: iProp :=
     OwnM pending0_r.
 
+  Definition initialized0_r ofs: MapRA0 := (ε, Excl.just ofs).
+
+  Definition initialized0 ofs: iProp :=
+    OwnM (initialized0_r ofs).
+    
+  Fixpoint initial0 (sz: nat): iProp :=
+    match sz with
+    | 0 => True%I
+    | S sz' => initial0 sz' ∗ initialized0 sz'
+    end.
+  
   
   Definition initial_r: (Z ==> (Excl.t Z))%ra := (fun _ => Excl.just 0%Z).
   
@@ -112,7 +123,7 @@ Section SPECS.
                       (fun varg => (⌜varg = ([Vint sz]: list val)↑⌝
                                      ∗ ⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝
                                      ∗ pending0)%I),
-                      (fun vret => True%I)))).
+                      (fun vret => initial0 sz%I)))).
 
   Definition get_spec: fspec :=
     mk_fspec_inv 0
@@ -122,7 +133,12 @@ Section SPECS.
                                      ∗ map_points_to k v)%I),
                       (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v)%I)))).
 
-  Definition get_specM: fspec := fspec_trivial.
+  Definition get_specM: fspec := 
+    mk_fspec_inv 0
+    (fun _ _ => mk_simple (fun k =>
+                  (ord_top,
+                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ initialized0 k)%I),
+                    (fun vret => initialized0 k)))).  
 
   Definition set_spec: fspec :=
     mk_fspec_inv 0
@@ -132,7 +148,12 @@ Section SPECS.
                                      ∗ map_points_to k w)%I),
                       (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v)%I)))).
 
-  Definition set_specM: fspec := fspec_trivial.
+  Definition set_specM: fspec :=
+    mk_fspec_inv 0
+    (fun _ _ => mk_simple (fun k =>
+                  (ord_top,
+                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ initialized0 k)%I),
+                    (fun vret => initialized0 k)))).  
 
   Definition set_by_user_spec: fspec :=
     mk_fspec_inv 0
@@ -142,7 +163,12 @@ Section SPECS.
                                      ∗ map_points_to k w)%I),
                       (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v)%I)))).
 
-  Definition set_by_user_specM: fspec := fspec_trivial.
+  Definition set_by_user_specM: fspec := 
+    mk_fspec_inv 0
+    (fun _ _ => mk_simple (fun k =>
+                  (ord_top,
+                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ initialized0 k)%I),
+                    (fun vret => initialized0 k)))).  
 
   Definition Map_initial_cond : iProp := initial_map ∗ pending0.
   
