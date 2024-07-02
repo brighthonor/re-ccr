@@ -313,14 +313,19 @@ Section SIMMODSEM.
 
   Definition init_points blk ofs f k := (initialized0 k ∨ OwnM ((blk, (ofs + k)%Z) |-> [Vint (f k)]))%I.
 
-  Fixpoint mem_inv blk ofs f sz : iProp := 
+  Fixpoint mem_index (sz: nat) : list Z :=
+      match sz with 0 => [] | S k => (Z.of_nat k) :: mem_index k end.
+
+  Definition mem_inv blk ofs f sz := ([∗ list] k ∈ (mem_index sz), init_points blk ofs f k)%I.
+
+  (* Fixpoint mem_inv blk ofs f sz : iProp := 
     match sz with
     | 0 => True%I
     | S sz0 => init_points blk ofs f sz0 ∗ mem_inv blk ofs f sz0
-    end.   
+    end.    *)
 
-  Lemma mem_inv_split blk ofs f sz k 
-    (SZ: (0 <= k < sz)): (mem_inv blk ofs f sz) -∗ (init_points blk ofs f k ∗ (init_points blk ofs f k -* mem_inv blk ofs f sz)).
+  Lemma mem_inv_split blk ofs f sz k (SZ: 0 <= k < sz): 
+    mem_inv blk ofs f sz -∗ (init_points blk ofs f k ∗ (init_points blk ofs f k -* mem_inv blk ofs f sz)).
   Proof.
     i. iIntros "M". iEval (unfold mem_inv) in "M". 
     iInduction sz as [|sz0] "IH"; [lia|].
@@ -338,10 +343,16 @@ Section SIMMODSEM.
   Let Ist: Any.t -> Any.t -> iProp := 
     (fun st_src st_tgt =>
              ((∃ blk ofs (f: Z -> Z) (sz: Z), 
-             ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
+             ⌜st_src = (f, sz)↑⌝ 
              ∗ mem_inv blk ofs f (Z.to_nat sz) ∗ pending0) 
              ∨ (⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I).
 
+  (* Let Ist: Any.t -> Any.t -> iProp := 
+    (fun st_src st_tgt =>
+             ((∃ blk ofs (f: Z -> Z) (sz: Z), 
+             ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
+             ∗ mem_inv blk ofs f (Z.to_nat sz) ∗ pending0) 
+             ∨ (⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑⌝))%I). *)
 
   (* Let Ist: Any.t -> Any.t -> iProp := 
     (fun st_src st_tgt =>
@@ -363,7 +374,7 @@ Section SIMMODSEM.
         iExFalso. iApply (pending0_unique with "P P0").
       }
       rewrite Any.upcast_downcast in G. inv G. simpl in G0. inv G0.
-      des. subst. 
+      (* des. subst.  *)
       steps. 
       iApply APC_start_clo. instantiate (1:= 1 + x).
       iApply APC_step_clo.
@@ -378,7 +389,7 @@ Section SIMMODSEM.
       force. instantiate (1:= Any.upcast [Vint x]). 
       force. iSplitR; [eauto|].
       iRename "P0" into "IST". call.
-      {  
+      {   
         iLeft. iExists _, _, (λ _ : Z, 0%Z), x.
         iFrame. iSplit.
         { 
@@ -386,7 +397,7 @@ Section SIMMODSEM.
           admit.
         }
         admit. 
-      }
+      } 
       unfold HoareCallPost.
       steps.
       iDestruct "ASM" as "[ASM %]".
@@ -407,50 +418,52 @@ Section SIMMODSEM.
       steps. iApply APC_start_clo. instantiate (1:= 1).
       iApply APC_step_clo.
       { eapply STBINCLM. instantiate (2:= "load"). stb_tac. ss. }
-      { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. }      
-      (* iPoseProof (points_to_get_split with "MAP") as "[A B]".
-      { eapply map_nth_error. eauto. } *)
+      { eapply OrdArith.lt_from_nat. eapply Nat.lt_succ_diag_r. } 
       symmetry in G0. inv G0.
       replace (ofs + (x * 8) `div` 8)%Z with (ofs + Z.to_nat x)%Z. 
       2: { rewrite Z_div_mult; ss. lia. }
       instantiate (1:= (Any.upcast [Vptr blk (ofs + Z.to_nat x)])).
-      iApply 
-
-
-      { iExFalso. iApply (initialized0_unique with "INIT INIT'"). }
-
+      iPoseProof (mem_inv_split with "MAP") as "[IP MAP]".
+      { instantiate (1:= Z.to_nat x). lia. }
 
       prep. unfold HoareCall.
       force. instantiate (1:= (blk, (ofs + Z.to_nat x)%Z, _)).
-      (* force. instantiate (1:= (blk, (ofs + Z.to_nat x)%Z, _)). *)
-      force. force. 
+      force. force.
+      iDestruct "IP" as "[INIT'|POINT]".
+      { 
+        iExFalso. iApply (initialized0_unique with "INIT").
+        iEval (rewrite ZifyInst.of_nat_to_nat_eq) in "INIT'".
+        inv G1. replace (Z.max 0 x) with x. 2: { destruct x; eauto. lia. }
+        eauto.
+      } 
       iSplitL "POINT".
       { 
-        replace (ofs + x)%Z with (ofs + Z.to_nat x)%Z; [|lia].
         iFrame. repeat iSplit; eauto.
       } 
-      (* iSplitR. { iFrame. repeat iSplit; eauto. admit. } *)
-      (* iRename "P0" into "IST". *)
-      iCombine "P0 INIT" as "IST".
-      (* iCombine "P0 B" as "IST". *)
-      (* iCombine "P0 A B" as "IST". *)
+      iCombine "P0 INIT MAP" as "IST".
       call.
       {
-        iDestruct "IST" as "[P0 INIT]".
+        iDestruct "IST" as "(P0 & INIT & MAP)".
         iLeft. iExists blk, ofs, f ,sz. iFrame.
-        repeat iSplit; eauto. 
-        admit.
-        (* iLeft. iDestruct "IST" as "(P0 & A & B)"; iFrame.
-        iExists blk, ofs, l, f, sz.
-        iPoseProof ("B" with "A") as "A".
-        iFrame. eauto.  *)
+        repeat iSplit; eauto.
+        iApply "MAP". iLeft.  
+        iEval (rewrite ZifyInst.of_nat_to_nat_eq).
+        inv G1. replace (Z.max 0 x) with x. 2: { destruct x; eauto. lia. }
+        eauto.
       }
       steps. 
       rewrite unfold_APC. 
       force. instantiate (1:= true). steps. 
-      force. force. iSplitR.
-      { eauto. }
+      force. instantiate (1:= vret).
       iDestruct "ASM" as "[[A %] %]". subst.
+      steps. force.
+      iSplitR "IST".
+      { 
+        iFrame. 
+        iSplit.
+        { admit. }
+        { iPureIntro. do 3 f_equal. lia. }  
+      }
       (* instantiate (1:= Vint (f y3)). steps. *)
       steps. eauto.
     
