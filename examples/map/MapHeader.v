@@ -20,10 +20,10 @@ Set Implicit Arguments.
 Section RESOURCE.
   Context `{_W: CtxWD.t}.
 
-  Global Instance MapRA: URA.t := URA.prod (Excl.t unit) (Auth.t (Z ==> (Excl.t Z)))%ra.
-  Context `{@GRA.inG MapRA Γ}.
+  Global Instance pendingRA: URA.t := URA.prod (Excl.t unit) (Auth.t (Z ==> (Excl.t Z)))%ra.
+  Context `{@GRA.inG pendingRA Γ}.
 
-  Definition map_points_to_r (k: Z) (v: Z): MapRA :=
+  Definition map_points_to_r (k: Z) (v: Z): pendingRA :=
     (ε, Auth.white ((fun n => if Z.eq_dec n k then Excl.just v else ε): @URA.car (Z ==> (Excl.t Z))%ra)).
 
   Definition map_points_to (k: Z) (v: Z): iProp :=
@@ -32,7 +32,7 @@ Section RESOURCE.
   (* Definition S_map_points_to {n} (k: Z) (v: Z): SRFSyn.t n :=
     (<ownm> (map_points_to_r k v))%SRF. *)
 
-  Definition pending_r: MapRA :=
+  Definition pending_r: pendingRA :=
     (Excl.just tt, ε).
 
   Definition pending: iProp :=
@@ -51,35 +51,16 @@ Section RESOURCE.
     | S sz' => initial_points_tos sz' ∗ map_points_to sz' 0
     end.
 
-  Definition MapRA0: URA.t := URA.prod (Excl.t unit) (Excl.t Z).
-  Context `{@GRA.inG MapRA0 Γ}.
 
-  Definition pending0_r: MapRA0 := (Excl.just tt, ε).
-
-  Definition pending0: iProp :=
-    OwnM pending0_r.
-
-  Definition initialized0_r ofs: MapRA0 := (ε, Excl.just ofs).
-
-  Definition initialized0 ofs: iProp :=
-    OwnM (initialized0_r ofs).
-    
-  Fixpoint initial0 (sz: nat): iProp :=
-    match sz with
-    | 0 => True%I
-    | S sz' => initial0 sz' ∗ initialized0 sz'
-    end.
-  
-  
   Definition initial_r: (Z ==> (Excl.t Z))%ra := (fun _ => Excl.just 0%Z).
   
-  Definition initial_map_r: MapRA :=
+  Definition initial_map_r: pendingRA :=
     (ε, (Auth.black initial_r) ⋅ (Auth.white initial_r)).
 
-  Definition black_map_r (f: Z -> Z): MapRA :=
+  Definition black_map_r (f: Z -> Z): pendingRA :=
     (Excl.unit, Auth.black ((fun k => Excl.just (f k)): (Z ==> (Excl.t Z))%ra)).
 
-  Definition unallocated_r (sz: Z): MapRA :=
+  Definition unallocated_r (sz: Z): pendingRA :=
     (Excl.unit, Auth.white ((fun k =>
                                if (Z_gt_le_dec 0 k) then Excl.just 0%Z
                                else if (Z_gt_le_dec sz k) then Excl.unit else Excl.just 0%Z)
@@ -94,16 +75,132 @@ Section RESOURCE.
   Definition unallocated (sz: Z): iProp :=
     OwnM (unallocated_r sz).
 
-  Global Opaque map_points_to pending pending0 initial_map black_map unallocated.
+
+
+
+  (* Definition MapRA0: URA.t := URA.prod (Excl.t unit) (Excl.t Z).
+  Context `{@GRA.inG MapRA0 Γ}. *)
+
+  Definition pending0RA: URA.t := Excl.t unit.
+  Context `{@GRA.inG pending0RA Γ}. 
+
+  Definition pending0_r: pending0RA := Excl.just tt.
+
+  Definition pending0: iProp :=
+    OwnM pending0_r.
+
+  Definition CallableRA : URA.t := Excl.t unit.
+  Context `{@GRA.inG CallableRA Γ}.
+  Definition callable_r :(@URA.car CallableRA) := Some tt.
+
+  Definition callable : iProp := OwnM callable_r.
+
+  Definition MapStateRA : URA.t := Auth.t (Excl.t (((Z->Z) * Z) * val)).
+  Context `{@GRA.inG MapStateRA Γ}.
+  Definition mapstate_r st : MapStateRA := Auth.white ((Excl.just st) : @URA.car (Excl.t (((Z->Z) * Z) * val))%ra).
+  Definition mapstate st : iProp := OwnM (mapstate_r st).
+
+  Definition mapstate_auth_r st : MapStateRA := Auth.black ((Excl.just st) : @URA.car (Excl.t (((Z->Z) * Z) * val))%ra).
+  Definition mapstate_auth st : iProp := OwnM (mapstate_auth_r st).
+
+  Definition mapstate_full st : iProp := mapstate_auth st ∗ mapstate st.
+
+  Lemma mapstate_update st st0 : mapstate_full st -∗ #=> mapstate_full st0.
+  Proof. 
+    iIntros "[H0 H1]". unfold mapstate_full, mapstate, mapstate_auth, mapstate_auth_r, mapstate_r.
+    iCombine "H0 H1" as "H".  
+    iPoseProof (OwnM_Upd with "H") as "H".
+    { 
+      instantiate (1:= (Auth.black ((Excl.just st0): @URA.car (Excl.t (((Z->Z) * Z) * val))) ⋅ Auth.white ((Excl.just st0): @URA.car (Excl.t (((Z->Z) * Z) * val))))).
+      ii. ur in H3. des_ifs. des. rewrite URA.unit_idl in H3.
+      unfold URA.extends in H3. des. ur in H3. ur.
+      rewrite URA.unit_idl. split.
+      { exists ctx. ur. des_ifs. }
+      des_ifs. ur. ss.
+    } 
+    iMod "H". iModIntro. 
+    iDestruct "H" as "[H0 H1]". iFrame.
+  Qed.
+
+  Lemma mapstate_auth_unique st st0: mapstate_auth st -∗ mapstate_auth st0 -∗ False.
+  Proof.
+    iIntros "H0 H1". iCombine "H0 H1" as "H".
+    iOwnWf "H". ur in H3. eauto.
+  Qed.
+
+  Lemma mapstate_upd st st0: mapstate_auth st -∗ mapstate st0 -∗ #=> mapstate_full st. 
+  Proof.
+    iIntros "H0 H1". 
+    unfold mapstate_full, mapstate, mapstate_auth, mapstate_auth_r, mapstate_r.
+    iCombine "H0 H1" as "H".
+    iPoseProof (OwnM_Upd with "H") as "H".
+    { 
+      instantiate (1:= (Auth.black ((Excl.just st): @URA.car (Excl.t (((Z->Z) * Z) * val))) ⋅ Auth.white ((Excl.just st): @URA.car (Excl.t (((Z->Z) * Z) * val))))).
+      ii. ur in H3. des_ifs. des. rewrite URA.unit_idl in H3.
+      unfold URA.extends in H3. des. ur in H3. ur.
+      rewrite URA.unit_idl. split.
+      { exists ctx. ur. des_ifs. }
+      des_ifs.
+    } 
+    iMod "H". iModIntro. 
+    iDestruct "H" as "[H0 H1]". iFrame.
+  Qed.
+
+  Lemma mapstate_eq st st0: mapstate_auth st -∗ mapstate st0 -∗ ⌜st = st0⌝.
+  Proof.
+    iIntros "H0 H1".
+    unfold mapstate_full, mapstate, mapstate_auth, mapstate_auth_r, mapstate_r.
+    iOwnWf "H0". eapply Auth.black_wf in H3.
+    iCombine "H0 H1" as "H".
+    iOwnWf "H". eapply Auth.auth_included in H4. des.
+    iPureIntro.
+    eapply (Excl.extends H3) in H4. 
+    des. clarify. 
+  Qed.
+  
+  (* Definition initialized0_r ofs: MapRA0 := (ε, Excl.just ofs).
+
+  Definition initialized0 ofs: iProp :=
+    OwnM (initialized0_r ofs).
+    
+  Fixpoint initial0 (sz: nat): iProp :=
+    match sz with
+    | 0 => True%I
+    | S sz' => initial0 sz' ∗ initialized0 sz'
+    end. *)
+
+  Global Opaque map_points_to pending pending0 initial_map black_map unallocated callable mapstate mapstate_auth.
 
 End RESOURCE.
 
-Section SPECS.
-  Context `{_W: CtxWD.t}.
-  Context `{@GRA.inG MapRA Γ}.
-  Context `{@GRA.inG MapRA0 Γ}.
 
-  (* Definition PENDING := (nroot .@ "MAP" .@ "PENDING"). *)
+Module MapRA.
+  Class t
+    `{_W: CtxWD.t}
+    `{@GRA.inG pendingRA Γ}
+    `{@GRA.inG pending0RA Γ}
+    `{@GRA.inG CallableRA Γ}
+    `{@GRA.inG MapStateRA Γ}
+    := MapRA: unit.
+
+End MapRA.
+
+Module MapRA0.
+  
+  Class t
+    `{_W: CtxWD.t}
+    `{@GRA.inG pending0RA Γ}
+    `{@GRA.inG CallableRA Γ}
+    `{@GRA.inG MapStateRA Γ}
+    := MapRA0: unit.
+
+End MapRA0.
+
+Section SPECS.
+  Context `{_M: MapRA.t}.
+  (* Context `{@GRA.inG MapRA Γ}.
+  Context `{@GRA.inG MapRA0 Γ}.
+  Context `{@GRA.inG CallableRA Γ}. *)
 
   Definition init_spec: fspec :=
     mk_fspec_inv 0
@@ -122,8 +219,8 @@ Section SPECS.
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint sz]: list val)↑⌝
                                      ∗ ⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝
-                                     ∗ pending0)%I),
-                      (fun vret => initial0 sz%I)))).
+                                     ∗ pending0 ∗ callable)%I),
+                      (fun vret => callable)))).
 
   Definition get_spec: fspec :=
     mk_fspec_inv 0
@@ -137,8 +234,8 @@ Section SPECS.
     mk_fspec_inv 0
     (fun _ _ => mk_simple (fun k =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ initialized0 k)%I),
-                    (fun vret => initialized0 k)))).  
+                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ callable)%I),
+                    (fun vret => callable)))).  
 
   Definition set_spec: fspec :=
     mk_fspec_inv 0
@@ -150,10 +247,10 @@ Section SPECS.
 
   Definition set_specM: fspec :=
     mk_fspec_inv 0
-    (fun _ _ => mk_simple (fun k =>
+    (fun _ _ => mk_simple (fun '(k, v) =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ initialized0 k)%I),
-                    (fun vret => initialized0 k)))).  
+                    (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝ ∗ callable)%I),
+                    (fun vret => callable)))).  
 
   Definition set_by_user_spec: fspec :=
     mk_fspec_inv 0
@@ -165,14 +262,15 @@ Section SPECS.
 
   Definition set_by_user_specM: fspec := 
     mk_fspec_inv 0
-    (fun _ _ => mk_simple (fun k =>
+    (fun _ _ => mk_simple (fun '(k, v) =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ initialized0 k)%I),
-                    (fun vret => initialized0 k)))).  
+                    (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝ ∗ callable)%I),
+                    (fun vret => callable)))).  
 
   Definition Map_initial_cond : iProp := initial_map ∗ pending0.
   
-  Definition Map0_initial_cond : iProp := emp.
+  Definition Map0_initial_cond : iProp := mapstate_full ((fun (_: Z) => 0%Z, 0%Z), Vnullptr).
+  (* Definition Map0_initial_cond : iProp := emp. *)
 
   Definition MapStb: alist gname fspec :=
     Seal.sealing "stb" [("init", init_spec); ("get", get_spec); ("set", set_spec); ("set_by_user", set_by_user_spec)].

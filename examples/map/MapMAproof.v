@@ -34,6 +34,7 @@ Section SIMMODSEM.
   Context `{_W: CtxWD.t}.
   Context `{@GRA.inG MapRA Γ}.
   Context `{@GRA.inG MapRA0 Γ}.
+  Context `{@GRA.inG CallableRA Γ}.
   Context `{@GRA.inG memRA Γ}. 
 
   Section LEMMA. 
@@ -92,10 +93,10 @@ Section SIMMODSEM.
     Proof.
       unfold initial_map, map_points_to.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
-      iOwnWf "H". exfalso. rr in H2. ur in H2. unseal "ra". des.
-      rr in H3. ur in H3. unseal "ra". des.
-      rr in H3. des. ur in H3. eapply equal_f with (x:=k) in H3.
-      ur in H3. des_ifs.
+      iOwnWf "H". exfalso. rr in H3. ur in H3. unseal "ra". des.
+      rr in H4. ur in H4. unseal "ra". des.
+      rr in H4. des. ur in H4. eapply equal_f with (x:=k) in H4.
+      ur in H4. des_ifs.
     Qed.
 
     Lemma unallocated_range sz k v
@@ -104,10 +105,10 @@ Section SIMMODSEM.
     Proof.
       unfold unallocated, map_points_to.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
-      iOwnWf "H". iPureIntro. rr in H2. ur in H2. unseal "ra". des.
-      rr in H3. ur in H3. unseal "ra".
-      rr in H3. ur in H3. unseal "ra". specialize (H3 k).
-      rr in H3. ur in H3. unseal "ra". des_ifs. lia.
+      iOwnWf "H". iPureIntro. rr in H3. ur in H3. unseal "ra". des.
+      rr in H3. ur in H4. unseal "ra".
+      rr in H4. ur in H4. unseal "ra". specialize (H4 k).
+      rr in H4. ur in H4. unseal "ra". des_ifs. lia.
     Qed.
 
     Lemma black_map_get f k v
@@ -116,10 +117,10 @@ Section SIMMODSEM.
     Proof.
       unfold black_map, map_points_to.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
-      iOwnWf "H". iPureIntro. rr in H2. ur in H2. unseal "ra". des.
-      rr in H3. ur in H3. unseal "ra". des.
-      rr in H3. des. ur in H3. eapply equal_f with (x:=k) in H3.
-      ur in H3. des_ifs.
+      iOwnWf "H". iPureIntro. rr in H3. ur in H3. unseal "ra". des.
+      rr in H4. ur in H4. unseal "ra". des.
+      rr in H4. des. ur in H4. eapply equal_f with (x:=k) in H4.
+      ur in H4. des_ifs.
     Qed.
 
     Lemma black_map_set f k w v
@@ -129,10 +130,10 @@ Section SIMMODSEM.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
       iPoseProof (OwnM_Upd with "H") as "H".
       { instantiate (1:=black_map_r (fun n => if Z.eq_dec n k then v else f n) ⋅ map_points_to_r k v).
-        rr. i. ur in H2. ur. unseal "ra". des_ifs. des. split; auto.
-        ur in H3. ur. des_ifs. des. rr in H3. des. split.
-        { rr. exists ctx. ur in H3. ur. extensionality n.
-          eapply equal_f with (x:=n) in H3. ur in H3. ur. des_ifs.
+        rr. i. ur in H3. ur. unseal "ra". des_ifs. des. split; auto.
+        ur in H4. ur. des_ifs. des. rr in H4. des. split.
+        { rr. exists ctx. ur in H4. ur. extensionality n.
+          eapply equal_f with (x:=n) in H4. ur in H4. ur. des_ifs.
         }
         { ur. i. rr. ur. unseal "ra". ss. }
       }
@@ -144,9 +145,9 @@ Section SIMMODSEM.
       pending -∗ pending -∗ False%I.
     Proof.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
-      iOwnWf "H". exfalso. clear - H2.
-      rr in H2. ur in H2. unseal "ra". des.
-      rr in H2. ur in H2. unseal "ra". ss.
+      iOwnWf "H". exfalso. clear - H3.
+      rr in H3. ur in H3. unseal "ra". des.
+      rr in H3. ur in H3. unseal "ra". ss.
     Qed.
   End LEMMA.
 
@@ -177,6 +178,8 @@ Section SIMMODSEM.
   (* Hypothesis PUREINCL: forall sk, stb_pure_incl (GlobalStbM sk) (GlobalStb sk). *)
 
 
+  From Ordinal Require Import Ordinal.
+
   Lemma isim_apc 
     I fls flt r g ps pt {R} RR st_src st_tgt k_src k_tgt stb_src stb_tgt
     (* (STBINCL: stb_pure_incl stb_tgt stb_src) *)
@@ -185,10 +188,18 @@ Section SIMMODSEM.
   -∗
     @isim _ I fls flt r g R RR ps pt (st_src, interp_hEs_hAGEs stb_src ord_top (trigger hAPC) >>= k_src) (st_tgt, interp_hEs_hAGEs stb_tgt ord_top (trigger hAPC) >>= k_tgt).
   Proof.
-    (* iIntros "[IST K]".
+    iIntros "[IST K]".
     unfold interp_hEs_hAGEs. rewrite! interp_trigger. grind.
     unfold HoareAPC. grind.
     choose. instantiate (1:= x).
+    induction ord_top.
+    { rewrite ! unfold_APC. steps. 
+      force. instantiate (1:= y).
+      destruct y; steps.
+      { iApply "K"; eauto. }
+    }
+
+
     (****)
     rewrite! unfold_APC.
     choose. instantiate (1:= x0).
@@ -205,7 +216,7 @@ Section SIMMODSEM.
     prep. call; eauto.
     take. instantiate (1:= x5).
     steps. force. iSplitL "ASM"; [eauto|].
-    steps.  *)
+    steps. 
   Admitted.
 
   (* Lemma isim_call_impure

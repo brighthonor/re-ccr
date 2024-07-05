@@ -34,8 +34,8 @@ def set_by_user(k: int) ≡
 
 Section I.
   Local Open Scope string_scope.
-  Context `{_W: CtxWD.t}.
-  Context `{@GRA.inG MapRA0 Γ}.
+  Context `{_M: MapRA0.t}.
+  (* Context `{@GRA.inG MapRA0 Γ}. *)
   (* Context `{@GRA.inG MapRA1 Σ}. *)
   Definition initF: list val -> itree hAGEs val :=
     fun varg =>

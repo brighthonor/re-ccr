@@ -35,8 +35,9 @@ def set_by_user(k: int) ≡
 ***)
 
 Section M.
-  Context `{_W: CtxWD.t}.
-  Context `{@GRA.inG MapRA0 Γ}.
+  Context `{_M: MapRA0.t}.
+  (* Context `{@GRA.inG MapRA0 Γ}.
+  Context `{@GRA.inG CallableRA Γ}. *)
 
   (* Let Es := (hAPCE +' Es). *)
 
@@ -74,8 +75,8 @@ Section M.
 
   Definition MapSbtbM: list (string * fspecbody) :=
     [("init", mk_specbody init_specM (cfunU initF));
-     ("get", mk_specbody set_specM (cfunU getF));
-     ("set", mk_specbody get_specM (cfunU setF));
+     ("get", mk_specbody get_specM (cfunU getF));
+     ("set", mk_specbody set_specM (cfunU setF));
      ("set_by_user", mk_specbody set_by_user_specM (cfunU set_by_userF))].
 
   Definition SMapSem: SModSem.t := {|
