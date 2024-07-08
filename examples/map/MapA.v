@@ -30,9 +30,10 @@ def set_by_user(k: int) ≡
 ***)
 
 Section A.
-  Context `{_W: CtxWD.t}.
+  Context `{_M: MapRA.t}.
+  (* Context `{_W: CtxWD.t}.
   Context `{@GRA.inG MapRA Γ}.
-  Context `{@GRA.inG MapRA0 Γ}.
+  Context `{@GRA.inG MapRA0 Γ}. *)
 
   (* Let Es := (hAPCE +' Es). *)
 

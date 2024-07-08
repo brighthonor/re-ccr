@@ -391,6 +391,48 @@ Section SIMMODSEM.
     iFrame. iApply IHsz; eauto. lia.
   Qed.
 
+  Lemma mem_inv_set blk ofs f sz k (SZ: 0 <= k < sz):
+    mem_inv blk ofs f sz -∗ (∀x, init_points blk ofs f k ∗ (OwnM ((blk, (ofs + k)%Z) |-> [Vint x]) -∗ mem_inv blk ofs (fun n => if Z.eq_dec n k then x else (f n)) sz)).
+  Proof.
+    induction sz; [lia|].
+    destruct (classic (k = sz)); cycle 1.
+    {
+      iIntros "H %". unfold mem_inv. s.
+      iDestruct "H" as "[H0 H1]".
+      replace (init_points blk ofs (λ n : Z, if Z.eq_dec n k then x else f n) sz) with (init_points blk ofs f sz).
+      2: { unfold init_points. destruct (Z.eq_dec sz k); [lia|ss]. }
+      iPoseProof (IHsz with "H1") as "H1"; [lia|]. 
+      iSpecialize ("H1" $! x). iDestruct "H1" as "[H1 H2]".
+      iFrame. iApply "H2".
+    }
+    clear IHsz SZ. subst.
+    iIntros "H %". unfold mem_inv. s.
+    iDestruct "H" as "[H0 H1]". iFrame.
+    iIntros "OWN". iSplitL "OWN".
+    { unfold init_points. des_ifs. }
+    assert (forall (sz: nat) (NONZERO: sz > 0), sz = list_max (map (Z.to_nat) (mem_index sz)) + 1).
+    { 
+      i. induction sz0; [lia|].  
+      s. destruct (classic (sz0 = 0)).
+      { rewrite H3. eauto. }
+      { assert (sz0 > 0) by lia. specialize (IHsz0 H4).
+        replace (Z.to_nat sz0 `max` list_max (map Z.to_nat (mem_index sz0))) with (Z.to_nat sz0); lia.
+      }
+    }
+    destruct (classic (sz = 0)).
+    { rewrite H4. ss. }
+    assert (sz > 0) by lia. hexploit (H3 sz H5).
+    generalize sz at 2 3 7. i. 
+
+
+    assert (sz > list_max (map Z.to_nat (mem_index sz0))) by lia. 
+    clear H4 H5 H6.
+    iStopProof. induction sz0; eauto. s.
+    iIntros "[H0 H1]". iSplitL "H0".
+    { unfold init_points. des_ifs. simpl in H7. lia. }
+    iApply IHsz0; eauto. simpl in H7. lia.
+  Qed.
+
   Definition init_map_st := (fun (_: Z) => 0%Z, 0%Z).
   
   Let Ist: Any.t -> Any.t -> iProp := 
@@ -583,6 +625,7 @@ Section SIMMODSEM.
         iApply IHn; [lia|iFrame].
       }
 
+    (***********************************)
     - unfold cfunU, getF, MapI.getF, interp_sb_hp, HoareFun, ccallU. s.
       steps. iDestruct "ASM" as "(W & (% & INIT) & %)". subst. 
       rewrite Any.upcast_downcast in *. steps.
@@ -651,6 +694,7 @@ Section SIMMODSEM.
       iExists blk, ofs, f, sz. iSplit; eauto.
       iApply "MEM". unfold init_points. eauto.
     
+    (***********************************)  
     - unfold cfunU, setF, MapI.setF, interp_sb_hp, HoareFun, ccallU. s.
       steps. iDestruct "ASM" as "(W & (% & INIT) & %)". subst. 
       rewrite Any.upcast_downcast in *. steps.
@@ -675,8 +719,10 @@ Section SIMMODSEM.
       symmetry in Heq, Heq0. inv Heq. inv Heq0.
       replace (ofs + (x0 * 8) `div` 8)%Z with (ofs + Z.to_nat x0)%Z. 
       2: { rewrite Z_div_mult; ss. lia. }
-      iPoseProof (mem_inv_split with "MEM") as "[IP MEM]".
+      iPoseProof (mem_inv_set with "MEM") as "MEM".
+      (* iPoseProof (mem_inv_split with "MEM") as "[IP MEM]". *)
       { instantiate (1:= Z.to_nat x0). lia. }
+      iSpecialize ("MEM" $! x1). iDestruct "MEM" as "[IP MEM]".
       unfold HoareCall.
       force. instantiate (1:= (blk, (ofs + Z.to_nat x0)%Z, _)).
       force. force. iSplitL "IP".
@@ -707,38 +753,27 @@ Section SIMMODSEM.
       iCombine "MB MW" as "M". iPoseProof (mapstate_update with "M") as ">M".
       instantiate (1:= (init_map_st, Vnullptr)).
       steps. iSplitL; eauto. iLeft. iExists _, _, _, _.
-      iSplit; eauto. iFrame.
+      iSplit; eauto. iFrame. iPoseProof ("MEM" with "A") as "MEM".
+      assert (Z.of_nat (Z.to_nat x0) = x0) by lia.
+      rewrite H3. eauto.
+
       (***********************************)
-
-
-
-
-
-      hexploit set_nth_success.
-      { rewrite H2. instantiate (1:= Z.to_nat y4). lia. }
-      i. des.
-      iPoseProof (points_to_set_split with "MAP") as "[A B]".
-      { rewrite set_nth_map. rewrite H1. ss.  }
-      iDestruct "A" as ( ? ) "A".
-      replace (ofs + (y4 * 8) `div` 8)%Z with (ofs + Z.to_nat y4)%Z. 
-      2: { rewrite Z_div_mult; ss. lia. }
+    - unfold cfunU, set_by_userF, MapI.set_by_userF, interp_sb_hp, HoareFun, ccallU. s.
+      steps. iDestruct "ASM" as "(W & (% & INIT) & %)". subst. 
+      rewrite Any.upcast_downcast in *. steps.
+      rewrite STB_setM. steps.
+      inv G. inv G0.
       unfold HoareCall.
-      force. instantiate (1:= ((blk, ofs), v')).
-      force. instantiate (1:= Any.upcast [Vptr blk (ofs + Z.to_nat y4); Vint y5]).
-      force. iSplitL "A". { iFrame. admit.  }
-      iCombine "P0 B" as "IST".
-      call.
-      { admit. }
+      force. Unshelve. 2: { econs. eapply y1. eapply y2. eapply (y4, y). }
+      force. instantiate (1:= [Vint y4; Vint y]↑).
+      force. iSplitL "INIT W". { iFrame. eauto. }
+      call; [eauto|].
       steps.
-      rewrite unfold_APC.
-      force. instantiate (1:= true). steps.
-      force. force. iSplitR.
-      { eauto. }
-      iDestruct "ASM" as "[[A %] %]". subst.
-      steps. eauto.
-     
-  Admitted.
-
+      iDestruct "ASM" as "(W & C & %)". subst.
+      force. instantiate (1:= y3↑).
+      force. iSplitL "W C". { iFrame. eauto. }
+      rewrite G. steps. eauto.
+  Qed.
 
 
 

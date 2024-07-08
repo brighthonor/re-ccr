@@ -227,8 +227,8 @@ Section SPECS.
       (fun _ _ => mk_simple (fun '(k, v) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k])↑⌝
-                                     ∗ map_points_to k v)%I),
-                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v)%I)))).
+                                     ∗ map_points_to k v ∗ callable)%I),
+                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v ∗ callable)%I)))).
 
   Definition get_specM: fspec := 
     mk_fspec_inv 0
@@ -242,8 +242,8 @@ Section SPECS.
       (fun _ _ => mk_simple (fun '(k, w, v) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝
-                                     ∗ map_points_to k w)%I),
-                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v)%I)))).
+                                     ∗ map_points_to k w ∗ callable)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v ∗ callable)%I)))).
 
   Definition set_specM: fspec :=
     mk_fspec_inv 0
@@ -257,20 +257,19 @@ Section SPECS.
       (fun _ _ => mk_simple (fun '(k, w) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k])↑⌝
-                                     ∗ map_points_to k w)%I),
-                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v)%I)))).
+                                     ∗ map_points_to k w ∗ callable)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v ∗ callable)%I)))).
 
   Definition set_by_user_specM: fspec := 
     mk_fspec_inv 0
-    (fun _ _ => mk_simple (fun '(k, v) =>
+    (fun _ _ => mk_simple (fun k =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝ ∗ callable)%I),
+                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ callable)%I),
                     (fun vret => callable)))).  
-
-  Definition Map_initial_cond : iProp := initial_map ∗ pending0.
   
   Definition Map0_initial_cond : iProp := mapstate_full ((fun (_: Z) => 0%Z, 0%Z), Vnullptr).
   (* Definition Map0_initial_cond : iProp := emp. *)
+  Definition Map_initial_cond : iProp := initial_map ∗ pending0 ∗ callable ∗ Map0_initial_cond.
 
   Definition MapStb: alist gname fspec :=
     Seal.sealing "stb" [("init", init_spec); ("get", get_spec); ("set", set_spec); ("set_by_user", set_by_user_spec)].
