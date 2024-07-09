@@ -137,7 +137,7 @@ Section COMM.
     replace P0 with P1.
     2: { eapply prop_ext. split; auto. }
     unfold compile. red. eapply adequacy_local_aux; et.
-    -admit. 
+    - admit. 
     - i. s.
       unfold add_fnsems. rewrite ! alist_find_app_o.
       destruct (alist_find fn (fnsems ms1)) eqn:MS1; destruct (alist_find fn (fnsems ms0)) eqn: MS0.

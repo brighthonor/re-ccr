@@ -1410,6 +1410,8 @@ Section WSIMMODSEM.
   Local Notation world_id := positive.
   Local Notation level := nat.
 
+  (* Context `{_W: CtxWD.t}. *)
+
   Context `{Σ: GRA.t}.
   Context `{sProp : level -> Type}.
   Context `{@IInvSet Σ sProp}.
@@ -1418,12 +1420,7 @@ Section WSIMMODSEM.
   Context `{@GRA.inG (OwnIsRA sProp) Σ}.
 
   Variable (ms_src ms_tgt: HModSem.t).
-  (* Variable u: world_id. *)
-  (* Variable n: level. *)
   Variable Ist: Any.t -> Any.t -> iProp.
-  (* Variable RR: (Any.t * Any.t) -> (Any.t * Any.t) -> iProp.  *)
-  (* Variable Es: coPsets. *)
-
 
   Let fl_src := ms_src.(fnsems).
   Let fl_tgt := ms_tgt.(fnsems).

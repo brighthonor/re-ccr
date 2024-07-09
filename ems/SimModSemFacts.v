@@ -28,10 +28,8 @@ Section ADEQUACY.
   Lemma sim_ctx_mod
     ctx md1 md2
     (SIM: ModPair.sim md1 md2)
-
   :
-    ModPair.sim (Mod.add md1 ctx) (Mod.add md2 ctx)
-  .
+    ModPair.sim (Mod.add md1 ctx) (Mod.add md2 ctx).
   Proof.
     inv SIM.
     econs; et.
@@ -138,13 +136,9 @@ Section ADEQUACY.
   Theorem adequacy_local_strong md_src md_tgt
           (SIM: ModPair.sim md_src md_tgt)
     :
-    <<CR: (refines_strong md_tgt md_src)>>
-  .
+    <<CR: (refines_strong md_tgt md_src)>>.
   Proof.
-
-    ii.
-    apply sim_ctx_mod with (ctx:=ctx) in SIM.
-
+    ii. apply sim_ctx_mod with (ctx:=ctx) in SIM.
     pose (Mod.add md_src ctx) as mds.
     pose (Mod.add md_tgt ctx) as mdt.
     fold mds. fold mdt in PR.

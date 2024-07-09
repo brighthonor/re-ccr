@@ -19,15 +19,18 @@ From ExtLib Require Import
 Require Import ProofMode STB Invariant.
 Require Import Mem1 MemOpen.
 
+Require Import SimModSemFacts IProofMode IRed ITactics.
+
+Require Import sProp sWorld World SRF.
+From stdpp Require Import coPset gmap namespaces.
+
+
 Set Implicit Arguments.
 
 Local Open Scope nat_scope.
 
 Section PROOF.
-  Context `{Σ: GRA.t}.
-
-  Context `{@GRA.inG MapRA0 Σ}.
-  Context `{@GRA.inG MapRA1 Σ}.
+  Context `{_M: MapRA.t}.
   Context `{@GRA.inG memRA Σ}.
 
   Theorem correct: refines2 [MapI.Map] [MapA.Map (fun _ => to_stb (MemStb ++ MapStb))].

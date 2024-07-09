@@ -893,8 +893,6 @@ Section SEMPAIR.
       w1
       (LE: le w0 w1)
       (MN: wf w1 (st_src, st_tgt))
-      
-      (* (NMN: forall mn' (NIN: mn <> mn'), st_local mn' = st_local mn') *)
   .
 
   Variant my_r0:
@@ -979,8 +977,11 @@ Section SEMPAIR.
       (Beh.of_program (ModSem.compile ms_tgt (Some P)))
       <1=
       (Beh.of_program (ModSem.compile ms_src (Some Q))).
-  Proof. Admitted.
-    (* eapply adequacy_global_itree; ss.
+  Proof. 
+  Admitted.
+(* 
+
+    eapply adequacy_global_itree; ss.
     (* hexploit INIT. i.  *)
     des. ginit.
     { eapply cpn7_wcompat; eauto with paco. }
@@ -1006,8 +1007,8 @@ Section SEMPAIR.
       { eapply simg_flag_down. gfinal. right. eapply sim_lift. econs; et. }
       { i. destruct vret_src, vret_tgt. des; clarify. steps. }
     }
-  Qed. *)
-
+  Qed.
+ *)
 
 
 
