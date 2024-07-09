@@ -263,7 +263,7 @@ Ltac start_ipm_proof :=
   | _ => try unfold from_iPropL
   end.
 
-Section CURRENT.
+(* Section CURRENT.
   Context `{Σ: GRA.t}.
 
   Variant current_iProp (fmr: Σ) (I: iProp): Prop :=
@@ -379,11 +379,11 @@ Section CURRENT.
     eapply URA.updatable_add; et.
   Qed.
 
-End CURRENT.
+End CURRENT. *)
 
 
 
-Section TACTICS.
+(* Section TACTICS.
   Context `{Σ: GRA.t}.
 
   Definition current_iPropL (fmr: Σ) (l: iPropL) :=
@@ -635,16 +635,16 @@ Section TACTICS.
     eapply current_iProp_entail; eauto.
   Qed.
 
-End TACTICS.
-Arguments current_iPropL: simpl never.
+End TACTICS. *)
+(* Arguments current_iPropL: simpl never. *)
 
-Section INW.
+(* Section INW.
   Context `{Σ: GRA.t}.
   Definition iNW (name: string) (P: iProp'): iProp' := P.
 End INW.
-Hint Unfold iNW.
+Hint Unfold iNW. *)
 
-Notation "☀----IPROPS----☀ fmr" := (@current_iPropL _ fmr)
+(* Notation "☀----IPROPS----☀ fmr" := (@current_iPropL _ fmr)
                                  (at level 2,
                                   format "☀----IPROPS----☀  fmr '//'",
                                   only printing).
@@ -926,13 +926,13 @@ Ltac mDes :=
   end.
 
 Ltac mDesAll :=
-  repeat mDes.
+  repeat mDes. *)
 
-Goal <<A: True>>. ss. Abort.
+(* Goal <<A: True>>. ss. Abort.
 Notation "{{ x : t }}" := (@iNW _ x t) (at level 80, x at next level, t at next level, no associativity).
-Goal <<A: True>>. ss. Abort.
+Goal <<A: True>>. ss. Abort. *)
 
-Section TEST.
+(* Section TEST.
   Context {Σ: GRA.t}.
   Context {M: URA.t}.
   Context `{@GRA.inG M Σ}.
@@ -1207,10 +1207,10 @@ Section TEST.
     i. mRename "H0" into "H".
   Abort.
 
-End TEST.
+End TEST. *)
 
 
-Module PARSE.
+(* Module PARSE.
   Section PARSE.
     Context `{Σ: GRA.t}.
 
@@ -1269,11 +1269,11 @@ Module PARSE.
     Abort.
 
   End PARSE.
-End PARSE.
+End PARSE. *)
 
 
 
-Ltac clear_fast :=
+(* Ltac clear_fast :=
   repeat multimatch goal with
          | a:unit |- _ => destruct a
          | H:True |- _ => clear H
@@ -1297,7 +1297,7 @@ Ltac iSplits :=
          | |- environments.envs_entails _ (@bi_exist _ _ _) => iExists _
          | _ => iSplit
          end
-.
+. *)
 
 
 Section IMOD.

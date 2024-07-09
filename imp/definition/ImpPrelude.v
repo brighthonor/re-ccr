@@ -48,6 +48,9 @@ Global Program Instance EMSConfigImp: EMSConfig := {|
   initial_arg := ([]: list val)↑;
 |}
 .
+Next Obligation. ss. Qed.
+Next Obligation. ss. Qed.
+Next Obligation. ss. Qed.
 
 Definition wordsize_64 := 64.
 Definition modulus_64 := two_power_nat wordsize_64.
@@ -310,3 +313,4 @@ Proof.
                | None => None
                end).
 Defined.
+

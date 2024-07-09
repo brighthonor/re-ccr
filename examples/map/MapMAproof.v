@@ -84,7 +84,8 @@ Section SIMMODSEM.
         }
       }
       { iIntros "H". iPoseProof (IHsz with "H") as "H". ss.
-        iDes. iPoseProof (unallocated_alloc with "A0") as "A0". iFrame. auto.
+        iDestruct "H" as "(B & I & U)".
+        iPoseProof (unallocated_alloc with "U") as "U". iFrame. auto.
       }
     Qed.
 

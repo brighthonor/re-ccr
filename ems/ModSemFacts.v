@@ -617,7 +617,7 @@ Proof.
     erewrite ! (bisimulation_is_eq _ _ (translate_ret _ _)).
     gstep. apply sim_itree_ret.
     unfold lift_rel. 
-    exists tt. splits; et. exists a. ss.
+    exists tt. splits; et.
   - (* Tau *)
     erewrite ! (bisimulation_is_eq _ _ (translate_tau _ _)).
     gstep. 

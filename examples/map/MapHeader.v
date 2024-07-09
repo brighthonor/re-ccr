@@ -326,6 +326,19 @@ Section PROOF.
 End PROOF.
 
 
+Notation pget := (p0 <- trigger sGet;; p0 <- p0↓ǃ;; Ret p0) (only parsing).
+Notation pput p0 := (trigger (sPut p0↑)) (only parsing).
+
+Fixpoint set_nth A (n:nat) (l:list A) (new:A) {struct l} : option (list A) :=
+  match n, l with
+  | O, x :: l' => Some (new :: l')
+  | O, other => None
+  | S m, [] => None
+  | S m, x :: t => option_map (cons x) (set_nth m t new)
+  end.
+
+
+(* 
 Ltac get_fresh_string :=
   match goal with
   | |- context["A"] =>
@@ -389,27 +402,17 @@ Definition add_ofs (ptr: val) (d: Z): val :=
   | Vptr b ofs => Vptr b (ofs + d)
   | _ => Vundef
   end
-.
+. *)
 
-Lemma scale_int_8 n: scale_int (8 * n) = Some n.
+(* Lemma scale_int_8 n: scale_int (8 * n) = Some n.
 Proof.
   unfold scale_int. des_ifs.
   - rewrite Z.mul_comm. rewrite Z.div_mul; ss.
   - contradict n0. eapply Z.divide_factor_l.
-Qed.
-Notation syscallU name vs := (z <- trigger (Syscall name vs↑ top1);; `z: Z <- z↓?;; Ret z).
-
-Notation pget := (p0 <- trigger sGet;; p0 <- p0↓ǃ;; Ret p0) (only parsing).
-Notation pput p0 := (trigger (sPut p0↑)) (only parsing).
+Qed. *)
+(* Notation syscallU name vs := (z <- trigger (Syscall name vs↑ top1);; `z: Z <- z↓?;; Ret z). *)
 
 
 (* Notation pget := (p0 <- trigger PGet;; p0 <- p0↓ǃ;; Ret p0) (only parsing).
 Notation pput p0 := (trigger (PPut p0↑)) (only parsing). *)
 
-Fixpoint set_nth A (n:nat) (l:list A) (new:A) {struct l} : option (list A) :=
-  match n, l with
-  | O, x :: l' => Some (new :: l')
-  | O, other => None
-  | S m, [] => None
-  | S m, x :: t => option_map (cons x) (set_nth m t new)
-  end.

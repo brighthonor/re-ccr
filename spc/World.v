@@ -696,14 +696,17 @@ Section WSATS.
       destruct (excluded_middle_informative _).
       { subst. 
         rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl.
-        r_solve. setoid_rewrite URA.unit_id. eauto. }
+        r_solve.
+      }
       destruct (pos_sup (pos_ext_0 eu) k) eqn: SUP0.
       { rewrite pos_ext_1_disj; eauto.
         erewrite pos_sup_trans; try eassumption; try apply pos_ext_0_sup_true.
-        r_solve. setoid_rewrite URA.unit_id. eauto. }
+        r_solve.
+      }
       destruct (pos_sup (pos_ext_1 eu) k) eqn: SUP1.
       { erewrite pos_sup_trans; try eassumption; try apply pos_ext_1_sup_true.
-        r_solve. setoid_rewrite URA.unit_id. eauto. }
+        r_solve. 
+      }
       rewrite pos_sup_cases; eauto; r_solve.
       eapply Pos.eqb_neq; eauto.
     }
@@ -718,14 +721,16 @@ Section WSATS.
       destruct (excluded_middle_informative _).
       { subst.
         rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl.
-        r_solve. setoid_rewrite URA.unit_id. eauto. }
+        r_solve. 
+      }
       destruct (pos_sup (pos_ext_0 eu) k) eqn: SUP0.
       { rewrite pos_ext_1_disj; eauto.
         erewrite pos_sup_trans; try eassumption; try apply pos_ext_0_sup_true.
-        r_solve. setoid_rewrite URA.unit_id. eauto. }
+        r_solve. 
+        }
       destruct (pos_sup (pos_ext_1 eu) k) eqn: SUP1.
       { erewrite pos_sup_trans; try eassumption; try apply pos_ext_1_sup_true.
-        r_solve. setoid_rewrite URA.unit_id. eauto. }
+        r_solve. }
       rewrite pos_sup_cases; eauto; r_solve.
       eapply Pos.eqb_neq; eauto.
     }
@@ -739,18 +744,18 @@ Section WSATS.
       exists ε. ur. ur. extensionalities k n.
       destruct (k =? eu)%positive eqn: EQ.
       { apply Pos.eqb_eq in EQ. subst.
-        rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl.
-        repeat setoid_rewrite URA.unit_id. eauto. }
+        rewrite ->pos_ext_0_sup_false, pos_ext_1_sup_false, pos_sup_refl. r_solve.
+      }
       destruct (pos_sup (pos_ext_0 eu) k) eqn: SUP0.
       { rewrite pos_ext_1_disj; eauto.
         erewrite pos_sup_trans; try eassumption; try apply pos_ext_0_sup_true.
-        r_solve. repeat setoid_rewrite URA.unit_id. eauto. }
+        r_solve. 
+      }
       destruct (pos_sup (pos_ext_1 eu) k) eqn: SUP1.
       { erewrite pos_sup_trans; try eassumption; try apply pos_ext_1_sup_true.
-        r_solve. repeat setoid_rewrite URA.unit_id. rewrite URA.add_comm.
-        setoid_rewrite URA.unit_id. eauto. }
-      rewrite pos_sup_cases; eauto.
-      repeat setoid_rewrite URA.unit_id. r_solve.
+        r_solve. 
+      }
+      rewrite pos_sup_cases; eauto. r_solve.
     }
 
     iIntros "(ERA & DRA & IRA)".
@@ -922,7 +927,7 @@ Section FANCY_UPDATE.
     iIntros "(P & F0 & S0 & E0 & D0 & R0) (A & S & E & D & R)".
     iPoseProof (FUpd_alloc with "P") as "Upd"; eauto.
     iMod ("Upd" with "[A S0 E0 D0 R0]") as "(A & (S0 & E0 & D9 & R0) & I0)".
-    - iFrame; iAssumption.
+    - iFrame. iSplitL; eauto. iAssumption.
     - iFrame; eauto.
   Qed.
 
@@ -937,7 +942,7 @@ Section FANCY_UPDATE.
     iIntros "(I & F0 & S0 & E0 & D0 & R0) (A & S & E & D & R)".
     iPoseProof (FUpd_open with "I") as "Upd"; eauto.
     iMod ("Upd" with "[A S0 E0 D0 R0]") as "(A & (S0 & E0 & D0 & R0) & P & _)".
-    - iFrame; iAssumption.
+    - iFrame. iSplitL; [iAssumption|eauto].
     - iFrame; eauto.
   Qed.
   
