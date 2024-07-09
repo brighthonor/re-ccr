@@ -131,9 +131,10 @@ Section WORLD_SATISFACTION.
 
   Variable u : univ_id.
   Variable n : level.
+  
 
   Definition inv_satall (I : gmap positive (SRFSyn.t n)) :=
-    ([∗ map] i ↦ p ∈ I, (⟦p⟧ ∗ OwnD u {[i]}) ∨ OwnE u {[i]})%I.
+    ([∗ map] i ↦ p ∈ I, ((@SRFSem.t (@SL.domain Σ) α β n p) ∗ OwnD u {[i]}) ∨ OwnE u {[i]})%I.
 
   Definition wsat : iProp := (∃ I, OwnI_auth u n I ∗ inv_satall I)%I.
 
@@ -176,7 +177,7 @@ Section WORLD_SATISFACTION.
             | None => True
             | Some G => (exists i, i ∉ G /\ φ i)
             end)
-    : OwnD_auth u ∗ wsat ⊢ |==> (∃ i, ⌜φ i⌝ ∧ OwnI u n i p) ∗ OwnD_auth u ∗ (⟦p⟧ -∗ wsat).
+    : OwnD_auth u ∗ wsat ⊢ |==> (∃ i, ⌜φ i⌝ ∧ OwnI u n i p) ∗ OwnD_auth u ∗ ((@SRFSem.t (@SL.domain Σ) α β n p) -∗ wsat).
   Proof.
     iIntros "[DA [% [AUTH SAT]]]".
     iMod (alloc_name (fun i => i ∉ dom I /\ φ i) with "DA") as "[DA [% [[%iI %iφ] D]]]".
@@ -231,7 +232,7 @@ Section WORLD_SATISFACTION.
   Qed.
 
   Lemma wsat_OwnI_open i p :
-    OwnI u n i p ∗ wsat ∗ OwnE u {[i]} ⊢ |==> ⟦p⟧ ∗ wsat ∗ OwnD u {[i]}.
+    OwnI u n i p ∗ wsat ∗ OwnE u {[i]} ⊢ |==> (@SRFSem.t (@SL.domain Σ) α β n p) ∗ wsat ∗ OwnD u {[i]}.
   Proof.
     iIntros "(I & [% [AUTH SAT]] & EN)". iModIntro.
     unfold OwnI, OwnI_auth, inv_satall.
@@ -579,7 +580,7 @@ Section WSATS.
             | None => True
             | Some G => (exists i, i ∉ G /\ φ i)
             end)
-    : OwnD_auth u ∗ wsats u b ⊢ |==> (∃ i, ⌜φ i⌝ ∧ OwnI u n i p) ∗ OwnD_auth u ∗ (⟦p⟧ -∗ wsats u b).
+    : OwnD_auth u ∗ wsats u b ⊢ |==> (∃ i, ⌜φ i⌝ ∧ OwnI u n i p) ∗ OwnD_auth u ∗ ((@SRFSem.t (@SL.domain Σ) α β n p) -∗ wsats u b).
   Proof.
     iIntros "[DA SALL]". iPoseProof (wsats_unfold with "SALL") as "SALL".
     iPoseProof (big_sepL_lookup_acc with "SALL") as "[WSAT K]".
@@ -614,7 +615,7 @@ Section WSATS.
             end)
     : free_worlds u b ∗ OwnD_auth u ∗ wsats u b ⊢ 
         |==> ((∃ i, ⌜φ i⌝ ∧ OwnI u n i p)
-              ∗ free_worlds u (S n) ∗ OwnD_auth u ∗ (⟦p⟧ -∗ wsats u (S n))).
+              ∗ free_worlds u (S n) ∗ OwnD_auth u ∗ ((@SRFSem.t (@SL.domain Σ) α β n p) -∗ wsats u (S n))).
   Proof.
     iIntros "(AUTH & D & WSAT)".
     iPoseProof ((wsats_allocs u b (S n)) with "[AUTH WSAT]") as "[AUTH WSAT]". lia. iFrame.
@@ -660,7 +661,7 @@ Section WSATS.
   Qed.
 
   Lemma wsats_OwnI_open u b n i p:
-    n < b -> OwnI u n i p ∗ wsats u b ∗ OwnE u {[i]} ⊢ |==> ⟦p⟧ ∗ wsats u b ∗ OwnD u {[i]}.
+    n < b -> OwnI u n i p ∗ wsats u b ∗ OwnE u {[i]} ⊢ |==> (@SRFSem.t (@SL.domain Σ) α β n p) ∗ wsats u b ∗ OwnD u {[i]}.
   Proof.
     iIntros (LT) "(I & SAT & EN)".
     unfold OwnI. iPoseProof (wsats_unfold with "SAT") as "SAT".

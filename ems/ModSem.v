@@ -235,8 +235,8 @@ Section LEMMAS.
   .
   Proof. 
     unfold triggerUB. rewrite translate_emb_bind. f_equal.
-    { apply translate_emb_eventE. }
-    extensionalities. ss.
+    { extensionalities. ss. }
+    apply translate_emb_eventE.
   Qed.
 
   Lemma translate_emb_triggerNB
@@ -246,8 +246,8 @@ Section LEMMAS.
   .
   Proof.
     unfold triggerNB. rewrite translate_emb_bind. f_equal. 
-    { apply translate_emb_eventE. }
-    extensionalities. ss.
+    { extensionalities. ss. }
+    apply translate_emb_eventE.
   Qed.
   
   Lemma translate_emb_unwrapU

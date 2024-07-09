@@ -748,7 +748,7 @@ Section HPSIM_ADEQUACY.
         iPoseProof (CUR with "FMR") as "FMR". iMod "FMR". 
         iModIntro. iFrame.
       }  
-      eapply own_ctx with (ctx := x) in FMR; et. rewrite URA.add_assoc in FMR.
+      eapply own_ctx with (ctx0 := x) in FMR; et. rewrite URA.add_assoc in FMR.
       replace (x ⋅ (ctx ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt)) with (ctx ⋅ x ⋅ fmr ⋅ fr_tgt ⋅ mr_tgt) in FMR; r_solve.
       eapply own_upd_in_middle; eauto.
     - unfold interp_hp_body. steps.

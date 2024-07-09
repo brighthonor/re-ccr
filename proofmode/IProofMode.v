@@ -805,7 +805,7 @@ Section SIM.
       + repeat (rr in REL; autorewrite with iprop in REL; des). subst.
         rr in REL2. uiprop in REL2. depdes REL2.
         eapply CIH; eauto. uiprop. esplits; eauto.
-        i. apply REL0 in H1. eapply URA.wf_mon with (b:=b).
+        i. apply REL0 in H1. eapply URA.wf_mon with (b0:=b).
         eapply eq_ind; eauto. r_solve.
   Qed.
 

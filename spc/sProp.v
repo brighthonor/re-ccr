@@ -26,7 +26,7 @@ Module HRA.
   Next Obligation. i. symmetry. apply HRA.subG_prf. Qed.
   
   Global Program Instance in_subG `{M: URA.t} `{emb: @GRA.inG M Γ} : @GRA.inG M Σ := {
-      inG_id := sub.(subG_map) emb.(GRA.inG_id);
+      inG_id := (@subG_map Γ Σ sub) (@GRA.inG_id M Γ emb);
       }.
   Next Obligation.
     i. destruct emb. subst. destruct sub. ss.
@@ -375,7 +375,7 @@ Module SLRed.
   Proof. unfold SL.impl. rewrite @SRFRed.cur. reflexivity. Qed.
 
   Lemma univ `{T:PF.t} `{@GPF.inG T τ} n (ty: T) p :
-    SRFSem.t n (SL.univ ty p) = (∀ x: (T.(PF.deg) ty (SRFSyn.t_prev n)), SRFSem.t n (p x))%I.
+    SRFSem.t n (SL.univ ty p) = (∀ x: ((@PF.deg T) ty (SRFSyn.t_prev n)), SRFSem.t n (p x))%I.
   Proof.
     destruct H eqn: EQ. subst.
     unfold SL.univ, eq_rect_r. ss.
