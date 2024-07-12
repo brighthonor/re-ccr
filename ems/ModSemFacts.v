@@ -34,6 +34,8 @@ Module ModSemFacts.
 Import ModSem.
 Section COMM.
 
+  (* TODO: Current definition of module linking is not commutative. (add ms1 ms2).(init_st) ≠ (add ms2 ms1).(init_st) *)
+
   Inductive comm_emb : IFun Es Es -> IFun Es Es -> Prop := 
     |comm_emb_1 : comm_emb emb_l emb_r
     |comm_emb_2 : comm_emb emb_r emb_l
@@ -51,7 +53,6 @@ Section COMM.
         fl fr itl itr stl str (w: unit)
         (COMM: comm_ems itl itr)
         (STATE: comm_st (stl, str))
-
   :
       sim_itree (fun _ => comm_st) top2 fl fr false false w (stl, itl) (str, itr).
   Proof.   
@@ -132,12 +133,12 @@ Section COMM.
   <<COMM: Beh.of_program (compile (add ms0 ms1) (Some P0)) <1= Beh.of_program (compile (add ms1 ms0) (Some P1))>>
   .
   Proof.
-    destruct (classic (P1)); cycle 1.
+    (* destruct (classic (P1)); cycle 1.
     { ii. eapply initial_itr_not_wf;et. }
     replace P0 with P1.
     2: { eapply prop_ext. split; auto. }
     unfold compile. red. eapply adequacy_local_aux; et.
-    - admit. 
+    (* - admit.  *)
     - i. s.
       unfold add_fnsems. rewrite ! alist_find_app_o.
       destruct (alist_find fn (fnsems ms1)) eqn:MS1; destruct (alist_find fn (fnsems ms0)) eqn: MS0.
@@ -182,7 +183,8 @@ Section COMM.
         * unfold sim_fsem, "==>". i. eapply add_comm_aux; et.
           rewrite H0. econs. econs.
       + left. unfold trans_l, trans_r.
-        rewrite ! alist_find_map. rewrite MS1, MS0. et.
+        rewrite ! alist_find_map. rewrite MS1, MS0. et. *)
+
     (* - exists tt. econs; et; clarify.
       unfold comm_st. ss. exists (init_st ms1), (init_st ms0). et. *)
 
@@ -417,7 +419,7 @@ Proof.
 
   (* 2: { exists tt. instantiate (1:= top2). instantiate (1:=(fun _ => assoc_st)).  econs; et; clarify. 
        unfold assoc_st. ss. exists (init_st ms0), (init_st ms1), (init_st ms2). splits; et. } *)
-  { admit. }
+  (* { admit. }
   i. s.
   unfold add_fnsems, trans_l, trans_r. s. unfold add_fnsems, trans_l, trans_r. 
   rewrite ! alist_find_app_o. rewrite ! alist_find_map. 
@@ -479,7 +481,7 @@ Proof.
     rewrite H0.
     erewrite <- ! (@bisimulation_is_eq _ _ _ _ (@translate_cmpE _ _ _ _ _ _ _)).
     econs. econs.
-  - s. et.
+  - s. et. *)
   Admitted.
 (* Qed. *)
 
@@ -492,7 +494,7 @@ Theorem add_assoc_rev
             Beh.of_program (compile (add (add ms0 ms1) ms2) (Some P1))>>
 .
 Proof.
-  destruct (classic (P1)); cycle 1.
+  (* destruct (classic (P1)); cycle 1.
   { ii. eapply initial_itr_not_wf;et. }
   replace P0 with P1.
   2: { eapply prop_ext. split; auto. }
@@ -510,7 +512,7 @@ Proof.
   destruct (alist_find fn (fnsems ms1)) eqn:MS1; 
   destruct (alist_find fn (fnsems ms2)) eqn: MS2;
   ( ss; et; right; esplits; et; s; et; unfold sim_fsem, "==>"; i; eapply add_assoc_rev_aux; et; rewrite H0;
-    erewrite <- ! (@bisimulation_is_eq _ _ _ _ (@translate_cmpE _ _ _ _ _ _ _)); econs; econs).
+    erewrite <- ! (@bisimulation_is_eq _ _ _ _ (@translate_cmpE _ _ _ _ _ _ _)); econs; econs). *)
   Admitted.
 (* Qed. *)
 

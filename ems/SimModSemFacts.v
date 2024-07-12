@@ -84,6 +84,8 @@ Section ADEQUACY.
       i. destruct a, b. inv H. ss.
     }
 
+    des.
+
     eapply adequacy_local_aux in PR; et.
     - i. esplits.
       pose (ms_src := Mod.get_modsem md_src (Sk.sort (Mod.sk md_src))).
@@ -129,7 +131,7 @@ Section ADEQUACY.
     (* - inv sim_initial. econs. econs.
       2: { fold sk_src sk_tgt. rewrite SKEQ. apply H. }
       instantiate (1:= x). refl. *)
-
+    - exists w_init. unfold sk_src, sk_tgt in *. rewrite sim_sk. eapply sim_initial.
     Qed.
 
 

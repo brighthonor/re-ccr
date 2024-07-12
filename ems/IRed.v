@@ -338,6 +338,18 @@ Section RESUM.
     repeat rewrite interp_trigger. grind.
   Qed.
 
+  Lemma resum_itr_event'
+        (R: Type)
+        (i: E R)
+    :
+      (resum_itr (E:=E) (F:=F) (ITree.trigger i))
+      =
+      (trigger i >>= (fun r => tau;; Ret r)).
+  Proof.
+    unfold resum_itr in *.
+    repeat rewrite interp_trigger. grind.
+  Qed.  
+
   Lemma resum_itr_triggerUB
         (R: Type)
     :
