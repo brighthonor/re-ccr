@@ -9,7 +9,7 @@ Require Import Lia.
 Require Import Program.
 From stdpp Require coPset gmap.
 Require Import Coqlib.
-(* From Fairness Require Import Axioms. *)
+(* Require Import Axioms. *)
 Require Import cmra excl updates.
 
 Require Import Coq.Logic.IndefiniteDescription.

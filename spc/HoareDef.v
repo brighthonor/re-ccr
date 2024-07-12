@@ -450,7 +450,7 @@ Section TRANSL.
     interp_hp_fun (interp_sb_hp stb sb).
 
   Definition prog_unit: callE ~> itree Es :=
-    fun _ '(Call fn args) => Ret tt↑.
+    fun _ '(Call _ _) => Ret tt↑.
 
   Definition cond_to_st (P: iProp): itree eventE Σ :=
     let itr := '(r, _) <- handle_Assume P ε;; Ret r in
