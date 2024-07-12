@@ -448,7 +448,14 @@ Section TRANSL.
 
   Definition fun_to_tgt stb (sb: fspecbody): (Any.t -> itree Es Any.t) :=
     interp_hp_fun (interp_sb_hp stb sb).
-    
+
+  Definition prog_unit: callE ~> itree Es :=
+    fun _ '(Call fn args) => Ret tt↑.
+
+  Definition cond_to_st (P: iProp): itree eventE Σ :=
+    let itr := '(r, _) <- handle_Assume P ε;; Ret r in
+    '(_, r) <- interp_Es prog_unit itr tt↑;; Ret r.
+ 
 End TRANSL.
 
 
@@ -465,22 +472,33 @@ Section HMODSEM.
   }
   .
 
-  Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: t -> itree eventE Any.t) (ms: t): ModSem.t := {|
+  Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (ms: t): ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
-    ModSem.init_st := mst ms;
+    ModSem.init_st := r <- cond_to_st ms.(initial_cond);; st <- ms.(initial_st);;  Ret (Any.pair st r↑)
+    (* ModSem.init_st := ms.(initial_st); *)
   |}
   .
 
-  Definition to_mod (ms: t): ModSem.t := transl (interp_hp_fun) initial_st ms.
+  (* Definition transl' (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: t -> itree eventE Any.t)  (ms: t): ModSem.t := {|
+    ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
+    ModSem.init_st := mst ms; (* + initial_cond? *)
+  |}
+  . *)
+
+  Definition to_mod (ms: t): ModSem.t := transl (interp_hp_fun) ms.
 
 
-  (* move lifting Mod -> HMod into somewhere else *)
-  Definition lift (ms: ModSem.t): t := {|
+  (* 
+    move lifting Mod -> HMod into somewhere else 
+    Might not be used in anywhere.
+  *)
+
+  (* Definition lift (ms: ModSem.t): t := {|
     fnsems := List.map (fun '(fn, bd) => (fn, lift_Es_fun bd)) (ModSem.fnsems ms);
     initial_st := ModSem.init_st ms;
-    initial_cond := ⌜True⌝%I
+    initial_cond := emp
   |}
-  .
+  . *)
 
   (**** Linking (need refactor)****)
 
@@ -526,21 +544,21 @@ Section HMOD.
   }
   .
 
-  Definition transl (tr: Sk.t -> (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: HModSem.t -> itree eventE Any.t) (md: t): Mod.t := {|
-    Mod.get_modsem := fun sk => HModSem.transl (tr sk) mst (md.(get_modsem) sk);
+  Definition transl (tr: Sk.t -> (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (md: t): Mod.t := {|
+    Mod.get_modsem := fun sk => HModSem.transl (tr sk) (md.(get_modsem) sk);
     Mod.sk := md.(sk);
   |}
   . 
 
 
   (********** What will be initial_st of Mod? (How to compile initial_cond) *********)
-  Definition to_mod (md: t): Mod.t := transl (fun _ => interp_hp_fun) HModSem.initial_st md.
+  Definition to_mod (md: t): Mod.t := transl (fun _ => interp_hp_fun) md.
 
-  Definition lift (md: Mod.t): t := {|
+  (* Definition lift (md: Mod.t): t := {|
     get_modsem := fun sk => HModSem.lift (md.(Mod.get_modsem) sk);
     sk := md.(Mod.sk);
   |}
-  .
+  . *)
 
   (***** LINKING ****)
 
@@ -1674,16 +1692,6 @@ Section AUX.
 .
 
 End AUX.
-
-
-
-
-(* TODO: Modify the Definition of  Spec Module *)
-(* TODO: Modify the Definition of  Spec Module *)
-(* TODO: Modify the Definition of  Spec Module *)
-(* TODO: Modify the Definition of  Spec Module *)
-(* TODO: Modify the Definition of  Spec Module *)
-(* TODO: Modify the Definition of  Spec Module *)
 
 
 (* Module SModSem.
