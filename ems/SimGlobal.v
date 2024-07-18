@@ -686,6 +686,7 @@ Proof.
 Qed.
 
 
+Context `{Sk.ld}.
 Variable md_src md_tgt: Mod.t.
 Let ms_src: ModSem.t := md_src.(Mod.enclose).
 Let ms_tgt: ModSem.t := md_tgt.(Mod.enclose).

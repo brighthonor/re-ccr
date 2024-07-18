@@ -1,4 +1,4 @@
-Require Import CoqlibCCR.
+Require Import Coqlib.
 Require Export ZArith.
 Require Import AList.
 Require Import String.
