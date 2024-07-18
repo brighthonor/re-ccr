@@ -1,9 +1,8 @@
 From stdpp Require Import coPset gmap namespaces.
-From sflib Require Import sflib.
 From iris Require Import bi.big_op.
 From iris Require base_logic.lib.invariants.
 
-Require Import Coqlib PCM IProp IPM.
+Require Import sflib Coqlib PCM IProp IPM.
 
 Require Import Coq.Logic.ClassicalEpsilon.
 Require Import Coq.Logic.IndefiniteDescription.
