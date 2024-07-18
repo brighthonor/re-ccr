@@ -519,6 +519,7 @@ End HModSem.
 Module HMod.
 Section HMOD.
   Context `{Σ: GRA.t}.
+  Context `{Sk.ld}.
 
   Record t: Type := mk {
     get_modsem: Sk.t -> HModSem.t;
@@ -603,6 +604,7 @@ Module SMod.
 Section SMOD.
 
   Context `{Σ: GRA.t}.
+  Context `{Sk.ld}.
   Variable stb: Sk.t -> gname -> option fspec.
   (* Variable o: ord. *)
 
@@ -639,7 +641,7 @@ Section SMOD.
     fun sk => map (map_snd fsb_fspec) (flat_map (SModSem.fnsems ∘ (flip get_modsem sk)) mds).
 
   Definition get_sk (mds: list t): Sk.t :=
-    Sk.sort (fold_right Sk.add Sk.unit (List.map sk mds)).
+    Sk.canon (fold_right Sk.add Sk.unit (List.map sk mds)).
 
   (* Definition get_initial_mrs (mds: list t): Sk.t -> Σ :=
     fun sk => fold_left (⋅) (List.map (SModSem.initial_mr ∘ (flip get_modsem sk)) mds) ε. *)

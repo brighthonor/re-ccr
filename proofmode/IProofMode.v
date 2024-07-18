@@ -1450,6 +1450,7 @@ Section WSIMMOD.
   Local Notation level := nat.
 
   Context `{Σ: GRA.t}.
+  Context `{Sk.ld}.
   Context `{sProp : level -> Type}.
   Context `{@IInvSet Σ sProp}.
   Context `{@GRA.inG OwnEsRA Σ}.
@@ -1465,7 +1466,7 @@ Section WSIMMOD.
 
   Inductive sim: Prop := mk {
     sim_modsem:
-        forall sk (SKINCL: Sk.incl md_tgt.(HMod.sk) sk) (SKWF: Sk.wf sk),
+        forall sk (SKINCL: Sk.le md_tgt.(HMod.sk) sk) (SKWF: Sk.wf sk),
         <<SIM: HModSemPair.sim (md_src.(HMod.get_modsem) sk) (md_tgt.(HMod.get_modsem) sk) Ist>>;
     sim_sk: <<SIM: md_src.(HMod.sk) = md_tgt.(HMod.sk)>>;
    }.

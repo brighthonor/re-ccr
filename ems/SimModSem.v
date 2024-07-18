@@ -783,6 +783,22 @@ Qed.
 End ModSemPair.
 
 
+Module ModLPair.
+Section SIMMOD.
+  Context `{Sk.ld}.
+  Variable (mds_src mds_tgt: list Mod.t).
+
+  Inductive sim sk: Prop := mk {
+     sim_modsem:
+       forall (SKINCL: Forall (flip Sk.le sk) (List.map Mod.sk mds_tgt))
+              (SKWF: Sk.wf sk),
+         <<SIM: Forall2 ModSemPair.sim (List.map (flip Mod.get_modsem sk) mds_src) (List.map (flip Mod.get_modsem sk) mds_tgt)>>;
+     sim_sk: <<SIM: Forall2 eq (List.map Mod.sk mds_src) (List.map Mod.sk mds_tgt)>>;
+   }.
+
+End SIMMOD.
+
+End ModLPair.
 
 
 
@@ -791,11 +807,12 @@ End ModSemPair.
 
 Module ModPair.
 Section SIMMOD.
-   Variable (md_src md_tgt: Mod.t).
-   Inductive sim: Prop := mk {
+  Context `{Sk.ld}.
+  Variable (md_src md_tgt: Mod.t).
+  Inductive sim: Prop := mk {
      sim_modsem:
        forall sk
-              (SKINCL: Sk.incl md_tgt.(Mod.sk) sk)
+              (SKINCL: Sk.le md_tgt.(Mod.sk) sk)
               (SKWF: Sk.wf sk),
          <<SIM: ModSemPair.sim (md_src.(Mod.get_modsem) sk) (md_tgt.(Mod.get_modsem) sk)>>;
      sim_sk: <<SIM: md_src.(Mod.sk) = md_tgt.(Mod.sk)>>;
@@ -810,6 +827,7 @@ End ModPair.
 Section SIMMOD.
 
   Context {CONF: EMSConfig}.
+  Context `{Sk.ld}.
 
   Lemma Mod_add_fnsems md0 md1 sk
     :
@@ -821,7 +839,7 @@ Section SIMMOD.
 
   Lemma Mod_add_sk md0 md1
     :
-      Mod.sk (Mod.add md0 md1) = Mod.sk md0 ++ Mod.sk md1.
+      Mod.sk (Mod.add md0 md1) = Sk.add (Mod.sk md0) (Mod.sk md1).
   Proof.
     ss.
   Qed.

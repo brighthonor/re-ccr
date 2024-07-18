@@ -885,12 +885,13 @@ End HModSemPair.
 Module HModPair.
 Section HPSIMMOD.
   Context `{Σ: GRA.t}.
+  Context `{Sk.ld}.
 
    Variable (md_src md_tgt: HMod.t).
    Inductive sim: Prop := mk {
      sim_modsem:
        forall sk
-              (SKINCL: Sk.incl md_tgt.(HMod.sk) sk)
+              (SKINCL: Sk.le md_tgt.(HMod.sk) sk)
               (SKWF: Sk.wf sk),
          <<SIM: HModSemPair.sim (md_src.(HMod.get_modsem) sk) (md_tgt.(HMod.get_modsem) sk)>>;
      sim_sk: <<SIM: md_src.(HMod.sk) = md_tgt.(HMod.sk)>>;
