@@ -1642,25 +1642,25 @@ Section AUX.
   Lemma translate_emb_assume
     run_ P
   :
-    translate (HModSem.emb_ run_) (assume P) = assume P
+    translate (HModSem.emb_ run_) (trigger (Assume P)) = trigger (Assume P)
   .
   Proof.
-    unfold assume. rewrite translate_emb_bind.
-    rewrite translate_emb_eventE. f_equal.
-    extensionalities.
-    rewrite translate_emb_ret. et.
+    unfold trigger.
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). ss.
+    do 2 f_equal.
+    extensionalities. rewrite translate_emb_ret. et.
   Qed.
 
   Lemma translate_emb_guarantee
     run_ P
   :
-    translate (HModSem.emb_ run_) (guarantee P) = guarantee P
+    translate (HModSem.emb_ run_) (trigger (Guarantee P)) = trigger (Guarantee P)
   .
   Proof.
-    unfold guarantee. rewrite translate_emb_bind.
-    rewrite translate_emb_eventE. f_equal.
-    extensionalities.
-    rewrite translate_emb_ret. et.
+    unfold trigger.
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). ss.
+    do 2 f_equal.
+    extensionalities. rewrite translate_emb_ret. et.
   Qed.
 
   Lemma translate_emb_ext

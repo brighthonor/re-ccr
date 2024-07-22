@@ -265,7 +265,7 @@ Section PROOF.
   |}
   .
 
-  (* Definition Mem: Mod.t := (SMod.to_tgt (fun _ => to_stb [])) SMem. *)
+  Definition HMem: HMod.t := (SMod.to_hmod (fun _ => to_stb [])) SMem.
 
 End PROOF.
 Global Hint Unfold MemStb: stb.

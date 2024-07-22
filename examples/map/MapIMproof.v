@@ -355,42 +355,6 @@ Section SIMMODSEM.
     iClear "IH". iDestruct "M" as "[I M]". subst. iFrame. eauto.
   Qed. 
 
-  (* Fixpoint mem_inv_f blk ofs f sz :=
-    match sz with
-    | 0 => True%I
-    | S sz' => (init_points blk ofs f sz' ∗ mem_inv_f blk ofs f sz')%I 
-    end.
-
-  Lemma mem_inv_unfold blk ofs f sz:
-    mem_inv blk ofs f sz -∗ mem_inv_f blk ofs f sz.
-  Proof. 
-    induction sz; ss.
-    iIntros "H". unfold mem_inv. s.
-    iDestruct "H" as "[H0 H1]". iFrame.
-    iApply IHsz. eauto.  
-  Qed. *)
-
-  (* Lemma mem_inv_split' blk ofs f sz k (SZ: 0 <= k < sz):
-    mem_inv blk ofs f sz -∗ (init_points blk ofs f k ∗ ([∗ list] n ∈ (mem_index sz), if Z.eq_dec n k then True else init_points blk ofs f n)).
-  Proof.
-    induction sz; [lia|].
-    destruct (classic (k = sz)).
-    {
-      subst. iIntros "H". unfold mem_inv. s.
-      iDestruct "H" as "[H0 H1]". iFrame.
-      destruct (Z.eq_dec sz sz); ss. iSplit; eauto.
-      clear IHsz SZ e. generalize sz at 1 5. i.
-      iStopProof. induction sz0; ss.
-      iIntros "[H0 H1]". iSplitL "H0".
-      { des_ifs. }
-      iApply IHsz0. eauto.
-    }
-    iIntros "H". unfold mem_inv. s.
-    iDestruct "H" as "[H0 H1]".
-    destruct (Z.eq_dec sz k); [lia|].
-    iFrame. iApply IHsz; eauto. lia.
-  Qed. *)
-
   Lemma mem_inv_set blk ofs f sz k (SZ: 0 <= k < sz):
     mem_inv blk ofs f sz -∗ (∀x, init_points blk ofs f k ∗ (OwnM ((blk, (ofs + k)%Z) |-> [Vint x]) -∗ mem_inv blk ofs (fun n => if Z.eq_dec n k then x else (f n)) sz)).
   Proof.
@@ -438,11 +402,32 @@ Section SIMMODSEM.
   Let Ist: Any.t -> Any.t -> iProp := 
     (fun st_src st_tgt =>
              ((∃ blk ofs (f: Z -> Z) (sz: Z), 
-                ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
-                ∗ mem_inv blk ofs f (Z.to_nat sz) ∗ pending0 ∗ mapstate_full (init_map_st, Vnullptr)) 
-             ∨ (⌜st_src = init_map_st↑ /\ st_tgt = Vnullptr↑⌝ ∗ mapstate_full (init_map_st, Vnullptr))
-             ∨ (∃ st_src0 st_tgt0, callable ∗ mapstate (st_src0, st_tgt0) ∗ ⌜st_src = st_src0↑ /\ st_tgt = st_tgt0↑⌝))%I).
+                ⌜st_src = Any.pair (f, sz)↑ tt↑ /\  st_tgt = Any.pair (Vptr blk ofs)↑ tt↑⌝ 
+                ∗ mem_inv blk ofs f (Z.to_nat sz) ∗ pending0) 
+             ∨ (⌜st_src = Any.pair init_map_st↑ tt↑ /\ st_tgt = Any.pair Vnullptr↑ tt↑⌝))%I).
+             (* ∨ (∃ st_src0 st_tgt0, callable ∗ mapstate (st_src0, st_tgt0) ∗ ⌜st_src = st_src0↑ /\ st_tgt = st_tgt0↑⌝). *)
 
+  Let Mem := HMem (fun _ => false).
+
+  Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) Ist.
+  Proof.
+    sim_init.
+    - iIntros "[H0 H1]". iFrame. steps. iRight. eauto.
+    - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
+      steps. rewrite translate_emb_assume. steps. (* TODO: Why not automated *)
+      iDestruct "ASM" as "(W & (%Y & %M & P0 & C) & %X)". subst.
+      iDestruct "IST" as "[IST|%]".
+      {
+        iDestruct "IST" as (? ? ? ?) "(_ & _ & P)".
+        iExFalso. iApply (pending0_unique with "P P0").
+      }
+      des. subst.
+      steps. rewrite Any.upcast_downcast. steps.
+      
+      inline_r.
+  Admitted.
+    
+(* 
   Theorem sim: HModPair.sim (MapM.HMap GlobalStbM) (MapI.Map) Ist.
   Proof.
     sim_init.
@@ -773,6 +758,6 @@ Section SIMMODSEM.
       force. instantiate (1:= y3↑).
       force. iSplitL "W C". { iFrame. eauto. }
       rewrite G. steps. eauto.
-  Qed.
+  Qed. *)
 
 End SIMMODSEM.
