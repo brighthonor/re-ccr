@@ -45,7 +45,7 @@ Section M.
     fun varg =>
       `sz: Z <- (pargs [Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, _) := data in
-      _ <- pput (f, sz);;;
+      _ <- pput (f, sz);;
       Ret Vundef
   .
 
@@ -53,7 +53,7 @@ Section M.
     fun varg =>
       k <- (pargs [Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, sz) := data in
-      _ <- assume(0 <= k < sz)%Z;;;
+      _ <- assume(0 <= k < sz)%Z;;
       Ret (Vint (f k))
   .
 
@@ -62,7 +62,7 @@ Section M.
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, sz) := data in
       assume(0 <= k < sz)%Z;;;
-      _ <- pput (fun n => if Z.eq_dec n k then v else f n, sz);;;
+      _ <- pput (fun n => if Z.eq_dec n k then v else f n, sz);;
       Ret Vundef
   .
 
