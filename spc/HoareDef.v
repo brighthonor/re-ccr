@@ -474,7 +474,7 @@ Section HMODSEM.
 
   Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (ms: t): ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
-    ModSem.init_st := r <- cond_to_st ms.(initial_cond);; st <- ms.(initial_st);;  Ret (Any.pair st r↑)
+    ModSem.init_st := r <- cond_to_st ms.(initial_cond);; st <- ms.(initial_st);; Ret (Any.pair st r↑)
     (* ModSem.init_st := ms.(initial_st); *)
   |}
   .

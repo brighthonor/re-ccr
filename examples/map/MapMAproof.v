@@ -32,10 +32,6 @@ Local Open Scope nat_scope.
 
 Section SIMMODSEM.
   Context `{_M: MapRA.t}.
-  (* Context `{_W: CtxWD.t}.
-  Context `{@GRA.inG MapRA Γ}.
-  Context `{@GRA.inG MapRA0 Γ}.
-  Context `{@GRA.inG CallableRA Γ}. *)
   Context `{@GRA.inG memRA Γ}. 
 
   Section LEMMA. 
@@ -236,28 +232,34 @@ Section SIMMODSEM.
 (* TODO: Try spawn & consume a dummy world *)
   Let Ist: Any.t -> Any.t -> iProp :=
         (fun st_src st_tgt =>
-             ((∃ f sz, pending ∗ ⌜st_src = f↑ /\ st_tgt = (f, sz)↑⌝ ∗ black_map f ∗ unallocated sz) ∨ 
-             (pending0 ∗ callable ∗ ⌜st_src = (fun (_: Z) => 0%Z)↑ /\ st_tgt = (fun (_: Z) => 0%Z, 0%Z)↑⌝ ∗ initial_map))%I).
+             ((pending0 ∗ ⌜st_src = (fun (_: Z) => 0%Z)↑ /\ st_tgt = (fun (_: Z) => 0%Z, 0%Z)↑⌝ ∗ initial_map) ∨
+              (∃ (st_src0: (Z -> Z)) (st_tgt0: ((Z -> Z) * Z)), pending ∗ initial_map ∗ mapstate (existT _ st_src0, existT _ st_tgt0)) ∨
+              (∃ f sz, pending ∗ callable ∗ ⌜st_src = f↑ /\ st_tgt = (f, sz)↑⌝ ∗ black_map f ∗ unallocated sz)
+             )%I)
+             .
 
+             (∃ (st_src0: ((Z -> Z) * Z)) (st_tgt0: val) , callable ∗ mapstate (existT _ st_src0, existT _ st_tgt0) ∗ ⌜st_src = st_src0↑ /\ st_tgt = st_tgt0↑⌝))%I).
+
+             
   Theorem sim: HModPair.sim (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist.
   Proof.
     sim_init.
-    - iIntros "(IST & P & C & INIT0)"; s. iSplitL "INIT0"; eauto.  
+    - iIntros "(IST & P & INIT0)"; s. iSplitL "INIT0"; eauto.  
       steps. iRight. iFrame. eauto. 
     - unfold cfunU, initF, MapM.initF, interp_sb_hp, HoareFun. s.
       take. instantiate (1:= x). destruct x. 
       take. instantiate (1:= x0).
       asm. iDestruct "ASM" as "(W & (%Y & %M & P) & %X)". subst.
-      iDestruct "IST" as "[IST|(P0 & C & % & INIT)]".
+      iDestruct "IST" as "[IST|(P0 & % & INIT)]".
       (* Precondition *)
       { 
         iDestruct "IST" as (? ?) "(P' & _)".
         iExFalso. iApply (pending_unique with "P P'"). 
       } 
+      iSplitL "P0 W".
+      { iFrame. eauto. } 
       iPoseProof (initial_map_initialize with "INIT") as "(BLACK & INIT & UNALLOC)". instantiate (1:= x).
       iCombine "P BLACK UNALLOC" as "IST".
-      iSplitL "P0 W C".
-      { iFrame. esplits; eauto. }  
       steps. 
       des. subst. rewrite Any.upcast_downcast in G. inv G.
       apc.
@@ -274,18 +276,18 @@ Section SIMMODSEM.
       steps. eauto. 
 
     - unfold cfunU, getF, MapM.getF, interp_sb_hp, HoareFun. s.
-      steps. iDestruct "ASM" as "(WORLD & (% & MAP & C) & %)". subst.
+      steps. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
       rewrite Any.upcast_downcast in G. inv G. inv G0.
       iDestruct "IST" as "[IST|IST]"; cycle 1.
       {
-        iExFalso. iDestruct "IST" as "(_ & _ & _ & INIT)".
+        iExFalso. iDestruct "IST" as "(_ & _ & INIT)".
         iApply (initial_map_no_points_to with "INIT MAP").
       }
       iDestruct "IST" as (? ?) "(P & % & BLACK & UNALLOC)". 
       des. subst. steps. 
       force. instantiate (1:= mk_meta y1 y2 y4).
       force. instantiate (1:= [Vint y4]↑).
-      force. iSplitL "WORLD C". { iFrame. eauto. }
+      force. iSplitL "WORLD". { iFrame. eauto. }
       iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
       steps. force. steps. 
       iPoseProof (black_map_get with "BLACK MAP") as "%".      

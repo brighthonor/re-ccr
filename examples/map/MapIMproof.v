@@ -439,15 +439,18 @@ Section SIMMODSEM.
     (fun st_src st_tgt =>
              ((∃ blk ofs (f: Z -> Z) (sz: Z), 
                 ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
-                ∗ mem_inv blk ofs f (Z.to_nat sz) ∗ pending0 ∗ mapstate_full (init_map_st, Vnullptr)) 
-             ∨ (⌜st_src = init_map_st↑ /\ st_tgt = Vnullptr↑⌝ ∗ mapstate_full (init_map_st, Vnullptr))
-             ∨ (∃ st_src0 st_tgt0, callable ∗ mapstate (st_src0, st_tgt0) ∗ ⌜st_src = st_src0↑ /\ st_tgt = st_tgt0↑⌝))%I).
+                ∗ mem_inv blk ofs f (Z.to_nat sz) ∗ pending0 ∗ mapstate_full (existT _ init_map_st, existT _ Vnullptr)) 
+
+             ∨ (⌜st_src = init_map_st↑ /\ st_tgt = Vnullptr↑⌝ ∗ mapstate_full (existT _ init_map_st, existT _ Vnullptr))
+
+             ∨ (∃ (st_src0: ((Z -> Z) * Z)) (st_tgt0: val) , callable ∗ mapstate (existT _ st_src0, existT _ st_tgt0) ∗ ⌜st_src = st_src0↑ /\ st_tgt = st_tgt0↑⌝))%I).
 
   Theorem sim: HModPair.sim (MapM.HMap GlobalStbM) (MapI.Map) Ist.
   Proof.
     sim_init.
     - iIntros "H". iSplitR; eauto. 
-      steps. iRight. iLeft. iFrame. esplits; eauto.
+      steps. iRight. iLeft. iFrame.
+      esplits; eauto.
     - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
       steps. iDestruct "ASM" as "(W & (%Y & %M & P0 & C) & %X)". subst.
       iDestruct "IST" as "[IST|[IST|IST]]"; swap 2 3.

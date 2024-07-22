@@ -155,19 +155,20 @@ Section PROOF.
         - instantiate (1:= mk_meta _ _ _)
         - 'call' tactic
       *)
-      admit.
+      steps. iDestruct "ASM" as "(W & % & %)". subst. rewrite STB_sim.
+      steps. unfold HoareCall.
+      steps. 
+      force. instantiate (1:= mk_meta _ _ _).
+      force. force. iSplitL "W".
+      { iFrame. iSplit; eauto. }
+      steps. call. { eauto. }
+      steps. iDestruct "ASM" as "(W & % & %)". subst.
+      rewrite Any.upcast_downcast in G1. inv G1.
+      force. force. iSplitL "W".
+      { iFrame. eauto. }
+      steps. iFrame. eauto.
+      Unshelve. eauto.
   Qed. 
 
 
-  steps. iDestruct "ASM" as "(W & % & %)". subst. rewrite STB_sim.
-  steps. unfold HoareCall.
-  steps. 
-  force. instantiate (1:= mk_meta _ _ _).
-  force. force. iSplitL "W".
-  { iFrame. iSplit; eauto. }
-  steps. call. { eauto. }
-  steps. iDestruct "ASM" as "(W & % & %)". subst.
-  rewrite Any.upcast_downcast in G1. inv G1.
-  force. force. iSplitL "W".
-  { iFrame. eauto. }
-  steps. iFrame. eauto.
+

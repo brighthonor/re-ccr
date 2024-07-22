@@ -95,12 +95,13 @@ Section RESOURCE.
 
   Definition callable : iProp := OwnM callable_r.
 
-  Definition MapStateRA : URA.t := Auth.t (Excl.t (((Z->Z) * Z) * val)).
+  Definition MapStateRA : URA.t := Auth.t (Excl.t (sigT id * sigT id))%type.
+  (* Definition MapStateRA : URA.t := Auth.t (Excl.t (((Z->Z) * Z) * val)). *)
   Context `{@GRA.inG MapStateRA Γ}.
-  Definition mapstate_r st : MapStateRA := Auth.white ((Excl.just st) : @URA.car (Excl.t (((Z->Z) * Z) * val))%ra).
+  Definition mapstate_r st : MapStateRA := Auth.white ((Excl.just st) : @URA.car (Excl.t _)%ra).
   Definition mapstate st : iProp := OwnM (mapstate_r st).
 
-  Definition mapstate_auth_r st : MapStateRA := Auth.black ((Excl.just st) : @URA.car (Excl.t (((Z->Z) * Z) * val))%ra).
+  Definition mapstate_auth_r st : MapStateRA := Auth.black ((Excl.just st) : @URA.car (Excl.t _)%ra).
   Definition mapstate_auth st : iProp := OwnM (mapstate_auth_r st).
 
   Definition mapstate_full st : iProp := mapstate_auth st ∗ mapstate st.
@@ -111,7 +112,7 @@ Section RESOURCE.
     iCombine "H0 H1" as "H".  
     iPoseProof (OwnM_Upd with "H") as "H".
     { 
-      instantiate (1:= (Auth.black ((Excl.just st0): @URA.car (Excl.t (((Z->Z) * Z) * val))) ⋅ Auth.white ((Excl.just st0): @URA.car (Excl.t (((Z->Z) * Z) * val))))).
+      instantiate (1:= (Auth.black ((Excl.just st0): @URA.car (Excl.t _)) ⋅ Auth.white ((Excl.just st0): @URA.car (Excl.t _)))).
       ii. ur in H3. des_ifs. des. rewrite URA.unit_idl in H3.
       unfold URA.extends in H3. des. ur in H3. ur.
       rewrite URA.unit_idl. split.
@@ -135,7 +136,7 @@ Section RESOURCE.
     iCombine "H0 H1" as "H".
     iPoseProof (OwnM_Upd with "H") as "H".
     { 
-      instantiate (1:= (Auth.black ((Excl.just st): @URA.car (Excl.t (((Z->Z) * Z) * val))) ⋅ Auth.white ((Excl.just st): @URA.car (Excl.t (((Z->Z) * Z) * val))))).
+      instantiate (1:= (Auth.black ((Excl.just st): @URA.car (Excl.t _)) ⋅ Auth.white ((Excl.just st): @URA.car (Excl.t _)))).
       ii. ur in H3. des_ifs. des. rewrite URA.unit_idl in H3.
       unfold URA.extends in H3. des. ur in H3. ur.
       rewrite URA.unit_idl. split.
@@ -209,8 +210,6 @@ Section SPECS.
                       (fun varg => ( ⌜varg = ([Vint sz]: list val)↑⌝
                                      ∗ ⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝
                                      ∗ pending)%I),
-                                     (* exists N, inv u n N S_pending *)
-                                     (* inv u n PENDING S_pending *)
                       (fun vret => (⌜vret = Vundef↑⌝ ∗ initial_points_tos sz)%I)))).
 
   Definition init_specM: fspec :=
@@ -227,8 +226,8 @@ Section SPECS.
       (fun _ _ => mk_simple (fun '(k, v) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k])↑⌝
-                                     ∗ map_points_to k v ∗ callable)%I),
-                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v ∗ callable)%I)))).
+                                     ∗ map_points_to k v)%I),
+                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v)%I)))).
 
   Definition get_specM: fspec := 
     mk_fspec_inv 0
@@ -242,8 +241,8 @@ Section SPECS.
       (fun _ _ => mk_simple (fun '(k, w, v) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝
-                                     ∗ map_points_to k w ∗ callable)%I),
-                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v ∗ callable)%I)))).
+                                     ∗ map_points_to k w)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v)%I)))).
 
   Definition set_specM: fspec :=
     mk_fspec_inv 0
@@ -257,8 +256,8 @@ Section SPECS.
       (fun _ _ => mk_simple (fun '(k, w) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k])↑⌝
-                                     ∗ map_points_to k w ∗ callable)%I),
-                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v ∗ callable)%I)))).
+                                     ∗ map_points_to k w)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v)%I)))).
 
   Definition set_by_user_specM: fspec := 
     mk_fspec_inv 0
@@ -267,9 +266,8 @@ Section SPECS.
                     (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ callable)%I),
                     (fun vret => callable)))).  
   
-  Definition Map0_initial_cond : iProp := mapstate_full ((fun (_: Z) => 0%Z, 0%Z), Vnullptr).
-  (* Definition Map0_initial_cond : iProp := emp. *)
-  Definition Map_initial_cond : iProp := initial_map ∗ pending0 ∗ callable ∗ Map0_initial_cond.
+  Definition Map0_initial_cond : iProp := callable ∗ mapstate_full (existT _ (fun (_: Z) => 0%Z, 0%Z), existT _ Vnullptr).
+  Definition Map_initial_cond : iProp := initial_map ∗ pending0 ∗ Map0_initial_cond.
 
   Definition MapStb: alist gname fspec :=
     Seal.sealing "stb" [("init", init_spec); ("get", get_spec); ("set", set_spec); ("set_by_user", set_by_user_spec)].

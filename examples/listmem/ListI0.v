@@ -209,7 +209,7 @@ Section L.
   .
     Definition ListSem : ModSem.t := {|
       ModSem.fnsems := [("scan", cfunU ScanAll); ("new_list", cfunU new_list); ("insert_node", cfunU insert_node); ("find_and_remove_node", cfunU find_and_remove_node)];
-      ModSem.init_st := Vundef↑;
+      ModSem.init_st := Ret Vundef↑;
     |}
   .
     
