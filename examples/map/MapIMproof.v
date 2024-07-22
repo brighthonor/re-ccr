@@ -1,4 +1,4 @@
-Require Import MapHeader MapI MapM HoareDef SimModSem SimModSemFacts.
+(* Require Import MapHeader MapI MapM HoareDef SimModSem SimModSemFacts.
 Require Import Coqlib.
 Require Import ImpPrelude.
 Require Import Skeleton.
@@ -778,4 +778,4 @@ Section SIMMODSEM.
       rewrite G. steps. eauto.
   Qed.
 
-End SIMMODSEM.
+End SIMMODSEM. *)

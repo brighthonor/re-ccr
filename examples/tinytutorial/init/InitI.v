@@ -44,12 +44,12 @@ Section INIT.
 
   Definition InitSem (sk: Sk.t): HModSem.t := {|
     HModSem.fnsems := [("init", cfunU initF); ("incr", cfunU incrF); ("final", cfunU finalF)];
-    HModSem.initial_st := Ret Vundef↑;
+    HModSem.initial_st := Ret tt↑;
     HModSem.initial_cond := emp%I;
   |}
   .
 
-  Definition InitI: HMod.t := {|
+  Definition Init: HMod.t := {|
     HMod.get_modsem := InitSem;
     HMod.sk := [("init", Gfun↑); ("incr", Gfun↑); ("final", Gfun↑)];
   |}

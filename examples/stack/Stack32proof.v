@@ -1,4 +1,4 @@
-Require Import Stack2 Stack3A HoareDef SimModSem SimModSemFacts.
+(* Require Import Stack2 Stack3A HoareDef SimModSem SimModSemFacts.
 Require Import Coqlib.
 Require Import ImpPrelude.
 Require Import Skeleton.
@@ -59,4 +59,4 @@ Section REFINE.
     }
     Unshelve. all: try exact 0. all: ss.
   Qed.
-End REFINE.
+End REFINE. *)

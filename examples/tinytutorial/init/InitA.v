@@ -20,20 +20,20 @@ Section SPC.
   Definition initF: list val -> itree hEs val :=
     fun args =>
       _ <- (pargs [] args)?;;
-      _ <- trigger (sPut 0↑);;
+      _ <- trigger (sPut (1:Z)↑);;
     Ret Vundef.
 
   Definition incrF: list val -> itree hEs val :=
     fun args =>
       _ <- (pargs [] args)?;;
       st <- trigger sGet;; st <- st↓?;;
-      _ <- trigger (sPut (st + 1)↑);;
+      _ <- trigger (sPut (st + 1)%Z↑);;
     Ret Vundef.
 
   Definition finalF: list val -> itree hEs val :=
     fun args =>
       _ <- (pargs [] args)?;;
-      _ <- trigger (sPut 0↑);;
+      _ <- trigger (sPut 0↑)%Z;;
     Ret Vundef.
 
 
@@ -68,25 +68,25 @@ Section SPC.
 
   Definition InitSbtb: list (string * fspecbody) :=
     [
-      ("initF", mk_specbody init_spec (cfunU initF));
-      ("incrF", mk_specbody incr_spec (cfunU incrF));
-      ("finalF", mk_specbody final_spec (cfunU finalF))
+      ("init", mk_specbody init_spec (cfunU initF));
+      ("incr", mk_specbody incr_spec (cfunU incrF));
+      ("final", mk_specbody final_spec (cfunU finalF))
     ].
 
   Definition InitSem: SModSem.t :=
     {|
       SModSem.fnsems := InitSbtb;
-      SModSem.initial_cond := emp;
+      SModSem.initial_cond := callable;
       SModSem.initial_st := Ret tt↑;
     |}.
 
-  Definition Init: SMod.t :=
+  Definition SInit: SMod.t :=
     {|
       SMod.get_modsem := fun _ => InitSem;
       SMod.sk := [("init", Gfun↑); ("incr", Gfun↑); ("final", Gfun↑)];
     |}.
 
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Definition InitA: HMod.t := (SMod.to_hmod GlobalStb Init).
+  Definition Init: HMod.t := (SMod.to_hmod GlobalStb SInit).
 
 End SPC.

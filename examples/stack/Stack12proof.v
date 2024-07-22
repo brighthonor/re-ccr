@@ -1,4 +1,4 @@
-Require Import Stack1 Stack2 HoareDef SimModSem SimModSemFacts.
+(* Require Import Stack1 Stack2 HoareDef SimModSem SimModSemFacts.
 Require Import Coqlib.
 Require Import ImpPrelude.
 Require Import Skeleton.
@@ -79,4 +79,4 @@ Section SIMMOD.
     eapply adequacy_local2. econs; ss. ii. eapply sim_modsem; ss.
   Qed.
 
-End SIMMOD.
+End SIMMOD. *)

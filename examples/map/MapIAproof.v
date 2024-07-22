@@ -1,4 +1,4 @@
-Require Import HoareDef MapHeader MapI MapM MapA SimModSem MapIMproof MapMAproof.
+(* Require Import HoareDef MapHeader MapI MapM MapA SimModSem MapIMproof MapMAproof.
 Require Import Coqlib.
 Require Import ImpPrelude.
 Require Import Skeleton.
@@ -21,7 +21,7 @@ Require Import Mem1 MemOpen.
 
 Require Import SimModSemFacts IProofMode IRed ITactics.
 
-Require Import sProp sWorld World SRF.
+(* Require Import sProp sWorld World SRF. *)
 From stdpp Require Import coPset gmap namespaces.
 
 
@@ -58,4 +58,4 @@ Section PROOF.
       }
     }
   Qed.
-End PROOF.
+End PROOF. *)

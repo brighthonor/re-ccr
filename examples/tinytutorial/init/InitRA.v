@@ -33,7 +33,7 @@ Section RA.
   Qed.
   
   Lemma callable_unique:
-    pending -∗ pending -∗ False%I.
+    callable -∗ callable -∗ False%I.
   Proof.
     iIntros "C0 C1". iCombine "C0 C1" as "C".
     iOwnWf "C" as C. exfalso. ur in C. ss. 

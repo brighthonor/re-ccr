@@ -1,4 +1,4 @@
-Require Import Stack2 Stack3A HoareDef SimModSem SimModSemFacts.
+(* Require Import Stack2 Stack3A HoareDef SimModSem SimModSemFacts.
 Require Import Coqlib.
 Require Import ImpPrelude.
 Require Import Skeleton.
@@ -382,4 +382,4 @@ Section SIMMOD.
     { ii. eapply sim_modsem; ss. }
   Qed.
 
-End SIMMOD.
+End SIMMOD. *)

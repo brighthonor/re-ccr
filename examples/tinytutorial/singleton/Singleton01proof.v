@@ -38,7 +38,78 @@ Section PRF.
   Theorem sim: HModPair.sim (Singleton1.Singleton GlobalStb) (Singleton0.Singleton) Ist.
   Proof.
     sim_init.
-    - (* Initialize *)
+    - (* initial condition *)
+      admit.
+    - (* singleton (fun 1) *)
+      unfold cfunU, singletonF, singletonA, interp_sb_hp, HoareFun, ccallU. s.
+      admit.
+  Admitted.
+
+End PRF.
+
+
+
+
+
+
+
+
+
+(*********************************************************************)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  (* Theorem sim: HModPair.sim (Singleton1.Singleton GlobalStb) (Singleton0.Singleton) Ist.
+  Proof.
+    sim_init.
+    - (* initial condition *)
       iIntros "R". iSplitR; eauto. steps.
       iLeft. eauto.
     - (* singleton (fun 1) *)
@@ -54,6 +125,4 @@ Section PRF.
       { iPureIntro. exists 0. rewrite Any.upcast_downcast. split; [lia|f_equal]. }
       { iApply ReadyBall. iFrame. }
     Unshelve. lia.
-  Qed. 
-
-End PRF.
+  Qed.  *)

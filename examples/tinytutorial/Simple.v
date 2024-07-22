@@ -142,19 +142,13 @@ Section PROOF.
     - (* invaraint *)
       iIntros. iSplit; eauto. steps. eauto.
     - (* fun 1 *)
-      unfold simple0_prog, simple1_prog, interp_sb_hp, cfunU, cfunN, HoareFun.
+      unfold simple0_prog, simple1_prog, interp_sb_hp, cfunU, cfunN, HoareFun. s.
       steps. iDestruct "ASM" as "(W & % & %)". subst.
       steps. force. force. iSplitL "W".
       { iFrame. eauto.  }
       steps. iFrame. eauto.
     - (* fun 2 *)
-      unfold simple0_call, simple1_call, interp_sb_hp, cfunU, cfunN, ccallU, HoareFun.
-      (* Hint
-        - rewrite Any.upcast_downcast
-        - unfold HoareCall
-        - instantiate (1:= mk_meta _ _ _)
-        - 'call' tactic
-      *)
+      unfold simple0_call, simple1_call, interp_sb_hp, cfunU, cfunN, ccallU, HoareFun. s.
       steps. iDestruct "ASM" as "(W & % & %)". subst. rewrite STB_sim.
       steps. unfold HoareCall.
       steps. 
