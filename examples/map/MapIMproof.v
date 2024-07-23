@@ -409,26 +409,6 @@ Section SIMMODSEM.
 
   Let Mem := HMem (fun _ => false).
 
-  Require Import ITacticsAux.
-
-  Ltac transl  := match goal with
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (trigger (Assume _))) >>= _) (_, _)) ] =>
-    rewrite translate_emb_assume
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (translate _ (trigger (Assume _))) >>= _)) ] =>
-    rewrite translate_emb_assume
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (trigger (Guarantee _))) >>= _) (_, _)) ] =>
-    rewrite translate_emb_guarantee
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (translate _ (trigger (Guarantee _))) >>= _)) ] =>
-    rewrite translate_emb_guarantee
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (interp_hEs_hAGEs _ _ _)) >>= _) (_, _)) ] =>
-    _ired
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, (translate _ (interp_hEs_hAGEs _ _ _)) >>= _)) ] =>
-    _ired
-  | _ => prep
-  end. 
-
-  Ltac st := repeat (try transl; steps).
-
   Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) Ist.
   Proof. 
   Admitted.

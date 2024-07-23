@@ -21,16 +21,20 @@ Require Import IProofMode ITacticsAux.
 From stdpp Require Import coPset gmap.
 
 (************ User Tactics **************)
+Ltac sim_init := econs; eauto; ii; econs; cycle 1; [s|sim_split].
 Ltac prep := cbn; ired_both.
-Ltac steps := try repeat _steps.
-Ltac force := prep; try force_l; try force_r.
-Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"].
+Ltac steps := repeat _steps.
+Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"]. 
+(* Ltac call H := prep; _call; iSplitL H; [ |iIntros "% % %"; iIntrosFresh H]. *) (* Try to overload 'call "string"' *)
+Ltac force_l := try (prep; _force_l).
+Ltac force_r := try (prep; _force_r).
 Ltac inline_l := prep; _inline_l; [eauto|].
 Ltac inline_r := prep; _inline_r; [eauto|].
-Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs]. (* Move to Aux *)
-Ltac sim_init := econs; eauto; ii; econs; cycle 1; [s|sim_split].
 
 (***** Temp *****)
+Ltac st := repeat _st.
+Ltac ired := repeat _ired.
+Ltac force := force_l; force_r.
 Ltac choose_l := iApply isim_choose_src.
 Ltac choose_r := iApply isim_choose_tgt; iIntros "%".
 Ltac take_l := iApply isim_take_src; iIntros "%".
@@ -45,6 +49,11 @@ Ltac asm := prep; asm_l; asm_r.
 Ltac grt := prep; grt_r; grt_l.
 
 
+(**** TODO ****)
+(* destruct? simplify? the linked module states *)
+Ltac des_link := unfold ModSem.run_l, ModSem.run_r; rewrite ! Any.pair_split; fold ModSem.run_l; fold ModSem.run_r. 
+(* A tactic to handle meta variables *)
+(* Tactics to handle APC. (APC in src / in tgt / ord_pure 0 / ord_pure n / ....  ) *)
 
 (************ User Notations **************)
 

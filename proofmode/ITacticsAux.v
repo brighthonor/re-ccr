@@ -35,8 +35,7 @@ Ltac ired_r := try Red.prw ltac:(IRed._red_gen) 1 1 1 0.
 Ltac ired_both := ired_l; ired_r.
 Ltac prep := cbn; ired_both.
 
-Ltac force_l :=
-  prep;
+Ltac _force_l :=
   match goal with
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _)) ] =>
     unfold guarantee; prep; iApply isim_choose_src
@@ -65,8 +64,7 @@ Ltac force_l :=
   end
 .
 
-Ltac force_r :=
-prep;
+Ltac _force_r :=
 match goal with
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _)) ] =>
     unfold assume; prep; iApply isim_take_tgt
@@ -219,7 +217,7 @@ Ltac _inline_l :=
 
 Ltac _inline_r := 
   match goal with
-  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (Call ?x0 ?y0) >>= _)) ] =>
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger  (Call ?x0 ?y0) >>= _)) ] =>
     iApply isim_inline_tgt
   | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, trigger (Call ?x0 ?y0) >>= _)) ] =>
     iApply wsim_inline_tgt
@@ -240,9 +238,9 @@ Ltac step :=
 (* Tactic Notation "steps!" := repeat (prep; try _step; try call; des_pairs). *)
 
 (* Try to add on red database*)
-Tactic Notation "_ired" := repeat (
+Ltac _ired := (
   unfold fun_spec_hp, body_spec_hp;
-  try rewrite interp_hAGEs_bind;
+  try rewrite ! interp_hAGEs_bind;
   try rewrite interp_hAGEs_tau;
   try rewrite interp_hAGEs_ret;
   try rewrite interp_hAGEs_call;
@@ -271,6 +269,33 @@ Ltac _steps :=
     _ired; step
   | _ => step
   end.
+
+Ltac _st :=
+  match goal with
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (trigger (Assume _))) >>= _) (_, _)) ] =>
+    rewrite translate_emb_assume; step
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (translate _ (trigger (Assume _))) >>= _)) ] =>
+    rewrite translate_emb_assume; step
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (trigger (Guarantee _))) >>= _) (_, _)) ] =>
+    rewrite translate_emb_guarantee; step
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (translate _ (trigger (Guarantee _))) >>= _)) ] =>
+    rewrite translate_emb_guarantee; step
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (interp_hEs_hAGEs _ _ _)) >>= _) (_, _)) ] =>
+    _ired; step
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, (translate _ (interp_hEs_hAGEs _ _ _)) >>= _)) ] =>
+    _ired; step
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (interp_hEs_hAGEs _ _ _) >>= _) (_, _)) ] =>
+    _ired; step 
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (interp_hEs_hAGEs _ _ _) >>= _)) ] =>
+    _ired; step
+  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, (interp_hEs_hAGEs _ _ _) >>= _) (_, _)) ] =>
+    _ired; step
+  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, (interp_hEs_hAGEs _ _ _) >>= _)) ] =>
+    _ired; step
+  | _ => step
+  end.
+
+  Ltac sim_split := econs; [econs;eauto;grind;iIntrosFresh "IST"|try sim_split; try econs]. (* Move to Aux *)
 
 
 (* iApply (@...) doesn't work in this way *)
