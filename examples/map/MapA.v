@@ -39,7 +39,6 @@ Section A.
 
   Definition initF: list val -> itree hEs val :=
     fun varg =>
-      ;;;
       Ret Vundef
   .
 
@@ -47,14 +46,14 @@ Section A.
     fun varg =>
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       f <- pget;;
-      _ <- pput (fun n => if Z.eq_dec n k then v else f n);;;
+      _ <- pput (fun n => if Z.eq_dec n k then v else f n);;
       Ret Vundef
   .
 
   Definition getF: list val -> itree hEs val :=
     fun varg =>
       k <- (pargs [Tint] varg)?;;
-      f <- pget;;;
+      f <- pget;;
       Ret (Vint (f k))
   .
 

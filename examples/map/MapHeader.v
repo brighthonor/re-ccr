@@ -89,7 +89,7 @@ Section RESOURCE.
   Definition pending0: iProp :=
     OwnM pending0_r.
 
-  Definition CallableRA : URA.t := Excl.t unit.
+  (* Definition CallableRA : URA.t := Excl.t unit.
   Context `{@GRA.inG CallableRA Γ}.
   Definition callable_r :(@URA.car CallableRA) := Some tt.
 
@@ -156,7 +156,7 @@ Section RESOURCE.
     iPureIntro.
     eapply (Excl.extends H3) in H4. 
     des. clarify. 
-  Qed.
+  Qed. *)
   
   (* Definition initialized0_r ofs: MapRA0 := (ε, Excl.just ofs).
 
@@ -169,7 +169,7 @@ Section RESOURCE.
     | S sz' => initial0 sz' ∗ initialized0 sz'
     end. *)
 
-  Global Opaque map_points_to pending pending0 initial_map black_map unallocated callable mapstate mapstate_auth.
+  Global Opaque map_points_to pending pending0 initial_map black_map unallocated.
 
 End RESOURCE.
 
@@ -179,8 +179,8 @@ Module MapRA.
     `{_W: CtxWD.t}
     `{@GRA.inG pendingRA Γ}
     `{@GRA.inG pending0RA Γ}
-    `{@GRA.inG CallableRA Γ}
-    `{@GRA.inG MapStateRA Γ}
+    (* `{@GRA.inG CallableRA Γ} *)
+    (* `{@GRA.inG MapStateRA Γ} *)
     := MapRA: unit.
 
 End MapRA.
@@ -190,8 +190,8 @@ Module MapRA0.
   Class t
     `{_W: CtxWD.t}
     `{@GRA.inG pending0RA Γ}
-    `{@GRA.inG CallableRA Γ}
-    `{@GRA.inG MapStateRA Γ}
+    (* `{@GRA.inG CallableRA Γ} *)
+    (* `{@GRA.inG MapStateRA Γ} *)
     := MapRA0: unit.
 
 End MapRA0.
@@ -219,57 +219,57 @@ Section SPECS.
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint sz]: list val)↑⌝
                                      ∗ ⌜(8 * (Z.of_nat sz) < modulus_64%Z)%Z⌝
-                                     ∗ pending0 ∗ callable)%I),
-                      (fun vret => callable)))).
+                                     ∗ pending0)%I),
+                      (fun vret => True%I)))).
 
   Definition get_spec: fspec :=
     mk_fspec_inv 0
       (fun _ _ => mk_simple (fun '(k, v) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k])↑⌝
-                                     ∗ map_points_to k v ∗ callable)%I),
-                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v ∗ callable)%I)))).
+                                     ∗ map_points_to k v)%I),
+                      (fun vret => (⌜vret = (Vint v)↑⌝ ∗ map_points_to k v)%I)))).
 
   Definition get_specM: fspec := 
     mk_fspec_inv 0
     (fun _ _ => mk_simple (fun k =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ callable)%I),
-                    (fun vret => callable)))).  
+                    (fun varg => (⌜varg = ([Vint k])↑⌝)%I),
+                    (fun vret => True%I)))).  
 
   Definition set_spec: fspec :=
     mk_fspec_inv 0
       (fun _ _ => mk_simple (fun '(k, w, v) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝
-                                     ∗ map_points_to k w ∗ callable)%I),
-                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v ∗ callable)%I)))).
+                                     ∗ map_points_to k w)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ map_points_to k v)%I)))).
 
   Definition set_specM: fspec :=
     mk_fspec_inv 0
     (fun _ _ => mk_simple (fun '(k, v) =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝ ∗ callable)%I),
-                    (fun vret => callable)))).  
+                    (fun varg => (⌜varg = ([Vint k; Vint v])↑⌝ )%I),
+                    (fun vret => True%I)))).  
 
   Definition set_by_user_spec: fspec :=
     mk_fspec_inv 0
       (fun _ _ => mk_simple (fun '(k, w) =>
                     (ord_top,
                       (fun varg => (⌜varg = ([Vint k])↑⌝
-                                     ∗ map_points_to k w ∗ callable)%I),
-                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v ∗ callable)%I)))).
+                                     ∗ map_points_to k w)%I),
+                      (fun vret => (⌜vret = Vundef↑⌝ ∗ ∃ v, map_points_to k v)%I)))).
 
   Definition set_by_user_specM: fspec := 
     mk_fspec_inv 0
     (fun _ _ => mk_simple (fun k =>
                   (ord_top,
-                    (fun varg => (⌜varg = ([Vint k])↑⌝ ∗ callable)%I),
-                    (fun vret => callable)))).  
+                    (fun varg => (⌜varg = ([Vint k])↑⌝)%I),
+                    (fun vret => True%I)))).  
   
-  Definition Map0_initial_cond : iProp := mapstate_full ((fun (_: Z) => 0%Z, 0%Z), Vnullptr).
-  (* Definition Map0_initial_cond : iProp := emp. *)
-  Definition Map_initial_cond : iProp := initial_map ∗ pending0 ∗ callable ∗ Map0_initial_cond.
+  (* Definition Map0_initial_cond : iProp := mapstate_full ((fun (_: Z) => 0%Z, 0%Z), Vnullptr). *)
+  Definition Map0_initial_cond : iProp := emp.
+  Definition Map_initial_cond : iProp := initial_map ∗ pending0 ∗ Map0_initial_cond.
 
   Definition MapStb: alist gname fspec :=
     Seal.sealing "stb" [("init", init_spec); ("get", get_spec); ("set", set_spec); ("set_by_user", set_by_user_spec)].

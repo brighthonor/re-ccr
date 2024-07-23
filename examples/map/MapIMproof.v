@@ -49,22 +49,22 @@ Section SIMMODSEM.
 
   Section LEMMA. 
 
-    Lemma callable_unique:
+    (* Lemma callable_unique:
       callable -∗ callable -∗ False%I.
     Proof.
       Local Transparent callable.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
       iOwnWf "H". exfalso. clear -H3.
       rr in H3. ur in H3. unseal "ra". des. ur in H3. ss.
-    Qed.    
+    Qed.     *)
 
     Lemma pending0_unique:
       pending0 -∗ pending0 -∗ False%I.
     Proof.
       Local Transparent pending0.
       iIntros "H0 H1". iCombine "H0 H1" as "H".
-      iOwnWf "H". exfalso. clear - H3.
-      rr in H3. ur in H3. unseal "ra". des. ur in H3. ss.
+      iOwnWf "H". exfalso. clear - H1.
+      rr in H1. ur in H1. unseal "ra". des. ur in H1. ss.
     Qed.
 
     Lemma points_to_get_split blk ofs l k v
@@ -102,7 +102,7 @@ Section SIMMODSEM.
       { destruct k; ss; eauto.
         hexploit IHl; eauto.
         { instantiate (1:=k). lia. }
-        i. des. rewrite H3. eauto.
+        i. des. rewrite H1. eauto.
       }
     Qed.
 
@@ -378,23 +378,23 @@ Section SIMMODSEM.
     { 
       i. induction sz0; [lia|].  
       s. destruct (classic (sz0 = 0)).
-      { rewrite H3. eauto. }
-      { assert (sz0 > 0) by lia. specialize (IHsz0 H4).
+      { rewrite H1. eauto. }
+      { assert (sz0 > 0) by lia. specialize (IHsz0 H2).
         replace (Z.to_nat sz0 `max` list_max (map Z.to_nat (mem_index sz0))) with (Z.to_nat sz0); lia.
       }
     }
     destruct (classic (sz = 0)).
-    { rewrite H4. ss. }
-    assert (sz > 0) by lia. hexploit (H3 sz H5).
+    { rewrite H2. ss. }
+    assert (sz > 0) by lia. hexploit (H1 sz H3).
     generalize sz at 2 3 7. i. 
 
 
     assert (sz > list_max (map Z.to_nat (mem_index sz0))) by lia. 
-    clear H4 H5 H6.
+    clear H2 H3 H4.
     iStopProof. induction sz0; eauto. s.
     iIntros "[H0 H1]". iSplitL "H0".
-    { unfold init_points. des_ifs. simpl in H7. lia. }
-    iApply IHsz0; eauto. simpl in H7. lia.
+    { unfold init_points. des_ifs. simpl in H5. lia. }
+    iApply IHsz0; eauto. simpl in H5. lia.
   Qed.
 
   Definition init_map_st := (fun (_: Z) => 0%Z, 0%Z).
@@ -430,14 +430,15 @@ Section SIMMODSEM.
   Ltac st := repeat (try transl; steps).
 
   Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) Ist.
-  Proof. Admitted.
-    (* Takes 9 minutes in Qed *)
+  Proof. 
+  Admitted.
+    (* Takes 9 minutes for Qed *)
 
     (* sim_init.
     - iIntros "[H0 H1]". iFrame. steps. iRight. eauto.
     - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
       st. (* need to optimize *)
-      iDestruct "ASM" as "(W & (%Y & %M & P0 & C) & %X)". subst.
+      iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)". subst.
       st.
       iDestruct "IST" as "[IST|%]".
       {
@@ -453,28 +454,20 @@ Section SIMMODSEM.
       unfold HoareAPC. st.
       rewrite unfold_APC.
       st. destruct y0; cycle 1.
-      { st. unfold guarantee. st. unfold triggerNB. st. inv y6. }
-      replace (ModSem.run_l (λ x0 : Any.t, (x0, x0)) (Any.pair (Any.upcast init_map_st) (Any.upcast ())))
-      with (Any.pair (Any.upcast init_map_st) (Any.upcast ()), Any.upcast init_map_st); cycle 1.
-      { unfold ModSem.run_l. rewrite Any.pair_split. ss. }
-      st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. 
-      replace (ModSem.run_l (λ _ : Any.t, (Any.upcast (λ _ : Z, 0%Z, y4), ())) (Any.pair (Any.upcast init_map_st) (Any.upcast ())))
-      with (Any.pair (Any.upcast (λ _ : Z, 0%Z, y4)) (Any.upcast ()), ()); cycle 1.
-      { unfold ModSem.run_l. rewrite Any.pair_split. ss. }
-      s. st.
-      replace (ModSem.run_l (λ _ : Any.t, (Any.upcast (Vptr b 0), ())) (Any.pair (Any.upcast Vnullptr) (Any.upcast ())))
-      with (Any.pair (Any.upcast (Vptr b 0)) (Any.upcast ()), ()); cycle 1.
-      { unfold ModSem.run_l. rewrite Any.pair_split. ss. }
-      force. st. force. iSplitL "W C". { iFrame. eauto. }
+      { unfold guarantee, triggerNB. st. inv y6. }
+      unfold ModSem.run_l. rewrite ! Any.pair_split. fold ModSem.run_l.
+      st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st.
+      unfold ModSem.run_l. rewrite ! Any.pair_split. fold ModSem.run_l.
+      st. force. st. force. iSplitL "W". { eauto. }
       rewrite Any.upcast_downcast in G. inv G. inv G0. st.
       pattern 0%Z at 36.
       match goal with
       | |- ?P 0%Z => cut (P (x-x)%Z)
       end; ss.
       { rewrite Z.sub_diag. ss. }
-      assert (OwnM ((b, 0%Z) |-> repeat Vundef x) -∗ OwnM ((b, 0%Z) |-> (repeat (Vint 0) (x - x) ++ repeat Vundef x))).
+      assert (OWN: OwnM ((b, 0%Z) |-> repeat Vundef x) -∗ OwnM ((b, 0%Z) |-> (repeat (Vint 0) (x - x) ++ repeat Vundef x))).
       { iIntros "H". rewrite Nat.sub_diag. ss. }
-      iPoseProof (H3 with "POINTS") as "O".
+      iPoseProof (OWN with "POINTS") as "O".
       iStopProof. cut (x <= x); [|lia].
       generalize x at 1 4 5 11. intros n. induction n; i; iIntros "(P0 & O)".
       { 
@@ -526,7 +519,7 @@ Section SIMMODSEM.
         remember ((b, (0 + length (repeat (Vint 0) (x - n)))%Z) |-> repeat Vundef n).
         assert (OwnM c ∗ OwnM c0 -∗ OwnM (c ⋅ c0)).
         { iIntros "[H0 H1]". iCombine "H0 H1" as "H". eauto. }
-        subst. iApply H5.
+        subst. iApply H2.
         iSplitL "H0 H1".
         {
           assert (LEN: x - S n = length (repeat (Vint 0) (x - S n))%Z).
@@ -542,7 +535,7 @@ Section SIMMODSEM.
         repeat rewrite repeat_length. rewrite <- Z.add_assoc. lia.
       }
       
-      iPoseProof (H5 with "O") as "[H0 H1]".
+      iPoseProof (H2 with "O") as "[H0 H1]".
 
       inline_r.
       replace ((0 + ((x - Z.pos (Pos.of_succ_nat n)) * 8) `div` 8))%Z with (x - S n)%Z.
@@ -568,7 +561,7 @@ Section SIMMODSEM.
       iApply ("H1" with "O").
 
     - unfold cfunU, getF, MapI.getF, interp_sb_hp, HoareFun, ccallU. s.
-      st. iDestruct "ASM" as "(W & (% & C) & %)". subst. st.
+      st. iDestruct "ASM" as "(W & % & %)". subst. st.
       iDestruct "IST" as "[IST|IST]"; cycle 1.
       { 
         iDestruct "IST" as "%". des. subst. 
@@ -590,7 +583,7 @@ Section SIMMODSEM.
       st. force. instantiate (1:= (blk, (ofs + Z.to_nat y4)%Z, Vint (f (Z.to_nat y4)))).
       st. force.
       st. force.
-      iSplitL "C W". { iFrame. eauto. }
+      iSplitL "W". { eauto. }
       st. force.
       st. force. iSplitL "IP".
       { iSplit; eauto. }
@@ -605,7 +598,7 @@ Section SIMMODSEM.
       iPoseProof ("M" with "GRT") as "M". iFrame. eauto.
 
     - unfold cfunU, setF, MapI.setF, interp_sb_hp, HoareFun, ccallU. s.
-      st. iDestruct "ASM" as "(W & (% & C) & %)". subst.
+      st. iDestruct "ASM" as "(W & % & %)". subst.
       rewrite Any.upcast_downcast in G. inv G. inv G0.
       iDestruct "IST" as "[IST|IST]"; cycle 1.
       { 
@@ -620,7 +613,7 @@ Section SIMMODSEM.
       st. 
       unfold scale_int. destruct (Zdivide_dec 8 (y5 * 8)); cycle 1.
       { exfalso. eapply n. eapply Z.divide_factor_r. }
-      st. force. st. force. iSplitL "W C".
+      st. force. st. force. iSplitL "W".
       { iFrame. eauto. }
       replace (ofs + (y5 * 8) `div` 8)%Z with (ofs + Z.to_nat y5)%Z. 
       2: { rewrite Z_div_mult; ss. lia. }
@@ -644,16 +637,16 @@ Section SIMMODSEM.
       repeat f_equal. extensionality x. des_ifs; lia.
 
     - unfold cfunU, set_by_userF, MapI.set_by_userF, interp_sb_hp, HoareFun, ccallU. s.
-      st. iDestruct "ASM" as "(W & (% & C) & %)". subst.
+      st. iDestruct "ASM" as "(W & % & %)". subst.
       rewrite Any.upcast_downcast in G. inv G. inv G0.
       st. rewrite STB_setM. st.
       unfold HoareCall.
       force. Unshelve. 2: { econs. eapply y1. eapply y2. eapply (y4, y). }
       force. instantiate (1:= [Vint y4; Vint y]↑).
-      st. force. iSplitL "W C". { iFrame. eauto. }
+      st. force. iSplitL "W". { iFrame. eauto. }
       call; [eauto|].
-      st. iDestruct "ASM" as "(W & C & %)". subst.
-      force. st. force. iSplitL "W C". { iFrame. eauto. } 
+      st. iDestruct "ASM" as "(W & _ & %)". subst.
+      force. st. force. iSplitL "W". { eauto. } 
       rewrite G0. st. iFrame. eauto.
 
    (***************** MEMORY FUNCTIONS ******************)
@@ -722,6 +715,6 @@ Section SIMMODSEM.
       st. force. st. force. st. force.
       iSplitL "GRT". { iFrame. }
       st. eauto.
-  Qed. 
-   *)
+  Qed.  *)
+  
 End SIMMODSEM.
