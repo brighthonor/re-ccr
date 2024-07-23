@@ -135,7 +135,7 @@ Section PROOF.
   Let Ist: Any.t -> Any.t -> iProp :=
     fun _ _ => emp%I.
 
-  (* Refinement Proof *)
+  (* Simulation Proof *)
   Theorem sim: HModPair.sim (Simple GlobalStb) (Simple0) Ist.
   Proof.
     sim_init.
@@ -164,5 +164,4 @@ Section PROOF.
       Unshelve. eauto.
   Qed. 
 
-
-
+  End PROOF.
