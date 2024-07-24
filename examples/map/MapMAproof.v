@@ -246,7 +246,7 @@ Section SIMMODSEM.
   (* Proved *)
     (* sim_init.
     - iIntros "(IST & P & INIT0)"; s. iSplitL "INIT0"; eauto.  
-      steps. iRight. iFrame. eauto. 
+      iRight. iFrame. eauto. 
     - unfold cfunU, initF, MapM.initF, interp_sb_hp, HoareFun. s.
       take. instantiate (1:= x). destruct x. 
       take. instantiate (1:= x0).

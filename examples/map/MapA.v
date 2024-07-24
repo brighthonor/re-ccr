@@ -74,7 +74,7 @@ Section A.
     SModSem.fnsems := MapSbtb;
     SModSem.initial_cond := Map_initial_cond;
     (* SModSem.initial_mr := GRA.embed (Excl.unit, Auth.excl ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra) ((fun _ => Excl.just 0%Z): @URA.car (Z ==> (Excl.t Z))%ra)); *)
-    SModSem.initial_st := Ret (fun (_: Z) => 0%Z)↑;
+    SModSem.initial_st := (fun (_: Z) => 0%Z)↑;
   |}
   .
 

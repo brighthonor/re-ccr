@@ -415,7 +415,7 @@ Section SIMMODSEM.
     (* Takes 9 minutes for Qed *)
 
     (* sim_init.
-    - iIntros "[H0 H1]". iFrame. steps. iRight. eauto.
+    - iIntros "[H0 H1]". iFrame. iRight. eauto.
     - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
       st. (* need to optimize *)
       iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)". subst.

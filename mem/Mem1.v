@@ -255,7 +255,7 @@ Section PROOF.
   Definition SMemSem (sk: Sk.t): SModSem.t := {|
     SModSem.fnsems := MemSbtb;
     SModSem.initial_cond := Own (GRA.embed (Auth.black (initial_mem_mr csl sk)));
-    SModSem.initial_st := Ret tt↑;
+    SModSem.initial_st := tt↑;
   |}
   .
 
