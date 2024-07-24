@@ -474,14 +474,14 @@ Section HMODSEM.
 
   Definition transl (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (ms: t): ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
-    ModSem.init_st := r <- cond_to_st ms.(initial_cond);;  Ret (Any.pair ms.(initial_st) r↑)
-    (* ModSem.init_st := ms.(initial_st); *)
+    ModSem.initial_st := r <- cond_to_st ms.(initial_cond);;  Ret (Any.pair ms.(initial_st) r↑)
+    (* ModSem.initial_st := ms.(initial_st); *)
   |}
   .
 
   (* Definition transl' (tr: (Any.t -> itree hAGEs Any.t) -> Any.t -> itree Es Any.t) (mst: t -> itree eventE Any.t)  (ms: t): ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, bd) => (fn, tr bd)) ms.(fnsems);
-    ModSem.init_st := mst ms; (* + initial_cond? *)
+    ModSem.initial_st := mst ms; (* + initial_cond? *)
   |}
   . *)
 
@@ -495,7 +495,7 @@ Section HMODSEM.
 
   (* Definition lift (ms: ModSem.t): t := {|
     fnsems := List.map (fun '(fn, bd) => (fn, lift_Es_fun bd)) (ModSem.fnsems ms);
-    initial_st := ModSem.init_st ms;
+    initial_st := ModSem.initial_st ms;
     initial_cond := emp
   |}
   . *)
@@ -596,7 +596,7 @@ Section SMODSEM.
   (* Compile directly to ModSem. Maybe deprecated? *)
   Definition compile (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> itree eventE Any.t) (ms: t) : ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, sb) => (fn, tr sb)) ms.(fnsems);
-    ModSem.init_st := mst ms;
+    ModSem.initial_st := mst ms;
   |}
  .
   Definition to_hmod (ms: t): HModSem.t := transl (interp_sb_hp stb) ms.
@@ -885,7 +885,7 @@ Qed.
         tr0 mr0 mds
         (sk: Sk.t)
     :
-      (ModSem.init_st (Mod.get_modsem (Mod.add_list (List.map (transl tr0 mr0) mds)) sk)) =
+      (ModSem.initial_st (Mod.get_modsem (Mod.add_list (List.map (transl tr0 mr0) mds)) sk)) =
       (load_initial_mrs sk mds mr0)
   .
   Proof.
@@ -897,7 +897,7 @@ Qed.
   Lemma transl_initial_mrs
         tr0 mr0 mds
     :
-      (ModSem.init_st (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds)))) =
+      (ModSem.initial_st (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds)))) =
       (load_initial_mrs (Sk.sort (List.fold_right Sk.add Sk.unit (List.map sk mds))) mds mr0)
   .
   Proof.
@@ -1708,7 +1708,7 @@ Section SMODSEM.
 
   Definition transl (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> Any.t) (ms: t): ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, sb) => (fn, tr sb)) ms.(fnsems);
-    ModSem.init_st := mst ms;
+    ModSem.initial_st := mst ms;
   |}
   .
 
@@ -1982,7 +1982,7 @@ Qed.
         tr0 mr0 mds
         (sk: Sk.t)
     :
-      (ModSem.init_st (Mod.get_modsem (Mod.add_list (List.map (transl tr0 mr0) mds)) sk)) =
+      (ModSem.initial_st (Mod.get_modsem (Mod.add_list (List.map (transl tr0 mr0) mds)) sk)) =
       (load_initial_mrs sk mds mr0)
   .
   Proof.
@@ -1994,7 +1994,7 @@ Qed.
   Lemma transl_initial_mrs
         tr0 mr0 mds
     :
-      (ModSem.init_st (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds)))) =
+      (ModSem.initial_st (Mod.enclose (Mod.add_list (List.map (transl tr0 mr0) mds)))) =
       (load_initial_mrs (Sk.sort (List.fold_right Sk.add Sk.unit (List.map sk mds))) mds mr0)
   .
   Proof.

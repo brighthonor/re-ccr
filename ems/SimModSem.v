@@ -749,44 +749,29 @@ Proof.
   }
 Qed.
 
-Lemma self_sim_itree_init:
-  forall st itr,
-    sim_itree_init (fun _ '(src, tgt) => src = tgt) top2 [] [] tt (st, itr) (st, itr).
+(* Move to SimGlobal? *)
+Lemma self_sim_global:
+  forall (itr: itree eventE Any.t), simg eq false false itr itr.
 Proof.
-  ginit. gcofix CIH. i. ides itr.
-  { gstep. eapply sim_itree_ret; ss. }
+  ginit. { i. eapply cpn7_wcompat. eapply simg_mon. }
+  gcofix CIH. i. ides itr.
+  { gstep. econs; eauto. }
+  { gstep. econs; eauto. econs; eauto. econs; eauto. gbase. eauto. }
+  destruct e; rewrite <- bind_trigger; resub.
   { 
-    guclo sim_itree_indC_spec. econs. 
-    guclo sim_itree_indC_spec. econs.
-    eapply sim_itree_progress_flag. gbase. eauto.
+    gstep. econs 6; eauto. i. econs 5; eauto. exists x. 
+    econs; eauto. gbase. eauto.
   }
-  destruct e.
-  { dependent destruction c. rewrite <- ! bind_trigger.
-    gstep.
-    eapply sim_itree_call; ss. ii. subst. econs; et.
-    eapply sim_itree_flag_down. gbase. auto.
+  {
+    gstep. econs; eauto. i. econs; eauto. exists x.
+    econs; eauto. gbase. eauto. 
   }
-  destruct s.
-  { rewrite <- ! bind_trigger. resub. dependent destruction s.
-    { guclo sim_itree_indC_spec. econs.
-      guclo sim_itree_indC_spec. econs.
-      eapply sim_itree_progress_flag. gbase. auto.
-    }
-  }
-  { rewrite <- ! bind_trigger. resub. dependent destruction e.
-    { guclo sim_itree_indC_spec. econs 9. i.
-      guclo sim_itree_indC_spec. econs. eexists.
-      eapply sim_itree_progress_flag. gbase. eauto.
-    }
-    { guclo sim_itree_indC_spec. econs 10. i.
-      guclo sim_itree_indC_spec. econs. eexists.
-      eapply sim_itree_progress_flag. gbase. eauto.
-    }
-    { guclo sim_itree_indC_spec. econs. i.
-      eapply sim_itree_progress_flag. gbase. auto.
-    }
+  {
+    gstep. econs; eauto. i. subst.
+    eapply simg_flag_down. gbase. eauto.  
   }
 Qed.
+
 
 (*** desiderata: (1) state-aware simulation relation !!!! ***)
 (*** (2) not whole function frame, just my function frame !!!! ***)
@@ -799,8 +784,10 @@ Section SIMMODSEM.
 
   Variable (ms_src ms_tgt: ModSem.t).
   
-  Definition fl_src := ms_src.(ModSem.fnsems).
-  Definition fl_tgt := ms_tgt.(ModSem.fnsems).
+  Let fl_src := ms_src.(ModSem.fnsems).
+  Let fl_tgt := ms_tgt.(ModSem.fnsems).
+  Let init_src := ms_src.(ModSem.initial_st).
+  Let init_tgt := ms_tgt.(ModSem.initial_st).
 
   Let W: Type := (Any.t) * (Any.t).
   
@@ -810,8 +797,9 @@ Section SIMMODSEM.
     le: world -> world -> Prop;
     le_PreOrder: PreOrder le;
     sim_fnsems: Forall2 (sim_fnsem wf le fl_src fl_tgt) ms_src.(ModSem.fnsems) ms_tgt.(ModSem.fnsems);
-    sim_initial: exists w_init,
-                 sim_itree_init wf le [] [] w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st));
+    sim_initial: simg eq false false init_src init_tgt;
+    (* sim_initial: exists w_init,
+                 sim_itree_init wf le [] [] w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st)); *)
                   (* init_st will be given as 'itree eventE Any.t', why not directly using sim_global?*)
   }.
 
@@ -823,20 +811,14 @@ Proof.
   econs; et.
   - instantiate (1:=fun (_ _: unit) => True). ss.
   - instantiate (1:=(fun (_: unit) '(src, tgt) => src = tgt)). (* fun p => fst p = snd p *)
-    generalize (ModSem.fnsems ms).
+    generalize (ModSem.fnsems ms) at 3 4.
     induction a; ii; ss.
     econs; et. econs; ss. ii; clarify.
     destruct w. exploit self_sim_itree; et.
-  - exists tt. exploit self_sim_itree_init; et.
+  - eapply self_sim_global.
 Qed.
 
 End ModSemPair.
-
-
-
-
-
-
 
 
 Module ModPair.
@@ -1017,142 +999,11 @@ Section SEMPAIR.
   Qed.
   (* Admitted. *)
 
-  Variant my_r1:
-    forall R0 R1 (RR: R0 -> R1 -> Prop), bool -> bool -> (itree eventE R0) -> (itree eventE R1) -> Prop :=
-  | my_r1_intro
-    w0 (init_src init_tgt: itree eventE Any.t)
-    (SIM: sim_itree_init wf le [] [] w0 (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt))
-  :
-    my_r1 (fun ret_src ret_tgt => exists w1, wf w1 (ret_src, ret_tgt)) false false init_src init_tgt.
-
-  Let sim_init_lift: my_r1 <7= simg.
-  Proof.
-    clear.
-    ginit.
-    { i. eapply cpn7_wcompat; eauto with paco. }
-    gcofix CIH. i. destruct PR.
-    unfold sim_itree_init in SIM.
-    remember (tt↑, resum_itr init_src) as is.
-    remember (tt↑, resum_itr init_tgt) as it.
-    remember w0 in SIM at 2.
-    remember false in SIM at 1.
-    remember false in SIM. 
-    revert init_src init_tgt Heqis Heqit Heqw Heqb Heqb0 CIH.
-    pattern b, b0, w, is, it.
-    match goal with
-    | |- ?P b b0 w is it => set P
-    end.
-    revert b b0 w is it SIM.
-    Local Transparent resum_itr. 
-    eapply (@sim_itree_ind world wf le [] [] Any.t Any.t (init_rel wf le w0) P); subst P; ss; i; clarify.
-    - ides init_src.
-      + ides init_tgt.
-        * steps. inv RET. des. exists x. rewrite resum_itr_ret in H0, H1. inv H0. inv H1. eauto.
-        * rewrite resum_itr_tau in H0. inv H0.
-        * rewrite <- resum_itr_ret in H0. unfold resum_itr in H0.
-          rewrite interp_ret in H0. erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0.
-          rewrite bind_trigger in H0. inv H0.
-      + rewrite resum_itr_tau in H1. inv H1.
-      + rewrite <- resum_itr_ret in H1. unfold resum_itr in H1.
-        rewrite interp_ret in H1. erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1.
-        rewrite bind_trigger in H1. inv H1.
-    - ides init_src.
-      + rewrite resum_itr_ret in H1. rewrite bind_trigger in H1. inv H1.
-      + rewrite resum_itr_tau in H1. rewrite bind_trigger in H1. inv H1.
-      + destruct e; unfold resum_itr in H1; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1;
-          rewrite ! bind_trigger in H1; inv H1.        
-    - ides init_src.
-      + rewrite resum_itr_ret in H1. rewrite bind_trigger in H1. inv H1.
-      + rewrite resum_itr_tau in H1. rewrite bind_trigger in H1. inv H1.
-      + ides init_tgt.
-        * rewrite resum_itr_ret in H0. rewrite bind_trigger in H0. inv H0. 
-        * rewrite resum_itr_tau in H0. rewrite bind_trigger in H0. inv H0.
-        * destruct e.
-         -- unfold resum_itr in H1; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1; rewrite ! bind_trigger in H1; inv H1.  
-         -- unfold resum_itr in H1; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1; rewrite ! bind_trigger in H1; inv H1.
-         -- destruct e0.
-          ++ unfold resum_itr in H0; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0; rewrite ! bind_trigger in H0; inv H0.
-          ++ unfold resum_itr in H0; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0; rewrite ! bind_trigger in H0; inv H0.
-          ++ rewrite <- ! bind_trigger.
-          rewrite <- bind_trigger in H0, H1. rewrite resum_itr_bind in H0, H1. 
-          rewrite resum_itr_event' in H0, H1. 
-          rewrite bind_bind in H0, H1. rewrite ! bind_trigger in H0, H1.
-          inv H0. inv H1. gstep. econs. i. gstep. econs; eauto.
-          gfinal. left. eapply CIH. econs. unfold sim_itree_init.
-          eapply sim_itree_bot_flag_up. 
-  Admitted.
-
-
-
-  Lemma sim_init_adequacy
-    w (init_src init_tgt: itree eventE Any.t)
-    (SIM: sim_itree_init wf le [] [] w (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt))
-  :
-    simg (fun x y => exists w1, wf w1 (x, y)) false false init_src init_tgt.
-  Proof.
-    clear -SIM.
-    ginit. { i. eapply cpn7_wcompat; eauto with paco. }
-    revert SIM. generalize init_src, init_tgt. gcofix CIH. 
-    i. clear init_src init_tgt.
-    rename init_src0 into init_src. rename init_tgt0 into init_tgt.
-    unfold sim_itree_init in SIM.
-    remember (tt↑, resum_itr init_src) as is.
-    remember (tt↑, resum_itr init_tgt) as it.
-    remember w in SIM at 2.
-    remember false in SIM at 1.
-    remember false in SIM. 
-    revert init_src init_tgt Heqis Heqit Heqw0 Heqb Heqb0 CIH.
-    pattern b, b0, w0, is, it.
-    match goal with
-    | |- ?P b b0 w0 is it => set P
-    end.
-    revert b b0 w0 is it SIM.
-    Local Transparent resum_itr. 
-    eapply (@sim_itree_ind world wf le [] [] Any.t Any.t (init_rel wf le w) P); subst P; ss; i; clarify.
-    - ides init_src.
-      + ides init_tgt.
-        * steps. inv RET. des. exists x. rewrite resum_itr_ret in H0, H1. inv H0. inv H1. eauto.
-        * rewrite resum_itr_tau in H0. inv H0.
-        * rewrite <- resum_itr_ret in H0. unfold resum_itr in H0.
-          rewrite interp_ret in H0. erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0.
-          rewrite bind_trigger in H0. inv H0.
-      + rewrite resum_itr_tau in H1. inv H1.
-      + rewrite <- resum_itr_ret in H1. unfold resum_itr in H1.
-        rewrite interp_ret in H1. erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1.
-        rewrite bind_trigger in H1. inv H1.
-    - ides init_src.
-      + rewrite resum_itr_ret in H1. rewrite bind_trigger in H1. inv H1.
-      + rewrite resum_itr_tau in H1. rewrite bind_trigger in H1. inv H1.
-      + destruct e; unfold resum_itr in H1; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1;
-          rewrite ! bind_trigger in H1; inv H1.
-    - ides init_src.
-      + rewrite resum_itr_ret in H1. rewrite bind_trigger in H1. inv H1.
-      + rewrite resum_itr_tau in H1. rewrite bind_trigger in H1. inv H1.
-      + ides init_tgt.
-        * rewrite resum_itr_ret in H0. rewrite bind_trigger in H0. inv H0. 
-        * rewrite resum_itr_tau in H0. rewrite bind_trigger in H0. inv H0.
-        * destruct e.
-         -- unfold resum_itr in H1; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1; rewrite ! bind_trigger in H1; inv H1.  
-         -- unfold resum_itr in H1; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1; rewrite ! bind_trigger in H1; inv H1.
-         -- destruct e0.
-          ++ unfold resum_itr in H0; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0; rewrite ! bind_trigger in H0; inv H0.
-          ++ unfold resum_itr in H0; erewrite (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0; rewrite ! bind_trigger in H0; inv H0.
-          ++ rewrite <- ! bind_trigger.
-
-        
-  Admitted.
-
-
-
 
   Context `{CONF: EMSConfig}.
 
-  (* Hypothesis INIT:
-    exists w, g_lift_rel w (ModSem.init_st ms_src) (ModSem.init_st ms_tgt). *)
-    (* sim_itree wf le [] [] false false w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st)); *)
-
   Hypothesis INIT:
-    exists w, sim_itree_init wf le [] [] w (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st)).
+    simg (fun x y => exists w, wf w (x, y)) false false ms_src.(ModSem.initial_st) ms_tgt.(ModSem.initial_st).
 
   Lemma adequacy_local_aux (P Q: Prop)
         (* (wf: world -> W -> Prop)  *)
@@ -1163,39 +1014,36 @@ Section SEMPAIR.
       (Beh.of_program (ModSem.compile ms_src (Some Q))).
   Proof. 
     eapply adequacy_global_itree; ss.
-    inv INIT. 
+    (* inv INIT.  *)
     des. ginit.
     { eapply cpn7_wcompat; eauto with paco. }
     unfold ModSem.initial_itr, assume. generalize "main" as fn. i.
     hexploit (fnsems_find_iff fn). i. des.
     { 
       esplits. guclo bindC_spec. econs.
-      { steps. force. exists (WF x0). steps. ss. }
+      { steps. force. exists (WF x). steps. ss. }
       i. grind. 
       unfold ITree.map, unwrapU, triggerUB.
       steps. guclo bindC_spec. econs.
-      { gfinal. right. eapply sim_init_lift. econs. eapply H. }
+      { gfinal. right. eapply INIT. }
       i. rewrite NONE. steps. ss.
     }
     {
       esplits. guclo bindC_spec. econs.
-      { steps. force. exists (WF x0). steps. ss. }
+      { steps. force. exists (WF x). steps. ss. }
       i. grind.
       unfold ITree.map. steps. guclo bindC_spec. econs.
-      { gfinal. right. eapply sim_init_lift. econs. eapply H. }
+      { gfinal. right. eapply INIT. }
       i. unfold unwrapU. rewrite SRC, TGT. grind.
       inv SIM0.
       guclo bindC_spec. econs.
       {
         hexploit (SIM (initial_arg) (initial_arg)); et; cycle 1. i.
-        gfinal. right. eapply sim_lift. econs; eauto. 
+        gfinal. right. eapply sim_lift. econs; eauto.
       }  
       { i. destruct vret_src0, vret_tgt1. des; clarify. steps. }
     }
   Qed.
-
-
-
 
 End SEMPAIR.
 
@@ -1423,140 +1271,6 @@ Proof.
       gfinal. left. eapply CIH; et.
 Qed.
 
-
-Lemma sim_ctx_init
-  {world} wf (le: relation world) ps pt w sts stt stctx (its itt: itree eventE Any.t)
-  (SIM: sim_itree wf le [] [] ps pt w (sts, resum_itr its) (stt, resum_itr itt))
-:
-  paco8 (_sim_itree (wf_lift wf) le [] []) bot8 Any.t Any.t
-  (@lift_rel world (wf_lift wf) le Any.t Any.t w eq) ps pt w
-  (Any.pair sts stctx, resum_itr its) (Any.pair stt stctx, resum_itr itt).
-Proof. 
-Admitted.
-  (* remember (resum_itr its) as itrs.
-  remember (resum_itr itt) as itrt.
-  revert_until wf. cofix CIH. i.
-  remember (sts, itrs) as stis.
-  remember (stt, itrt) as stit.
-  remember w eqn:Weq.
-  unfold sim_itree in SIM.
-  rewrite Weq in SIM at 2.
-  move SIM before le. revert_until SIM.
-  pattern ps, pt, w, stis, stit.
-  match goal with
-  | |- ?P ps pt w stis stit => set P
-  end.
-  Local Transparent resum_itr.
-  eapply (@sim_itree_ind world wf le [] [] Any.t Any.t (lift_rel wf le w0 (@eq Any.t)) P); subst P; ss; i; des; clarify; try (rewrite <- H0); try (rewrite <- H1).
-  - pstep. econs. unfold lift_rel in *. des. subst. esplits; eauto.
-    r. rewrite !Any.pair_split. esplits; eauto.
-  - rewrite bind_trigger in H0. ides itt.
-    + rewrite resum_itr_ret in H0. inv H0.
-    + rewrite resum_itr_tau in H0. inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-  - rewrite bind_trigger in H0. ides itt.
-    + rewrite resum_itr_ret in H0. inv H0.
-    + rewrite resum_itr_tau in H0. inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-      rewrite bind_trigger in H1. ides its.
-      * rewrite resum_itr_ret in H1. inv H1.
-      * rewrite resum_itr_tau in H1. inv H1.
-      * destruct e; unfold resum_itr in H1; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H1;
-        rewrite bind_trigger in H1; inv H1.
-        pstep. econs. i. econs. unfold upaco8. left. eapply CIH.
-        { eapply inj_pair2 in H5. eapply equal_f in H5. rewrite H5.
-          unfold resum_itr. rewrite <- (interp_tau _). eauto. }
-        { eapply inj_pair2 in H0. eapply equal_f in H0. rewrite H0. 
-          unfold resum_itr. rewrite <- (interp_tau _). eauto. }
-        { unfold sim_itree. eapply sim_itree_bot_flag_up. eapply K. } 
-  - ides its.
-    + rewrite resum_itr_ret in H0. inv H0.
-    + rewrite resum_itr_tau in H0. inv H0.
-      ginit. eapply sim_itreeC_spec. econs.
-      gfinal. right. eapply IH; eauto.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-  - ides itt.
-    + rewrite resum_itr_ret in H0. inv H0.
-    + rewrite resum_itr_tau in H0. inv H0.
-      ginit. eapply sim_itreeC_spec. econs.
-      gfinal. right. eapply IH; eauto.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-  - rewrite bind_trigger in H0. ides its.
-    + rewrite resum_itr_ret in H0; inv H0.
-    + rewrite resum_itr_tau in H0; inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-      ginit. eapply sim_itreeC_spec. econs. gfinal. right. eapply IH; eauto.
-      eapply inj_pair2 in H3. eapply equal_f in H3. rewrite H3.
-      unfold resum_itr. rewrite <- (interp_tau _). eauto.
-  - rewrite bind_trigger in H0. ides itt.
-    + rewrite resum_itr_ret in H0; inv H0.
-    + rewrite resum_itr_tau in H0; inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-      ginit. eapply sim_itreeC_spec. econs. i. gfinal. right. eapply K; eauto.
-      eapply inj_pair2 in H3. eapply equal_f in H3. rewrite H3.
-      unfold resum_itr. rewrite <- (interp_tau _). eauto.
-  - rewrite bind_trigger in H0. ides its.
-    + rewrite resum_itr_ret in H0; inv H0.
-    + rewrite resum_itr_tau in H0; inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-      ginit. eapply sim_itreeC_spec. econs. i. gfinal. right. eapply K; eauto.
-      eapply inj_pair2 in H3. eapply equal_f in H3. rewrite H3.
-      unfold resum_itr. rewrite <- (interp_tau _). eauto. 
-  - rewrite bind_trigger in H0. ides itt.
-    + rewrite resum_itr_ret in H0; inv H0.
-    + rewrite resum_itr_tau in H0; inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-      ginit. eapply sim_itreeC_spec. econs. gfinal. right. eapply IH; eauto.
-      eapply inj_pair2 in H3. eapply equal_f in H3. rewrite H3.
-      unfold resum_itr. rewrite <- (interp_tau _). eauto.
-  - rewrite bind_trigger in H0. ides its.
-    + rewrite resum_itr_ret in H0. inv H0.
-    + rewrite resum_itr_tau in H0. inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-  - rewrite bind_trigger in H0. ides itt.
-    + rewrite resum_itr_ret in H0. inv H0.
-    + rewrite resum_itr_tau in H0. inv H0.
-    + destruct e; unfold resum_itr in H0; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)) in H0;
-      rewrite bind_trigger in H0; inv H0.
-  - pstep. econs. left. eapply CIH; eauto.
-Qed.  *)
-
-  Lemma self_resum_itr 
-      {world} (wf: world -> Any.t * Any.t -> Prop) (le: relation world) ps pt (w: world) stl str (it: itree eventE Any.t)
-      (WF: wf w (stl, str))
-      (LE: PreOrder le)
-    :
-      sim_itree wf le [] [] ps pt w (stl, resum_itr it) (str, resum_itr it).
-  Proof.
-  Admitted.
-    (* remember (resum_itr it) as itr.
-    revert_until world. cofix CIH. i.
-    ides it.
-    - rewrite resum_itr_ret. ginit. gstep. econs.
-      r. esplits; eauto. refl.
-    - rewrite resum_itr_tau. ginit. gstep. econs. econs. econs.
-      gfinal. right. eapply CIH; eauto.
-    - Local Transparent resum_itr. 
-      destruct e; unfold resum_itr; erewrite ! (bisimulation_is_eq _ _ (interp_vis _ _ _)).
-      + ginit. gstep. econs 9. i. econs 8. econs. econs. econs.
-        gfinal. right. eapply CIH; unfold resum_itr; eauto.
-      + ginit. gstep. econs. i. econs. econs. econs. econs.
-        gfinal. right. eapply CIH; unfold resum_itr; eauto.
-      + ginit. gstep. econs. i. econs. econs. econs.
-        gfinal. right. eapply CIH; unfold resum_itr; eauto.
-(******* Can't Qed (error) *******)
-  Qed. *)
-
-
 Theorem sim_ctx
       ctx ms1 ms2
       (SIM: ModSemPair.sim ms1 ms2)
@@ -1564,26 +1278,25 @@ Theorem sim_ctx
       ModSemPair.sim (add ms1 ctx) (add ms2 ctx)
 .
 Proof.
- Admitted.
-  (* inv SIM. inv sim_initial.
+ (* Admitted. *)
+  inv SIM.
   econs; et; cycle 1.
-  { exists x. instantiate (1:= wf_lift wf0). s.
-    s. rewrite ! resum_itr_bind. ginit. guclo lbindC_spec. econs.
-    { gfinal. right. eapply sim_ctx_init in H. admit. }
-    instantiate (1:=lift_rel (wf_lift wf0) top2 x eq).
-    i. rr in SIM. des. subst.
-    rr in WF. des_ifs. eapply Any.split_pair in Heq, Heq0. des. subst.
-    gfinal. right. eapply sim_ctx_init. eapply self_resum_itr; eauto. r. rewrite Any.pair_split
-    
-    exploit self_sim_itree. eapply self_sim_itree.
-    Search resum_itr.    
-    rewrite ! Any.pair_split.
-    splits; et.
+  { 
+    s. ginit. { eapply cpn7_wcompat. eapply simg_mon. }
+    guclo bindC_spec. econs.
+    { gfinal. right. eauto. }
+    i. subst.
+    guclo bindC_spec. econs.
+    { gfinal. right. eapply self_sim_global. }
+    i. subst.
+    gstep. econs. eauto. 
   }
+   
   s. unfold add_fnsems, trans_l, trans_r.
   apply Forall2_app; eapply Forall2_apply_Forall2; et; cycle 1.
   - instantiate (1:= eq). induction (fnsems ctx); et.
   - i. clarify. econs; et. ii; clarify.
+    instantiate (1:= wf_lift wf0).
     destruct b. ss.
     destruct (Any.split mrs_src) eqn: SRC; destruct (Any.split mrs_tgt) eqn:TGT; clarify.
     2: { destruct p. clarify. }
@@ -1650,15 +1363,15 @@ Proof.
         -- (* Syscall *)
            apply sim_itree_syscall. i. econs.
            gfinal. left. eapply CIH; et; rewrite ! Any.pair_split; et.
-  - i. destruct H0. r in H0. rr in H1. 
+  - i. destruct H. r in H. rr in H0. 
     destruct a, b. econs; et. ss.
     ii; clarify. ss. 
     destruct (Any.split mrs_src) eqn: SRC; destruct (Any.split mrs_tgt) eqn:TGT; clarify.
     2: { destruct p. clarify. }
     destruct p, p0. des. clarify.
-    specialize H1 with (x:=y) (y:=y) (w:=w) (mrs_src := t0) (mrs_tgt := t2).
-    specialize (H1 eq_refl SIMMRS).
+    specialize H0 with (x:=y) (y:=y) (w:=w) (mrs_src := t0) (mrs_tgt := t2).
+    specialize (H0 eq_refl SIMMRS).
     eapply sim_ctx_aux; et.
-Qed. *)
+Qed.
 
 End SIMCTX.
