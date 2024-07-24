@@ -1434,7 +1434,8 @@ Section WSIMMODSEM.
  
   Inductive sim: Prop := mk {
     isim_fnsems: Forall2 (isim_fnsem Ist fl_src fl_tgt RR) fl_src fl_tgt;
-    isim_initial: cond_src ⊢ cond_tgt ∗ (isim (fun _ _ => ⌜True⌝%I) [] [] ibot ibot (fun '(_, v_src) '(_, v_tgt) => Ist v_src v_tgt) false false (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt))
+    isim_initial: cond_src ⊢ cond_tgt ∗ (Ist init_src init_tgt);
+    (* isim_initial: cond_src ⊢ cond_tgt ∗ (isim (fun _ _ => ⌜True⌝%I) [] [] ibot ibot (fun '(_, v_src) '(_, v_tgt) => Ist v_src v_tgt) false false (tt↑, resum_itr init_src) (tt↑, resum_itr init_tgt)) *)
     (* In initial itree, states are dummy and return values are initial states of main-itree. *)
   }.     
      

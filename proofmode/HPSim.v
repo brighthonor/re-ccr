@@ -839,7 +839,7 @@ Qed.
 
 
 
-
+(* 
 
 Module HModSemPair.
 Section HPSIMMODSEM.
@@ -897,6 +897,6 @@ Section HPSIMMOD.
    }.
 
 End HPSIMMOD.
-End HModPair.
+End HModPair. *)
 
 

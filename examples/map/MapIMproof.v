@@ -410,7 +410,7 @@ Section SIMMODSEM.
   Let Mem := HMem (fun _ => false).
 
   Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) Ist.
-  Proof. 
+  Proof.  
   Admitted.
     (* Takes 9 minutes for Qed *)
 
