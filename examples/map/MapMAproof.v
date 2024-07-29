@@ -268,7 +268,7 @@ Section SIMMODSEM.
     rewrite! HoareCall_parse. unfold HoareCallPre.
     st. iDestruct "GRT" as "[[WORLD [% %]] _]". subst.
     apply Any.upcast_inj in H3. des. depdes EQ0.
-    force. instantiate (1:= mk_meta y4 y5 (_, _, _)).
+    force. instantiate (1:= mk_meta _ _ (_, _, _)).
     force. instantiate (1:= Any.upcast [Vint _; Vint _]).
     st. force. iSplitL "WORLD MAP".
     { iFrame. eauto. }
@@ -279,7 +279,7 @@ Section SIMMODSEM.
     unfold HoareCallPost.
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
     rewrite Any.upcast_downcast in G. depdes G.
-    force. (*TODO: what is it? *) prep. asm_r.
+    force. force_r.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
     iSplitL "WORLD". { iFrame. eauto. }
