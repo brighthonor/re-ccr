@@ -28,8 +28,8 @@ Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"]
 (* Ltac call H := prep; _call; iSplitL H; [ |iIntros "% % %"; iIntrosFresh H]. *) (* Try to overload 'call "string"' *)
 Ltac force_l := try (prep; _force_l).
 Ltac force_r := try (prep; _force_r).
-Ltac inline_l := prep; _inline_l; [eauto|].
-Ltac inline_r := prep; _inline_r; [eauto|].
+Ltac inline_l := prep; _inline_l; [eauto|]; unfold interp_sb_hp, HoareFun.
+Ltac inline_r := prep; _inline_r; [eauto|]; unfold interp_sb_hp, HoareFun.
 
 (***** Temp *****)
 Ltac st := repeat _st.

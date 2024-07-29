@@ -92,9 +92,16 @@ Section PROOF.
     |}
   .
 
-  Definition Mem: Mod.t := {|
+  Definition _Mem: Mod.t := {|
     Mod.get_modsem := MemSem;
     Mod.sk := Sk.unit;
   |}
   .
+  Definition Mem := _Mem.
+
+  Lemma Mem_unfold: Mem = _Mem.
+  Proof. eauto. Qed.
+  
+  Global Opaque Mem.
+  
 End PROOF.
