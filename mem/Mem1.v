@@ -243,6 +243,7 @@ Section PROOF.
             (fun vret => (b, ofs) |-> [v_new] ∗ ⌜vret = (Vint 0)↑⌝)
     )))%I.
 
+  (* Is this the best way to define cmp? (points_to is not resource anymore)*)
   Definition cmp_spec: fspec :=
     (mk_simple
        (fun '(result, resource) => (
