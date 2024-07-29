@@ -17,7 +17,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import HTactics ProofMode IPM.
 Require Import OpenDef.
-Require Import Mem1 MemOpen STB Invariant.
+Require Import Mem1 STB Invariant.
 
 Require Import SimModSemFacts IProofMode IRed ITactics.
 
@@ -70,24 +70,23 @@ Section SIMMODSEM.
     Lemma points_to_get_split blk ofs l k v
           (GET: nth_error l k = Some v)
       :
-      OwnM((blk, ofs) |-> l) -∗ (OwnM((blk, (ofs + k)%Z) |-> [v])) ** ((OwnM((blk, (ofs + k)%Z) |-> [v]) -* OwnM((blk, ofs) |-> l))).
+      (blk, ofs) |-> l -∗ ((blk, (ofs + k)%Z) |-> [v]) ∗ ((blk, (ofs + k)%Z) |-> [v] -* (blk, ofs) |-> l).
     Proof.
       revert blk ofs k v GET. induction l; ss; i.
       { destruct k; ss. }
       destruct k; ss.
-      { clarify. iIntros "H". rewrite points_to_split.
-        iDestruct "H" as "[H0 H1]". iSplitL "H0".
+      { clarify. iIntros "H". 
+        iPoseProof (points_to_split with "H") as "[H0 H1]". iSplitL "H0".
         { rewrite Z.add_0_r. ss. }
-        iIntros "H". iSplitL "H".
+        iIntros "H". iApply points_to_split. iSplitL "H".
         { rewrite Z.add_0_r. ss. }
         { ss. }
       }
-      { iIntros "H". rewrite points_to_split.
-        iDestruct "H" as "[H0 H1]".
+      { iIntros "H". iPoseProof (points_to_split with "H") as "[H0 H1]".
         iPoseProof (IHl with "H1") as "H1"; eauto.
         iDestruct "H1" as "[H1 H2]".
         replace (ofs + Z.pos (Pos.of_succ_nat k))%Z with (ofs + 1 + k)%Z by lia.
-        iSplitL "H1"; auto. iIntros "H1". iSplitL "H0"; auto.
+        iSplitL "H1"; auto. iIntros "H1". iApply points_to_split. iSplitL "H0"; auto.
         iApply "H2". auto.
       }
     Qed.
@@ -109,15 +108,15 @@ Section SIMMODSEM.
     Lemma points_to_set_split blk ofs l k v l'
           (GET: set_nth k l v = Some l')
       :
-      OwnM((blk, ofs) |-> l) -∗ (∃ v', OwnM((blk, (ofs + k)%Z) |-> [v'])) ** ((OwnM((blk, (ofs + k)%Z) |-> [v]) -* OwnM((blk, ofs) |-> l'))).
+      (blk, ofs) |-> l -∗ (∃ v', (blk, (ofs + k)%Z) |-> [v']) ** (((blk, (ofs + k)%Z) |-> [v] -* (blk, ofs) |-> l')).
     Proof.
       revert blk ofs k v l' GET. induction l; ss; i.
       { destruct k; ss. }
       destruct k; ss.
-      { clarify. iIntros "H". rewrite points_to_split.
-        iDestruct "H" as "[H0 H1]". iSplitL "H0".
+      { clarify. iIntros "H". iPoseProof (points_to_split with "H") as "[H0 H1]".
+        iSplitL "H0".
         { rewrite Z.add_0_r. iExists _. ss. }
-        iIntros "H". iEval (rewrite points_to_split). iSplitL "H".
+        iIntros "H". iApply points_to_split. iSplitL "H".
         { rewrite Z.add_0_r. ss. }
         { ss. }
       }
@@ -206,28 +205,46 @@ Section SIMMODSEM.
 
     Lemma points_to_nil blk ofs
       :
-      ((blk, ofs) |-> []) = ε.
+      ((blk, ofs) |-> []) = OwnM ε.
     Proof.
       Local Transparent URA.unit.
-      ss. unfold points_to, Auth.white. f_equal.
-      rewrite unfold_points_to.
+      ss. unfold points_to, points_to_r, Auth.white. do 2 f_equal.
+      rewrite unfold_points_to_r.
       extensionality _blk. extensionality _ofs. unfold andb. des_ifs.
       exfalso. ss. lia.
     Qed.
+    
+    Lemma points_to_add_unit blk ofs l
+      :
+      (blk, ofs) |-> l -∗ (OwnM ε ∗ (blk, ofs) |-> l).
+    Proof.
+      iIntros "H". assert (ofs = ofs); eauto. revert H1. 
+      generalize ofs at 2 4. i. unfold points_to.
+      replace (points_to_r (blk, ofs) l) with (points_to_r (blk, ofs) l ⋅ ε); [|r_solve].
+      iDestruct "H" as "[H0 H1]". rewrite H1. iFrame.
+    Qed.  
+
+
+    (* Lemma emp_own_unit: emp -∗ OwnM ε.
+    Proof.
+      uiprop. i. *)
 
     Lemma points_to_app blk ofs l0 l1
       :
-      (blk, ofs) |-> (l0 ++ l1) = ((blk, ofs) |-> l0) ⋅ ((blk, (ofs + strings.length l0)%Z) |-> l1).
+      (blk, ofs) |-> (l0 ++ l1) ⊣⊢ ((blk, ofs) |-> l0) ∗ ((blk, (ofs + strings.length l0)%Z) |-> l1).
     Proof.
       revert ofs l1. induction l0; i; ss.
-      { rewrite points_to_nil. rewrite URA.unit_idl. ss.
-        replace (ofs + 0)%Z with ofs; ss. lia.
+      { 
+        rewrite points_to_nil. unfold points_to. iSplit.
+        - iIntros "H". replace (points_to_r (blk, ofs) l1) with (ε ⋅ (points_to_r (blk, ofs) l1)); [|r_solve].
+          iDestruct "H" as "[H0 H1]". rewrite Z.add_0_r. iFrame.  
+        - iIntros "[_ H]". rewrite Z.add_0_r. iFrame.
       }
-      { rewrite points_to_split. rewrite (points_to_split blk ofs a l0).
-        erewrite IHl0. rewrite URA.add_assoc. f_equal; ss.
-        replace (ofs + Z.pos (Pos.of_succ_nat (strings.length l0)))%Z with
-          (ofs + 1 + strings.length l0)%Z; ss. lia.
-      }
+      rewrite points_to_split. rewrite (points_to_split blk ofs a l0). erewrite IHl0. 
+      replace (ofs + Z.pos (Pos.of_succ_nat (strings.length l0)))%Z with (ofs + 1 + strings.length l0)%Z; [|lia].
+      iSplit.
+      - iIntros "(H0 & H1 & H2)". iFrame.
+      - iIntros "[[H0 H1] H2]". iFrame.
     Qed.
 
     Lemma OwnM_combine M `{@GRA.inG M Γ} a0 a1
@@ -241,9 +258,7 @@ Section SIMMODSEM.
 
   (***** Move and rename: APC & HoareCall LEMMAS *****)
 
-
-  (* Try to match bind pattern *)
-  Lemma APC_start_clo
+  (* Lemma APC_start_clo
     I fls flt r g ps pt {R} RR st_src k_src sti_tgt  
     at_most o stb 
   :
@@ -315,22 +330,16 @@ Section SIMMODSEM.
     force. iSplitL "P"; [eauto|]. 
     call; [eauto|].
     steps. iApply "K". iFrame.
-  Qed.
+  Qed. *)
+
+
 
   (****************************)
 
   Local Notation universe := positive.
   (* Local Notation level := nat. *)
 
-  (* Lemma initialized0_unique k : initialized0 k -∗ initialized0 k -∗ False.
-  Proof. 
-    iIntros "I0 I1". iCombine "I0 I1" as "I".
-    iOwnWf "I". clear -H2.
-    rr in H2. ur in H2. unseal "ra". des. ur in H0. ss.
-  Qed. *)
-
-  Definition init_points blk ofs f k :=  (OwnM ((blk, (ofs + k)%Z) |-> [Vint (f k)]))%I.
-  (* Definition init_points blk ofs f k := (initialized0 k ∨ OwnM ((blk, (ofs + k)%Z) |-> [Vint (f k)]))%I. *)
+  Definition init_points blk ofs f k :=  ((blk, (ofs + k)%Z) |-> [Vint (f k)])%I.
 
   Fixpoint mem_index (sz: nat) : list Z :=
       match sz with 0 => [] | S k => (Z.of_nat k) :: mem_index k end.
@@ -356,7 +365,7 @@ Section SIMMODSEM.
   Qed. 
 
   Lemma mem_inv_set blk ofs f sz k (SZ: 0 <= k < sz):
-    mem_inv blk ofs f sz -∗ (∀x, init_points blk ofs f k ∗ (OwnM ((blk, (ofs + k)%Z) |-> [Vint x]) -∗ mem_inv blk ofs (fun n => if Z.eq_dec n k then x else (f n)) sz)).
+    mem_inv blk ofs f sz -∗ (∀x, init_points blk ofs f k ∗ (((blk, (ofs + k)%Z) |-> [Vint x]) -∗ mem_inv blk ofs (fun n => if Z.eq_dec n k then x else (f n)) sz)).
   Proof.
     induction sz; [lia|].
     destruct (classic (k = sz)); cycle 1.
@@ -411,10 +420,10 @@ Section SIMMODSEM.
 
   Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) Ist.
   Proof.  
-  Admitted.
+  (* Admitted. *)
     (* Takes 9 minutes for Qed *)
 
-    (* sim_init.
+    sim_init.
     - iIntros "[H0 H1]". iFrame. iRight. eauto.
     - unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
       st. (* need to optimize *)
@@ -445,9 +454,9 @@ Section SIMMODSEM.
       | |- ?P 0%Z => cut (P (x-x)%Z)
       end; ss.
       { rewrite Z.sub_diag. ss. }
-      assert (OWN: OwnM ((b, 0%Z) |-> repeat Vundef x) -∗ OwnM ((b, 0%Z) |-> (repeat (Vint 0) (x - x) ++ repeat Vundef x))).
+      assert (POINTS: ((b, 0%Z) |-> repeat Vundef x) -∗ ((b, 0%Z) |-> (repeat (Vint 0) (x - x) ++ repeat Vundef x))).
       { iIntros "H". rewrite Nat.sub_diag. ss. }
-      iPoseProof (OWN with "POINTS") as "O".
+      iPoseProof (POINTS with "POINTS") as "O".
       iStopProof. cut (x <= x); [|lia].
       generalize x at 1 4 5 11. intros n. induction n; i; iIntros "(P0 & O)".
       { 
@@ -467,8 +476,9 @@ Section SIMMODSEM.
         {
           replace (x-x) with 0; [|lia].
           iIntros "H". rewrite points_to_app. rewrite repeat_length. s.
-          rewrite points_to_nil. r_solve. 
+          rewrite points_to_nil. 
           replace (0 + 0)%Z with 0%Z; [eauto|lia].
+          iApply points_to_add_unit. eauto.
         }
         replace (Z.to_nat x) with x; [|lia]. iFrame.
       }
@@ -483,29 +493,26 @@ Section SIMMODSEM.
       assert (EQ: (0 + ((x - S n)%nat * 8) `div` 8) = (x - S n)).
       { rewrite Nat.div_mul; ss. }
       assert (
-        OwnM ((b, 0%Z) |-> (repeat (Vint 0) (x - S n) ++ Vundef :: repeat Vundef n))
+        ((b, 0%Z) |-> (repeat (Vint 0) (x - S n) ++ Vundef :: repeat Vundef n))
         -∗
-        (OwnM ((b, Z.of_nat (x - S n)) |-> [Vundef]) ** (OwnM ((b, Z.of_nat (x - S n)) |-> [Vint 0]) -* OwnM ((b, 0%Z) |-> (repeat (Vint 0) (x - n) ++ repeat Vundef n))))
+        (((b, Z.of_nat (x - S n)) |-> [Vundef]) ** (((b, Z.of_nat (x - S n)) |-> [Vint 0]) -* ((b, 0%Z) |-> (repeat (Vint 0) (x - n) ++ repeat Vundef n))))
       ).
       { 
+        clear IHn.
         iIntros "H". rewrite points_to_app. rewrite points_to_split.
         iDestruct "H" as "[H0 [H1 H2]]". iSplitL "H1".
         {
           replace (x - S n: Z) with (0 + strings.length (repeat (Vint 0) (x - S n)))%Z; ss.
           rewrite repeat_length. lia.
         }
-        iIntros "H1". rewrite points_to_app.
-        remember ((b, 0%Z) |-> repeat (Vint 0) (x - n)).
-        remember ((b, (0 + length (repeat (Vint 0) (x - n)))%Z) |-> repeat Vundef n).
-        assert (OwnM c ∗ OwnM c0 -∗ OwnM (c ⋅ c0)).
-        { iIntros "[H0 H1]". iCombine "H0 H1" as "H". eauto. }
-        subst. iApply H2.
+        iIntros "H1". rewrite points_to_app. subst.
         iSplitL "H0 H1".
         {
           assert (LEN: x - S n = length (repeat (Vint 0) (x - S n))%Z).
           { rewrite repeat_length. refl. }
           iEval (rewrite LEN) in "H1".
-          iCombine "H0 H1" as "H". iEval (rewrite <- points_to_app) in "H".
+          iPoseProof (points_to_app with "[H0 H1]") as "H". 
+          { iSplitL "H0"; iFrame. }
           replace (repeat (Vint 0) (x - S n) ++ [Vint 0]) with (repeat (Vint 0) ((x - S n) + 1)).
           { replace (x - S n + 1) with (x - n); ss. lia. }
           { rewrite repeat_app; ss. }
@@ -695,6 +702,6 @@ Section SIMMODSEM.
       st. force. st. force. st. force.
       iSplitL "GRT". { iFrame. }
       st. eauto.
-  Qed.  *)
+  Qed. 
   
 End SIMMODSEM.

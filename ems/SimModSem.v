@@ -749,9 +749,12 @@ Proof.
   }
 Qed.
 
-(* Move to SimGlobal? *)
+(*  
+  - Need clearer statement about 'wf'.
+  - Move to SimGlobal? 
+*)
 Lemma self_sim_global:
-  forall (itr: itree eventE Any.t), simg eq false false itr itr.
+  forall (wf: Any.t -> Any.t -> Prop) (WF: forall x, wf x x) (itr: itree eventE Any.t), simg wf false false itr itr.
 Proof.
   ginit. { i. eapply cpn7_wcompat. eapply simg_mon. }
   gcofix CIH. i. ides itr.
@@ -797,7 +800,7 @@ Section SIMMODSEM.
     le: world -> world -> Prop;
     le_PreOrder: PreOrder le;
     sim_fnsems: Forall2 (sim_fnsem wf le fl_src fl_tgt) ms_src.(ModSem.fnsems) ms_tgt.(ModSem.fnsems);
-    sim_initial: simg eq false false init_src init_tgt;
+    sim_initial: simg (fun x y => exists w, wf w (x, y)) false false init_src init_tgt;
     (* sim_initial: exists w_init,
                  sim_itree_init wf le [] [] w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st)); *)
                   (* init_st will be given as 'itree eventE Any.t', why not directly using sim_global?*)
@@ -815,7 +818,7 @@ Proof.
     induction a; ii; ss.
     econs; et. econs; ss. ii; clarify.
     destruct w. exploit self_sim_itree; et.
-  - eapply self_sim_global.
+  - eapply self_sim_global. ss.
 Qed.
 
 End ModSemPair.
@@ -1287,16 +1290,17 @@ Proof.
     { gfinal. right. eauto. }
     i. subst.
     guclo bindC_spec. econs.
-    { gfinal. right. eapply self_sim_global. }
+    { gfinal. right. eapply self_sim_global; ss. }
     i. subst.
-    gstep. econs. eauto. 
+    gstep. econs; ss. inv SIM.
+    instantiate (1:= wf_lift wf0). exists x.
+    ss. rewrite! Any.pair_split. eauto.
   }
    
   s. unfold add_fnsems, trans_l, trans_r.
   apply Forall2_app; eapply Forall2_apply_Forall2; et; cycle 1.
   - instantiate (1:= eq). induction (fnsems ctx); et.
   - i. clarify. econs; et. ii; clarify.
-    instantiate (1:= wf_lift wf0).
     destruct b. ss.
     destruct (Any.split mrs_src) eqn: SRC; destruct (Any.split mrs_tgt) eqn:TGT; clarify.
     2: { destruct p. clarify. }
