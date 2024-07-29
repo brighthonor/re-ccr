@@ -35,7 +35,7 @@ def set_by_user(k: int) ≡
 ***)
 
 Section M.
-  Context `{_M: MapRA0.t}.
+  Context `{_M: MapRA.t}.
   (* Context `{@GRA.inG MapRA0 Γ}.
   Context `{@GRA.inG CallableRA Γ}. *)
 
@@ -62,7 +62,7 @@ Section M.
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       `data: (Z -> Z) * Z <- pget;; let (f, sz) := data in
       assume(0 <= k < sz)%Z;;;
-      _ <- pput (fun n => if Z.eq_dec n k then v else f n, sz);;
+      _ <- pput (<[k:=v]> f, sz);;
       Ret Vundef
   .
 
@@ -93,6 +93,14 @@ Section M.
   .
 
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Definition HMap: HMod.t := (SMod.to_hmod GlobalStb SMap).
-  (* Definition Map: Mod.t := (SMod.to_tgt GlobalStb SMap). *)
+  Definition _HMap: HMod.t := (SMod.to_hmod GlobalStb SMap).
+  Definition HMap := _HMap.
+
+  Lemma HMap_unfold: HMap = _HMap.
+  Proof. eauto. Qed.
+  
+  Global Opaque HMap.
+  
 End M.
+
+

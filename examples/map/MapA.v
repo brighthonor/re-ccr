@@ -46,7 +46,7 @@ Section A.
     fun varg =>
       '(k, v) <- (pargs [Tint; Tint] varg)?;;
       f <- pget;;
-      _ <- pput (fun n => if Z.eq_dec n k then v else f n);;
+      _ <- pput (<[k:=v]> (f: Z->Z));;
       Ret Vundef
   .
 
@@ -85,6 +85,15 @@ Section A.
   .
 
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Definition HMap: HMod.t := (SMod.to_hmod GlobalStb SMap).
-  (* Definition Map: Mod.t := (SMod.to_tgt GlobalStb SMap). *)
+  Definition _HMap: HMod.t := (SMod.to_hmod GlobalStb SMap).
+  Definition HMap := _HMap.
+
+  Lemma HMap_unfold: HMap = _HMap.
+  Proof. eauto. Qed.
+
+  Global Opaque HMap.
+
 End A.
+
+
+  

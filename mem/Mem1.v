@@ -127,6 +127,15 @@ Notation "loc |-> vs" := (points_to loc vs) (at level 20).
 Section AUX.
   Context `{@GRA.inG memRA Σ}.
 
+  Lemma points_to_nil ptr:
+    ptr |-> [] = ε.
+  Proof.
+    unfold points_to, Auth.white.
+    replace (_points_to ptr []) with (ε: Mem1._memRA); eauto.
+    rewrite unfold_points_to. extensionalities b' ofs'.
+    des_ifs. ss. nia.
+  Qed.
+  
   Lemma points_to_disj
         ptr x0 x1
     :
@@ -184,6 +193,35 @@ Section AUX.
   (* Global Opaque is_list. *)
 End AUX.
 
+Section POINTS_TO.
+  Context `{@GRA.inG memRA Σ}.
+
+  Definition PointsTo p v := OwnM (p |-> [v]).
+  
+  Lemma points_to_conv b ofs l:
+    OwnM ((b,ofs) |-> l) -∗ [∗ list] i↦v ∈ l, PointsTo (b, ofs + i)%Z v.
+  Proof.
+    revert b ofs. induction l; eauto; i.
+    rewrite points_to_split. s.
+    iIntros "(H&T)". rewrite Z.add_0_r.
+    iFrame. iPoseProof (IHl with "T") as "T". clear IHl.
+    eapply eq_ind. { iApply "T". }
+    f_equal. extensionalities i v. do 2 f_equal. nia.
+  Qed.
+
+  Lemma points_to_conv_r b ofs l:
+    ([∗ list] i↦v ∈ l, PointsTo (b, ofs + i)%Z v) -∗ OwnM ((b,ofs) |-> l).
+  Proof.
+    revert b ofs. induction l; i.
+    { s. rewrite points_to_nil. apply OwnM_unit. }
+    rewrite points_to_split. s.
+    iIntros "(H&T)". rewrite Z.add_0_r. iApply OwnM_combine.
+    iFrame. iApply IHl. clear IHl.
+    eapply eq_ind. { iApply "T". }
+    f_equal. extensionalities x i. do 2 f_equal. nia.
+  Qed.
+  
+End POINTS_TO.
 
 
 

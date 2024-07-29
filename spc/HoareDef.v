@@ -73,8 +73,8 @@ Section FSPEC.
     @mk_fspec
       X
       measure
-      (fun x arg_src arg_tgt => (∃ (aa: AA), ⌜arg_src = aa↑⌝ ∧ precond x aa arg_tgt)%I)
-      (fun x ret_src ret_tgt => (∃ (ar: AR), ⌜ret_src = ar↑⌝ ∧ postcond x ar ret_tgt)%I)
+      (fun x arg_src arg_tgt => (∃ (aa: AA), ⌜arg_src = aa↑⌝ ∗ precond x aa arg_tgt)%I)
+      (fun x ret_src ret_tgt => (∃ (ar: AR), ⌜ret_src = ar↑⌝ ∗ postcond x ar ret_tgt)%I)
   .
 
   Definition fspec_trivial: fspec :=
@@ -326,8 +326,8 @@ Global Opaque _APC.
 
   Definition mk_simple {X: Type} (DPQ: X -> ord * (Any_tgt -> iProp) * (Any_tgt -> iProp)): fspec :=
     mk_fspec (fst ∘ fst ∘ DPQ)
-             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∧ ⌜y = a⌝)%I)
-             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∧ ⌜z = a⌝)%I)
+             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∗ ⌜y = a⌝)%I)
+             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∗ ⌜z = a⌝)%I)
   .
 
   Definition handle_hAPCE_hAGEs (ord_cur: ord): hAPCE ~> itree hAGEs :=

@@ -535,6 +535,13 @@ Section ILEMMAS.
     rewrite <- URA.add_assoc. et.
   Qed.
 
+  Lemma OwnM_combine (M: URA.t) `{@GRA.inG M Σ} (a0 a1: M)
+    :
+    (OwnM a0 ∗ OwnM a1) -∗ OwnM (a0 ⋅ a1).
+  Proof.
+    iIntros "[H0 H1]". iCombine "H0 H1" as "H". auto.
+  Qed.
+  
   Lemma IUpd_unfold I P
     :
     #=(I)=> P ⊢ (I -∗ #=> (I ∗ P)).

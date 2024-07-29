@@ -38,8 +38,8 @@ Section SPEC.
 
   (* Definition mk_fspec_inv {X: Type} (DPQ: X -> ord * (Any.t -> iProp) * (Any.t -> iProp)): fspec :=
     mk_fspec (fst ∘ fst ∘ DPQ)
-             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∧ ⌜y = a⌝)%I)
-             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∧ ⌜z = a⌝)%I)
+             (fun x y a => (((snd ∘ fst ∘ DPQ) x a: iProp) ∗ ⌜y = a⌝)%I)
+             (fun x z a => (((snd ∘ DPQ) x a: iProp) ∗ ⌜z = a⌝)%I)
   . *)
 
   Inductive meta_inv {X: positive -> nat -> Type} : Type :=
@@ -660,7 +660,7 @@ Section SIM.
     r g {R} RR ps pt st_src st_tgt X (x: option X) k_src i_tgt
   :
     bi_entails
-      (∃ x', ⌜x = Some x'⌝ ∧ @isim r g R RR ps pt (st_src, k_src x') (st_tgt, i_tgt))
+      (∃ x', ⌜x = Some x'⌝ ∗ @isim r g R RR ps pt (st_src, k_src x') (st_tgt, i_tgt))
       (isim r g RR ps pt (st_src, unwrapN x >>= k_src) (st_tgt, i_tgt)).
   Proof.
     iIntros "H". iDestruct "H" as (x') "[% H]".
@@ -673,7 +673,7 @@ Section SIM.
         r g ps pt st_src st_tgt x i_tgt
     :
       bi_entails
-        (∃ x', ⌜x = Some x'⌝ ∧ isim (r, g, ps, pt) Frz RR (st_src, Ret x') (st_tgt, i_tgt))
+        (∃ x', ⌜x = Some x'⌝ ∗ isim (r, g, ps, pt) Frz RR (st_src, Ret x') (st_tgt, i_tgt))
         (isim (r, g, ps, pt) Frz RR (st_src, unwrapN x) (st_tgt, i_tgt)).
   Proof.
     erewrite (@idK_spec _ _ (unwrapN x)).
@@ -685,7 +685,7 @@ Section SIM.
     r g {R} RR ps pt st_src st_tgt X (x: option X) i_src k_tgt
   :
     bi_entails
-      (∃ x', ⌜x = Some x'⌝ ∧ @isim r g R RR ps pt (st_src, i_src) (st_tgt, k_tgt x'))
+      (∃ x', ⌜x = Some x'⌝ ∗ @isim r g R RR ps pt (st_src, i_src) (st_tgt, k_tgt x'))
       (isim r g RR ps pt (st_src, i_src) (st_tgt, unwrapU x >>= k_tgt)).
   Proof.
     iIntros "H". iDestruct "H" as (x') "[% H]". subst.
@@ -698,7 +698,7 @@ Section SIM.
         r g ps pt st_src st_tgt x i_src
     :
       bi_entails
-        (∃ x', ⌜x = Some x'⌝ ∧ isim (r, g, ps, pt) Frz RR (st_src, i_src) (st_tgt, Ret x'))
+        (∃ x', ⌜x = Some x'⌝ ∗ isim (r, g, ps, pt) Frz RR (st_src, i_src) (st_tgt, Ret x'))
         (isim (r, g, ps, pt) Frz RR (st_src, i_src) (st_tgt, unwrapU x)).
   Proof.
     erewrite (@idK_spec _ _ (unwrapU x)).
@@ -1336,7 +1336,7 @@ Section WSIM.
     E r g {R} RR ps pt st_src st_tgt X (x: option X) k_src i_tgt
   :
     bi_entails
-      (∃ x', ⌜x = Some x'⌝ ∧ @wsim E r g R RR ps pt (st_src, k_src x') (st_tgt, i_tgt))
+      (∃ x', ⌜x = Some x'⌝ ∗ @wsim E r g R RR ps pt (st_src, k_src x') (st_tgt, i_tgt))
       (wsim E r g RR ps pt (st_src, unwrapN x >>= k_src) (st_tgt, i_tgt)).
   Proof.
     iIntros "H". iDestruct "H" as (x') "[% H]".
@@ -1347,7 +1347,7 @@ Section WSIM.
     E r g {R} RR ps pt st_src st_tgt X (x: option X) i_src k_tgt
   :
     bi_entails
-      (∃ x', ⌜x = Some x'⌝ ∧ @wsim E r g R RR ps pt (st_src, i_src) (st_tgt, k_tgt x'))
+      (∃ x', ⌜x = Some x'⌝ ∗ @wsim E r g R RR ps pt (st_src, i_src) (st_tgt, k_tgt x'))
       (wsim E r g RR ps pt (st_src, i_src) (st_tgt, unwrapU x >>= k_tgt)).
   Proof.
     iIntros "H". iDestruct "H" as (x') "[% H]". subst.
@@ -1466,11 +1466,63 @@ Section WSIMMOD.
         forall sk (SKINCL: Sk.incl md_tgt.(HMod.sk) sk) (SKWF: Sk.wf sk),
         <<SIM: HModSemPair.sim (md_src.(HMod.get_modsem) sk) (md_tgt.(HMod.get_modsem) sk) Ist>>;
     sim_sk: <<SIM: md_src.(HMod.sk) = md_tgt.(HMod.sk)>>;
-   }.
+  }.
+
+  Definition sim_fun fn : Prop :=
+    forall st_src st_tgt sk,
+    let fnsems_src := HModSem.fnsems (HMod.get_modsem md_src sk) in
+    let fnsems_tgt := HModSem.fnsems (HMod.get_modsem md_tgt sk) in
+    match alist_find fn fnsems_src, alist_find fn fnsems_tgt with
+    | Some isrc, Some itgt => forall a: Any.t,
+      Ist st_src st_tgt -∗
+      isim Ist fnsems_src fnsems_tgt ibot ibot
+      (λ '(st_src0, v_src) '(st_tgt0, v_tgt), Ist st_src0 st_tgt0 ** ⌜v_src = v_tgt⌝)
+      false false (st_src, isrc a) (st_tgt, itgt a)
+    | _, _ => False
+    end.
 
 End WSIMMOD.
 End HModPair.
 
+Section HModRefl.
+  Context `{Σ: GRA.t}.
+
+  Lemma unfold_iter_eq (E : Type -> Type) (A B : Type) (f : A -> itree E (A + B)) (x : A)
+    :
+    ITree.iter f x = lr <- f x;;
+                     match lr with
+                     | inl l => tau;; ITree.iter f l
+                     | inr r => Ret r
+                     end.
+  Proof.
+    eapply bisim_is_eq. eapply unfold_iter.
+  Qed.
+
+  Lemma combine_quant A (B: A -> Type) (P: forall a (b: B a), Prop)
+      (PR: forall (ab: sigT B), P (projT1 ab) (projT2 ab)):
+    forall a b, P a b.
+  Proof. i. eapply (PR (existT a b)). Qed.
+
+  Definition IstEq: Any.t -> Any.t -> iProp :=
+    fun st_src st_tgt => ⌜ st_src = st_tgt ⌝%I.
+
+  Definition IstProd (IstL IstR : Any.t -> Any.t -> iProp) : Any.t -> Any.t -> iProp :=
+    fun st_src st_tgt => (∃ st_srcL st_tgtL st_srcR st_tgtR,
+      ⌜st_src = Any.pair st_srcL st_srcR /\ st_tgt = Any.pair st_tgtL st_tgtR⌝ ∗
+      IstL st_srcL st_tgtL ∗ IstR st_srcR st_tgtR)%I.
+
+  Lemma ist_eq_run_r A (run: _ -> (_ * A)) Ist st_src st_tgt:
+    IstProd Ist IstEq st_src st_tgt -∗
+      (⌜(ModSem.run_r run st_src).2 = (ModSem.run_r run st_tgt).2⌝ ∗
+      IstProd Ist IstEq (ModSem.run_r run st_src).1 (ModSem.run_r run st_tgt).1).
+  Proof.
+    iIntros "IST". iDestruct "IST" as (? ? ? ?) "(% & IST & %)". des; subst.
+    unfold ModSem.run_r. rewrite !Any.pair_split. destruct (run st_tgtR).
+    iSplitR; eauto.
+    iExists _,_,_,_. eauto.
+  Qed.
+  
+End HModRefl.
 
 (* Module IModSemPair.
 Section ISIMMODSEM.

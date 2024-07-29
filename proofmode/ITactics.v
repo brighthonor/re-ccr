@@ -153,6 +153,37 @@ Notation "'------------------------------------------------------------------∗
 
 
 
+(*** TODO: move the following lemma ***)
+
+  Lemma isim_reflR `{Σ: GRA.t} R Ist fnsems_src fnsems_tgt st_src st_tgt (itr: itree _ R):
+    IstProd Ist IstEq st_src st_tgt -∗
+      isim (IstProd Ist IstEq) fnsems_src fnsems_tgt ibot ibot
+      (λ '(st_src, v_src) '(st_tgt, v_tgt), IstProd Ist IstEq st_src st_tgt ** ⌜v_src = v_tgt⌝) false false
+      (st_src, translate (HModSem.emb_ ModSem.run_r) itr)
+      (st_tgt, translate (HModSem.emb_ ModSem.run_r) itr).
+  Proof.
+    Local Ltac CIH :=
+      iApply isim_progress; iApply isim_base;
+      match goal with [|- context[_ ?R _ _ _ (?st_src, _ _ ?itr) (?st_tgt, _)]] =>
+         iApply ("CIH" $! (@existT _ (λ _, _) itr (@existT _ (λ _, _) st_src st_tgt))); eauto
+      end.
+      
+    revert st_src st_tgt. apply combine_quant.
+    revert itr. apply combine_quant.
+    
+    eapply isim_coind. i. destruct a as [itr [st_src st_tgt]]. s.
+    iIntros "(#(_ & CIH) & IST)".
+    assert (CASE := case_itrH _ itr); des; subst.
+    - st. eauto.
+    - st. CIH.
+    - st. force. iFrame. CIH.
+    - st. force. iFrame. CIH.
+    - destruct c. st. call; eauto. CIH.
+    - destruct s. st.
+      iPoseProof (ist_eq_run_r with "IST") as "(%EQ & IST)". rewrite <-EQ.
+      CIH.
+    - destruct e; st; force; CIH.
+  Qed.
 
 
 

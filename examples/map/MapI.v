@@ -34,7 +34,7 @@ def set_by_user(k: int) ≡
 
 Section I.
   Local Open Scope string_scope.
-  Context `{_M: MapRA0.t}.
+  Context `{_M: MapRA.t}.
   (* Context `{@GRA.inG MapRA0 Γ}. *)
   (* Context `{@GRA.inG MapRA1 Σ}. *)
   Definition initF: list val -> itree hAGEs val :=
@@ -84,12 +84,18 @@ Section I.
   |}
   .
 
-  Definition Map: HMod.t := {|
+  Definition _Map: HMod.t := {|
     HMod.get_modsem := fun _ => MapSem;
     HMod.sk := [("init", Gfun↑); ("get", Gfun↑); ("set", Gfun↑); ("set_by_user", Gfun↑)];
   |}
   .
+  Definition Map := _Map.
+  
+  Lemma Map_unfold: Map = _Map.
+  Proof. eauto. Qed.
 
-  (* Definition HMap : HMod.t := HMod.lift Map. *)
+  Global Opaque Map.
 
 End I.
+
+
