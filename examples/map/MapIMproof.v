@@ -17,7 +17,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import HTactics ProofMode IPM.
 Require Import OpenDef.
-Require Import Mem1 MemOpen STB Invariant.
+Require Import Mem1 STB Invariant.
 
 Require Import IProofMode IRed ITactics.
 

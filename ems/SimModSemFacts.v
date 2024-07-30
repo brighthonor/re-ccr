@@ -131,7 +131,7 @@ Section ADEQUACY.
     (* - inv sim_initial. econs. econs.
       2: { fold sk_src sk_tgt. rewrite SKEQ. apply H. }
       instantiate (1:= x). refl. *)
-    - exists w_init. unfold sk_src, sk_tgt in *. rewrite sim_sk. eapply sim_initial.
+    - unfold sk_src, sk_tgt in *. rewrite sim_sk. eapply sim_initial.
     Qed.
 
 

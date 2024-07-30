@@ -25,36 +25,41 @@ Local Arguments Z.of_nat: simpl nomatch.
 Section PROOF.
   Context `{@GRA.inG memRA Σ}.
 
-  Definition _points_to (loc: mblock * Z) (vs: list val): _memRA :=
+  Definition _points_to_r (loc: mblock * Z) (vs: list val): _memRA :=
     let (b, ofs) := loc in
     (fun _b _ofs => if (dec _b b) && ((ofs <=? _ofs) && (_ofs <? (ofs + Z.of_nat (List.length vs))))%Z
                     then (List.nth_error vs (Z.to_nat (_ofs - ofs))) else ε)
   .
 
   (* Opaque _points_to. *)
-  Lemma unfold_points_to loc vs:
-    _points_to loc vs =
+  Lemma unfold_points_to_r loc vs:
+    _points_to_r loc vs =
     let (b, ofs) := loc in
     (fun _b _ofs => if (dec _b b) && ((ofs <=? _ofs) && (_ofs <? (ofs + Z.of_nat (List.length vs))))%Z
                     then (List.nth_error vs (Z.to_nat (_ofs - ofs))) else ε)
   .
   Proof. refl. Qed.
 
-  Definition points_to (loc: mblock * Z) (vs: list val): memRA := Auth.white (_points_to loc vs).
+  Definition points_to_r (loc: mblock * Z) (vs: list val): memRA := Auth.white (_points_to_r loc vs).
 
-  Definition var_points_to (skenv: SkEnv.t) (var: gname) (v: val): memRA :=
+  Definition points_to (loc: mblock * Z) (vs: list val): iProp := OwnM (points_to_r loc vs).
+
+  Definition var_points_to_r (skenv: SkEnv.t) (var: gname) (v: val): memRA :=
     match (skenv.(SkEnv.id2blk) var) with
-    | Some  blk => points_to (blk, 0%Z) [v]
+    | Some  blk => points_to_r (blk, 0%Z) [v]
     | None => ε
     end.
 
-  Lemma points_to_split
+  Definition var_points_to (skenv: SkEnv.t) (var: gname) (v: val): iProp :=
+    OwnM (var_points_to_r skenv var v).
+
+  Lemma points_to_r_split
         blk ofs hd tl
     :
-      (points_to (blk, ofs) (hd :: tl)) = (points_to (blk, ofs) [hd]) ⋅ (points_to (blk, (ofs + 1)%Z) tl)
+      (points_to_r (blk, ofs) (hd :: tl)) = (points_to_r (blk, ofs) [hd]) ⋅ (points_to_r (blk, (ofs + 1)%Z) tl)
   .
   Proof.
-    ss. unfold points_to. unfold Auth.white. repeat (rewrite URA.unfold_add; ss).
+    ss. unfold points_to_r. unfold Auth.white. repeat (rewrite URA.unfold_add; ss).
     f_equal.
     repeat (apply func_ext; i).
     des_ifs; bsimpl; des; des_sumbool; subst; ss;
@@ -82,7 +87,18 @@ Section PROOF.
       rewrite Z.sub_diag in *. ss.
   Qed.
 
-  Definition initial_mem_mr (csl: gname -> bool) (sk: Sk.t): _memRA :=
+  Lemma points_to_split
+        blk ofs hd tl
+      :
+        (points_to (blk, ofs) (hd :: tl)) ⊣⊢ ((points_to (blk, ofs) [hd]) ∗ (points_to (blk, (ofs + 1)%Z) tl))%I
+  .
+  Proof.
+    unfold points_to. rewrite points_to_r_split. iSplit. 
+    - iIntros "[H0 H1]". iFrame.
+    - iIntros "[H0 H1]". iCombine "H0 H1" as "H". eauto.
+  Qed.
+
+  Definition _initial_mem_r (csl: gname -> bool) (sk: Sk.t): _memRA :=
     fun blk ofs =>
       match List.nth_error sk blk with
       | Some (g, gd) =>
@@ -93,6 +109,12 @@ Section PROOF.
         end
       | _ => ε
       end.
+
+  Definition initial_mem_r (csl: gname -> bool) (sk: Sk.t): memRA :=
+    Auth.black (_initial_mem_r csl sk).
+ 
+  Definition initial_mem (csl: gname -> bool) (sk: Sk.t): iProp :=
+    OwnM (initial_mem_r csl sk).
 
 
 (* Lemma points_tos_points_to *)
@@ -139,12 +161,12 @@ Section AUX.
   Lemma points_to_disj
         ptr x0 x1
     :
-      (OwnM (ptr |-> [x0]) -∗ OwnM (ptr |-> [x1]) -* ⌜False⌝)
+      ((ptr |-> [x0]) -∗ (ptr |-> [x1]) -* ⌜False⌝)
   .
   Proof.
     destruct ptr as [blk ofs].
     iIntros "A B". iCombine "A B" as "A". iOwnWf "A" as WF0.
-    unfold points_to in WF0. rewrite ! unfold_points_to in *. repeat (ur in WF0); ss.
+    unfold points_to_r in WF0. rewrite ! unfold_points_to_r in *. repeat (ur in WF0); ss.
     specialize (WF0 blk ofs). des_ifs; bsimpl; des; des_sumbool; zsimpl; ss; try lia.
   Qed.
 
@@ -152,8 +174,8 @@ Section AUX.
     match xs with
     | [] => (⌜ll = Vnullptr⌝: iProp)%I
     | xhd :: xtl =>
-      (∃ lhd ltl, ⌜ll = Vptr lhd 0⌝ ** (OwnM ((lhd,0%Z) |-> [xhd; ltl]))
-                             ** is_list ltl xtl: iProp)%I
+      (∃ lhd ltl, ⌜ll = Vptr lhd 0⌝ ∗ ((lhd,0%Z) |-> [xhd; ltl])
+                             ∗ is_list ltl xtl: iProp)%I
     end
   .
 
@@ -162,8 +184,8 @@ Section AUX.
       match xs with
       | [] => (⌜ll = Vnullptr⌝: iProp)%I
       | xhd :: xtl =>
-        (∃ lhd ltl, ⌜ll = Vptr lhd 0⌝ ** (OwnM ((lhd,0%Z) |-> [xhd; ltl]))
-                               ** is_list ltl xtl: iProp)%I
+        (∃ lhd ltl, ⌜ll = Vptr lhd 0⌝ ∗ ((lhd,0%Z) |-> [xhd; ltl])
+                               ∗ is_list ltl xtl: iProp)%I
       end
   .
   Proof.
@@ -172,8 +194,8 @@ Section AUX.
 
   Lemma unfold_is_list_cons: forall ll xhd xtl,
       is_list ll (xhd :: xtl) =
-      (∃ lhd ltl, ⌜ll = Vptr lhd 0⌝ ** (OwnM ((lhd,0%Z) |-> [xhd; ltl]))
-                             ** is_list ltl xtl: iProp)%I.
+      (∃ lhd ltl, ⌜ll = Vptr lhd 0⌝ ∗ ((lhd,0%Z) |-> [xhd; ltl])
+                             ∗ is_list ltl xtl: iProp)%I.
   Proof.
     i. eapply unfold_is_list.
   Qed.
@@ -186,7 +208,7 @@ Section AUX.
   Proof.
     iIntros "H0". destruct xs; ss; et.
     { iPure "H0" as H0. iPureIntro. left. et. }
-    iDestruct "H0" as (lhd ltl) "[[H0 H1] H2]".
+    iDestruct "H0" as (lhd ltl) "(H0 & H1 & H2)".
     iPure "H0" as H0. iPureIntro. right. subst. et.
   Qed.
 
@@ -232,47 +254,48 @@ Section PROOF.
   Definition alloc_spec: fspec :=
     (mk_simple (fun sz => (
                     (ord_pure 0),
-                    (fun varg => (⌜varg = [Vint (Z.of_nat sz)]↑ /\ (8 * (Z.of_nat sz) < modulus_64)%Z⌝: iProp)%I),
+                    (fun varg => (⌜varg = [Vint (Z.of_nat sz)]↑ /\ (8 * (Z.of_nat sz) < modulus_64)%Z⌝: iProp)),
                     (fun vret => (∃ b, (⌜vret = (Vptr b 0)↑⌝)
-                                         ** OwnM ((b, 0%Z) |-> (List.repeat Vundef sz))): iProp)%I
-    ))).
+                                         ∗ (b, 0%Z) |-> (List.repeat Vundef sz)): iProp)
+    )))%I.
 
   Definition free_spec: fspec :=
     (mk_simple (fun '(b, ofs) => (
                     (ord_pure 0),
-                    (fun varg => (∃ v, (⌜varg = ([Vptr b ofs])↑⌝) ** OwnM ((b, ofs) |-> [v]))%I),
-                    fun vret => ⌜vret = (Vint 0)↑⌝%I
-    ))).
+                    (fun varg => (∃ v, (⌜varg = [Vptr b ofs]↑⌝) ∗ (b, ofs) |-> [v])),
+                    (fun vret => ⌜vret = (Vint 0)↑⌝)
+    )))%I.
 
   Definition load_spec: fspec :=
     (mk_simple (fun '(b, ofs, v) => (
                     (ord_pure 0),
-                    (fun varg => (⌜varg = ([Vptr b ofs])↑⌝) ** OwnM(((b, ofs) |-> [v]))),
-                    (fun vret => OwnM((b, ofs) |-> [v]) ** ⌜vret = v↑⌝)
-    ))).
+                    (fun varg => (⌜varg = [Vptr b ofs]↑⌝) ∗ (b, ofs) |-> [v]),
+                    (fun vret => (b, ofs) |-> [v] ∗ ⌜vret = v↑⌝)
+    )))%I.
 
   Definition store_spec: fspec :=
     (mk_simple
        (fun '(b, ofs, v_new) => (
             (ord_pure 0),
-            (fun varg => (∃ v_old, (⌜varg = ([Vptr b ofs ; v_new])↑⌝) ** OwnM((b, ofs) |-> [v_old]))%I),
-            (fun vret => OwnM((b, ofs) |-> [v_new]) ** ⌜vret = (Vint 0)↑⌝
-    )))).
+            (fun varg => (∃ v_old, (⌜varg = [Vptr b ofs ; v_new]↑⌝) ∗ (b, ofs) |-> [v_old])),
+            (fun vret => (b, ofs) |-> [v_new] ∗ ⌜vret = (Vint 0)↑⌝)
+    )))%I.
 
+  (* Is this the best way to define cmp? (points_to is not resource anymore)*)
   Definition cmp_spec: fspec :=
     (mk_simple
        (fun '(result, resource) => (
             (ord_pure 0),
             (fun varg =>
-               ((∃ b ofs v, ⌜varg = [Vptr b ofs; Vnullptr]↑⌝ ** ⌜resource = ((b, ofs) |-> [v])⌝ ** ⌜result = false⌝) ∨
-                (∃ b ofs v, ⌜varg = [Vnullptr; Vptr b ofs]↑⌝ ** ⌜resource = ((b, ofs) |-> [v])⌝ ** ⌜result = false⌝) ∨
-                (∃ b0 ofs0 v0 b1 ofs1 v1, ⌜varg = [Vptr b0 ofs0; Vptr b1 ofs1]↑⌝ ** ⌜resource = (((b0, ofs0) |-> [v0])) ⋅ ((b1, ofs1) |-> [v1])⌝ ** ⌜result = false⌝) ∨
-                (∃ b ofs v, ⌜varg = [Vptr b ofs; Vptr b  ofs]↑⌝ ** ⌜resource = ((b, ofs) |-> [v])⌝ ** ⌜result = true⌝) ∨
+               ((∃ b ofs v, ⌜varg = [Vptr b ofs; Vnullptr]↑⌝ ∗ (OwnM resource -* ((b, ofs) |-> [v])) ∗ ⌜result = false⌝) ∨
+                (∃ b ofs v, ⌜varg = [Vnullptr; Vptr b ofs]↑⌝ ∗(OwnM resource -* ((b, ofs) |-> [v])) ∗ ⌜result = false⌝) ∨
+                (∃ b0 ofs0 v0 b1 ofs1 v1, ⌜varg = [Vptr b0 ofs0; Vptr b1 ofs1]↑⌝ ∗ (OwnM resource -* ((b0, ofs0) |-> [v0] ∗ (b1, ofs1) |-> [v1])) ∗ ⌜result = false⌝) ∨
+                (∃ b ofs v, ⌜varg = [Vptr b ofs; Vptr b  ofs]↑⌝ ∗ (OwnM resource -* (b, ofs) |-> [v]) ∗ ⌜result = true⌝) ∨
                 (⌜varg = [Vnullptr; Vnullptr]↑ /\ result = true⌝))
-                 ** OwnM(resource)
+                 ∗ OwnM resource
             ),
-            (fun vret => OwnM(resource) ** ⌜vret = (if result then Vint 1 else Vint 0)↑⌝)
-    ))).
+            (fun vret => OwnM resource ∗ ⌜vret = (if result then Vint 1 else Vint 0)↑⌝)
+    )))%I.
 
   Definition MemStb: list (gname * fspec).
     eapply (Seal.sealing "stb").
@@ -292,7 +315,7 @@ Section PROOF.
 
   Definition SMemSem (sk: Sk.t): SModSem.t := {|
     SModSem.fnsems := MemSbtb;
-    SModSem.initial_cond := Own (GRA.embed (Auth.black (initial_mem_mr csl sk)));
+    SModSem.initial_cond := initial_mem csl sk;
     SModSem.initial_st := tt↑;
   |}
   .
@@ -314,4 +337,4 @@ Section PROOF.
 End PROOF.
 Global Hint Unfold MemStb: stb.
 
-Global Opaque _points_to.
+Global Opaque _points_to_r.
