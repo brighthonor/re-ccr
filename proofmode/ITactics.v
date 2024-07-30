@@ -48,6 +48,13 @@ Ltac take := prep; take_l; take_r.
 Ltac asm := prep; asm_l; asm_r.
 Ltac grt := prep; grt_r; grt_l.
 
+Ltac apc :=
+  st; rewrite interp_hAGEs_hapc;
+  st; unfold HoareAPC; st; rewrite unfold_APC; st;
+  match goal with [b: bool|-_] => destruct b end;
+  [|unfold guarantee, triggerNB; st;
+    match goal with [v: void|-_] => destruct v end].
+
 
 (**** TODO ****)
 (* destruct? simplify? the linked module states *)

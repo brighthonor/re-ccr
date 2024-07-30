@@ -125,13 +125,8 @@ Section SIMMODSEM.
     st. force. instantiate (1:= x).
     st. force. instantiate (1:= [Vint x]↑).
     st. force. iSplitR; eauto.
-    (* todo: make the following as a lemma *)
-    st. rewrite interp_hAGEs_hapc. st. unfold HoareAPC. st. rewrite unfold_APC.
-    st. destruct y4; cycle 1.
-    { unfold guarantee, triggerNB. st. inv y6. }
-    
+    apc.
     unfold ModSem.run_l. rewrite !Any.pair_split. fold ModSem.run_l.
-    
     st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st.
     unfold ModSem.run_l. rewrite ! Any.pair_split. fold ModSem.run_l.
     st. force. st. force. iSplitL "W". { iFrame. eauto. }
@@ -175,10 +170,7 @@ Section SIMMODSEM.
       iExists Vundef. iFrame.
       iPureIntro. do 3 f_equal. rewrite Z.div_mul; nia.
     }
-    (* todo: make the following as a lemma *)
-    st. rewrite interp_hAGEs_hapc. st. unfold HoareAPC. st. rewrite unfold_APC.
-    st. destruct y3; cycle 1.
-    { unfold guarantee, triggerNB. st. inv y5. }
+    apc.
 
     st. iDestruct "GRT" as "[[GRT %] %]". subst.
     st. iSpecialize ("CTN" $! (Vint 0)). iPoseProof ("CTN" with "GRT") as "PTS".
@@ -218,10 +210,7 @@ Section SIMMODSEM.
     st. force.
     st. force. rewrite Z2Nat.id; try nia.
     iSplitL "IP"; eauto.
-    (* todo: make the following as a lemma *)
-    st. rewrite interp_hAGEs_hapc. st. unfold HoareAPC. st. rewrite unfold_APC.
-    st. destruct y4; cycle 1.
-    { unfold guarantee, triggerNB. st. inv y6. }
+    apc.
     
     st. iDestruct "GRT" as "[[GRT %] %]". subst.
     st. iSplitL; eauto.
@@ -259,10 +248,7 @@ Section SIMMODSEM.
     st. force.
     st. force. rewrite Z2Nat.id; try nia.
     iSplitL "IP"; eauto.
-    (* todo: make the following as a lemma *)
-    st. rewrite interp_hAGEs_hapc. st. unfold HoareAPC. st. rewrite unfold_APC.
-    st. destruct y3; cycle 1.
-    { unfold guarantee, triggerNB. st. inv y7. }
+    apc.
     st. iDestruct "GRT" as "[[GRT %] %]". subst.
     st. iSplitL; eauto.
 
