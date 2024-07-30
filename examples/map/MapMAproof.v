@@ -191,7 +191,7 @@ Section SIMMODSEM.
     simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.getF getF.
     
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
-    rewrite Any.upcast_downcast in G. inv G. inv G0.
+    hss. inv G. inv G0.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
     iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)".
@@ -227,7 +227,7 @@ Section SIMMODSEM.
     iPoseProof (black_map_set with "BLACK MAP") as ">(BLACK & MAP)". instantiate (1:= y5).
     subst. force_r. { eauto. } st.
     iDestruct "GRT" as "(WORLD & %)". des; subst.
-    rewrite Any.upcast_downcast in G. inv G. inv G0. 
+    hss. inv G. inv G0. 
     force_l. force_l. iSplitL "WORLD MAP". { iFrame. eauto. } 
     st. iSplit; eauto.
     iRight. iFrame. iExists (<[y4:=y5]> f), sz.
@@ -239,39 +239,31 @@ Section SIMMODSEM.
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "set_by_user".
   Proof.
     simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.set_by_userF set_by_userF.
-    
+
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
-    iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
-    { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
-    iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)". des. subst.
-    rewrite Any.upcast_downcast in G. inv G. inv G0.
-    force_r. instantiate (1:= mk_meta _ _ _).
-    force_r.
-    force_r. iSplitL "WORLD". { iFrame. eauto. }
-    st. unfold ccallU. st. rewrite STB_set. st.
-    rewrite STB_setM in G0. inv G0.
-    apply Any.downcast_upcast in G. des. subst.
-    rewrite! HoareCall_parse. unfold HoareCallPre.
+    force_r. force_r. force_r. instantiate (1:= mk_meta _ _ _). s.
+    iSplitL "WORLD". { iFrame. eauto. }
+
+    st. rewrite STB_set. st.
+    rewrite !HoareCall_parse. unfold HoareCallPre.
+    rewrite STB_setM in G2. inv G2.
+    hss. inv G. inv G0.
     st. iDestruct "GRT" as "[[WORLD [% %]] _]". subst.
-    apply Any.upcast_inj in H3. des. depdes EQ0.
-    force_l. instantiate (1:= mk_meta _ _ (_, _, _)).
-    force_l. st. force_l.
+    force_l. instantiate (1:= mk_meta _ _ (_,_,_)).
+    force_l. force_l.
     iSplitL "WORLD MAP". { iFrame. eauto. }
-    st. iCombine "P BLACK UNALLOC" as "IST". call.
-    { iRight. iDestruct "IST" as "(P & B & U)".
-      iFrame. iExists f, sz. iFrame. eauto.
-    }
+
+    st. call. { eauto. }
+
     unfold HoareCallPost.
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
-    rewrite Any.upcast_downcast in G. depdes G.
-    force_l. force_r.
-    iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
-    { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
-    force_r. iSplitL "WORLD". { iFrame. eauto. }
-    st. iDestruct "GRT" as "(WORLD & %)".
-    force_l. des. subst. iSplitL "WORLD MAP". { iFrame. eauto. }
-    st. iSplitL; eauto.
-    iRight. iFrame.    
+    hss. inv G.
+    force_r. st. force_r.
+    iSplitL "WORLD". { iFrame. eauto. }
+    st. iDestruct "GRT" as "(WORLD & _ & %)". subst.
+    force_l. force_l.
+    iSplitL "MAP WORLD". { iFrame. eauto. }
+    st. eauto.
   Qed.
   
   Theorem sim: HModPair.sim (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist.

@@ -45,7 +45,8 @@ Ltac apc :=
 
 Ltac hss :=
   try (unfold ModSem.run_l; rewrite !Any.pair_split; fold ModSem.run_l);
-  try (unfold ModSem.run_r; rewrite !Any.pair_split; fold ModSem.run_r).
+  try (unfold ModSem.run_r; rewrite !Any.pair_split; fold ModSem.run_r);
+  try (rewrite !Any.upcast_downcast in * ).
 
 (***** Temp *****)
 Ltac prep := cbn; ired_both.

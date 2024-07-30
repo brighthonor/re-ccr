@@ -129,7 +129,7 @@ Section SIMMODSEM.
     apc. hss.
     st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st. hss.
     st. force_l. st. force_l. iSplitL "W". { iFrame. eauto. }
-    rewrite Any.upcast_downcast in G. inv G. inv G0. st.
+    hss. inv G. inv G0. st.
 
     (* iPoseProof (points_to_conv with "POINTS") as "POINTS". *)
     replace (repeat Vundef x) with (repeat (Vint 0) (x-x) ++ repeat Vundef x); cycle 1.
@@ -189,7 +189,7 @@ Section SIMMODSEM.
     simF_init MapM.HMap_unfold MapI.Map_unfold getF MapI.getF.
     
     st. iDestruct "ASM" as "(W & % & %)". subst. st.
-    rewrite Any.upcast_downcast in G. inv G. inv G0.
+    hss. inv G. inv G0.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
       des; subst; hss.
@@ -224,7 +224,7 @@ Section SIMMODSEM.
     simF_init MapM.HMap_unfold MapI.Map_unfold setF MapI.setF.
 
     st. iDestruct "ASM" as "(W & % & %)". subst. st.
-    rewrite Any.upcast_downcast in G. inv G. inv G0.
+    hss. inv G. inv G0.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";      
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
       des; subst; hss.
@@ -261,7 +261,7 @@ Section SIMMODSEM.
     simF_init MapM.HMap_unfold MapI.Map_unfold set_by_userF MapI.set_by_userF.
     
     st. iDestruct "ASM" as "(W & % & %)". subst.
-    rewrite Any.upcast_downcast in G. inv G. inv G0.
+    hss. inv G. inv G0.
     st. rewrite STB_setM. st. unfold HoareCall.
     force_l. instantiate (1:= mk_meta _ _ (_, _)).
     force_l.
