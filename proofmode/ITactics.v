@@ -22,17 +22,31 @@ From stdpp Require Import coPset gmap.
 
 (************ User Tactics **************)
 Ltac sim_init := econs; eauto; ii; econs; cycle 1; [s|sim_split].
-Ltac prep := cbn; ired_both.
-Ltac steps := repeat _steps.
-Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"]. 
-(* Ltac call H := prep; _call; iSplitL H; [ |iIntros "% % %"; iIntrosFresh H]. *) (* Try to overload 'call "string"' *)
+Tactic Notation "simF_init" constr(LS) constr(LT) reference(FS) reference(FT) :=
+  unfold HModPair.sim_fun; i;
+  rewrite// [in alist_find _ _]LS; s;
+  rewrite// [in alist_find _ _]LT; s;
+  unfold FS; unfold FT;
+  i; iIntros "IST"; unfold cfunU, interp_sb_hp, HoareFun, ccallU; s.
+
+Ltac st := repeat _st.
 Ltac force_l := try (prep; _force_l).
 Ltac force_r := try (prep; _force_r).
 Ltac inline_l := prep; _inline_l; [eauto|]; unfold interp_sb_hp, HoareFun.
 Ltac inline_r := prep; _inline_r; [eauto|]; unfold interp_sb_hp, HoareFun.
+Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"]. 
+(* Ltac call H := prep; _call; iSplitL H; [ |iIntros "% % %"; iIntrosFresh H]. *) (* Try to overload 'call "string"' *)
+Ltac apc :=
+  st; rewrite interp_hAGEs_hapc;
+  st; unfold HoareAPC; st; rewrite unfold_APC; st;
+  match goal with [b: bool|-_] => destruct b end;
+  [|unfold guarantee, triggerNB; st;
+    match goal with [v: void|-_] => destruct v end].
+
 
 (***** Temp *****)
-Ltac st := repeat _st.
+Ltac prep := cbn; ired_both.
+Ltac steps := repeat _steps.
 Ltac ired := repeat _ired.
 Ltac force := force_l; force_r.
 Ltac choose_l := iApply isim_choose_src.
@@ -47,14 +61,6 @@ Ltac choose := prep; choose_r; choose_l.
 Ltac take := prep; take_l; take_r.
 Ltac asm := prep; asm_l; asm_r.
 Ltac grt := prep; grt_r; grt_l.
-
-Ltac apc :=
-  st; rewrite interp_hAGEs_hapc;
-  st; unfold HoareAPC; st; rewrite unfold_APC; st;
-  match goal with [b: bool|-_] => destruct b end;
-  [|unfold guarantee, triggerNB; st;
-    match goal with [v: void|-_] => destruct v end].
-
 
 (**** TODO ****)
 (* destruct? simplify? the linked module states *)

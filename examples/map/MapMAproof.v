@@ -167,10 +167,8 @@ Section SIMMODSEM.
     HModPair.sim_fun
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "init".
   Proof.
-    r. i. pattern (MapA.HMap GlobalStb) at 1. rewrite MapA.HMap_unfold. s.
-    pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s. i. iIntros "IST".
+    simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.initF initF.
     
-    unfold cfunU, initF, MapM.initF, interp_sb_hp, HoareFun. s.
     st.
     iDestruct "ASM" as "(W & (%Y & %M & P) & %X)". subst.
     iDestruct "IST" as "[(P0 & INIT & %)|(P' & _)]"; cycle 1.
@@ -190,10 +188,8 @@ Section SIMMODSEM.
     HModPair.sim_fun
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "get".
   Proof.
-    r. i. pattern (MapA.HMap GlobalStb) at 1. rewrite MapA.HMap_unfold. s.
-    pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s. i. iIntros "IST".
-
-    unfold cfunU, getF, MapM.getF, interp_sb_hp, HoareFun. s.
+    simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.getF getF.
+    
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
@@ -217,10 +213,8 @@ Section SIMMODSEM.
     HModPair.sim_fun
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "set".
   Proof.
-    r. i. pattern (MapA.HMap GlobalStb) at 1. rewrite MapA.HMap_unfold. s.
-    pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s. i. iIntros "IST".
-
-    unfold cfunU, setF, MapM.setF, interp_sb_hp, HoareFun. s.
+    simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.setF setF.
+    
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst. 
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
@@ -244,10 +238,8 @@ Section SIMMODSEM.
     HModPair.sim_fun
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "set_by_user".
   Proof.
-    r. i. pattern (MapA.HMap GlobalStb) at 1. rewrite MapA.HMap_unfold. s.
-    pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s. i. iIntros "IST".
-
-    unfold cfunU, set_by_userF, MapM.set_by_userF, interp_sb_hp, HoareFun. s.
+    simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.set_by_userF set_by_userF.
+    
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }

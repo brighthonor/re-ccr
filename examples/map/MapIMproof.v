@@ -114,10 +114,8 @@ Section SIMMODSEM.
       (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem)
       (IstProd Ist IstEq) "init".
   Proof.
-    r. i. pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s.
-    pattern MapI.Map at 1. rewrite MapI.Map_unfold. s. i. iIntros "IST".
-
-    unfold cfunU, initF, MapI.initF, interp_sb_hp, HoareFun, ccallU. s.
+    simF_init MapM.HMap_unfold MapI.Map_unfold initF MapI.initF.
+    
     st. iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)". subst.
     st. iDestruct "IST" as (? ? ? ?) "(%& [%|(P & _)] &%)"; des; subst; cycle 1.
     { iExFalso. iApply (pending0_unique with "P P0"). }
@@ -187,10 +185,8 @@ Section SIMMODSEM.
       (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem)
       (IstProd Ist IstEq) "get".
   Proof.
-    r. i. pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s.
-    pattern MapI.Map at 1. rewrite MapI.Map_unfold. s. i. iIntros "IST".
-
-    unfold cfunU, getF, MapI.getF, interp_sb_hp, HoareFun, ccallU. s.
+    simF_init MapM.HMap_unfold MapI.Map_unfold getF MapI.getF.
+    
     st. iDestruct "ASM" as "(W & % & %)". subst. st.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";
@@ -224,10 +220,8 @@ Section SIMMODSEM.
       (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem)
       (IstProd Ist IstEq) "set".
   Proof.
-    r. i. pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s.
-    pattern MapI.Map at 1. rewrite MapI.Map_unfold. s. i. iIntros "IST".
-    
-    unfold cfunU, setF, MapI.setF, interp_sb_hp, HoareFun, ccallU. s.
+    simF_init MapM.HMap_unfold MapI.Map_unfold setF MapI.setF.
+
     st. iDestruct "ASM" as "(W & % & %)". subst. st.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";      
@@ -264,10 +258,8 @@ Section SIMMODSEM.
       (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem)
       (IstProd Ist IstEq) "set_by_user".
   Proof.
-    r. i. pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s.
-    pattern MapI.Map at 1. rewrite MapI.Map_unfold. s. i. iIntros "IST".
-
-    unfold cfunU, set_by_userF, MapI.set_by_userF, interp_sb_hp, HoareFun, ccallU. s.
+    simF_init MapM.HMap_unfold MapI.Map_unfold set_by_userF MapI.set_by_userF.
+    
     st. iDestruct "ASM" as "(W & % & %)". subst.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     st. rewrite STB_setM. st. unfold HoareCall.
