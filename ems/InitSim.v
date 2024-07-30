@@ -403,5 +403,3 @@ Section SIM.
   Qed.
 
 End SIM.
-
-

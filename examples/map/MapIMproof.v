@@ -49,15 +49,6 @@ Section SIMMODSEM.
   Definition fun_to_list (f: Z -> Z) (sz: nat) : list val :=
     map (fun i:nat => Vint (f i)) (seq 0 sz).
 
-  Definition Ist: Any.t -> Any.t -> iProp :=
-    fun st_src st_tgt =>
-       ((⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑ /\ st_tgt = Vnullptr↑⌝)
-        ∨
-        (pending0 ∗ ∃ blk ofs (f: Z -> Z) (sz: Z), 
-            ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
-            ∗ [∗ list] i↦v ∈ (fun_to_list f (Z.to_nat sz)), PointsTo (blk, (ofs + i))%Z v)
-       )%I.
-
   Lemma repeat_update {A} i n (v v' w: A):
     <[i:=v]> (repeat v i ++ v' :: repeat w n) = repeat v (i+1) ++ repeat w n.
   Proof.
@@ -109,6 +100,15 @@ Section SIMMODSEM.
   
   Let Mem := HMem (fun _ => false).
 
+  Definition Ist: Any.t -> Any.t -> iProp :=
+    fun st_src st_tgt =>
+       ((⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑ /\ st_tgt = Vnullptr↑⌝)
+        ∨
+        (pending0 ∗ ∃ blk ofs (f: Z -> Z) (sz: Z), 
+            ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
+            ∗ (blk, ofs) |-> (fun_to_list f (Z.to_nat sz)))
+       )%I.
+
   Lemma simF_init:
     HModPair.sim_fun
       (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem)
@@ -137,7 +137,7 @@ Section SIMMODSEM.
     st. force. st. force. iSplitL "W". { iFrame. eauto. }
     rewrite Any.upcast_downcast in G. inv G. inv G0. st.
 
-    iPoseProof (points_to_conv with "POINTS") as "POINTS".
+    (* iPoseProof (points_to_conv with "POINTS") as "POINTS". *)
     replace (repeat Vundef x) with (repeat (Vint 0) (x-x) ++ repeat Vundef x); cycle 1.
     { rewrite Nat.sub_diag. eauto. }
     match goal with |- context[ITree.iter ?f 0%Z] =>
@@ -181,7 +181,7 @@ Section SIMMODSEM.
     { unfold guarantee, triggerNB. st. inv y5. }
 
     st. iDestruct "GRT" as "[[GRT %] %]". subst.
-    st. iPoseProof ("CTN" with "GRT") as "PTS".
+    st. iSpecialize ("CTN" $! (Vint 0)). iPoseProof ("CTN" with "GRT") as "PTS".
     rewrite ->!Zpos_P_of_succ_nat, <-!Nat2Z.inj_succ.
     replace (x - S n + 1)%Z with (x - n)%Z by nia.
     iApply IHn; try nia. iFrame.

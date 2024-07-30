@@ -25,78 +25,27 @@ Local Arguments Z.of_nat: simpl nomatch.
 Section PROOF.
   Context `{@GRA.inG memRA Σ}.
 
-  Definition _points_to_r (loc: mblock * Z) (vs: list val): _memRA :=
-    let (b, ofs) := loc in
-    (fun _b _ofs => if (dec _b b) && ((ofs <=? _ofs) && (_ofs <? (ofs + Z.of_nat (List.length vs))))%Z
-                    then (List.nth_error vs (Z.to_nat (_ofs - ofs))) else ε)
-  .
+  Definition _points_to_singleton_r (loc: mblock * Z) (v: val): _memRA := 
+    fun b ofs => if (dec loc.1 b) && (dec loc.2 ofs) then Some v else ε.
 
-  (* Opaque _points_to. *)
-  Lemma unfold_points_to_r loc vs:
-    _points_to_r loc vs =
-    let (b, ofs) := loc in
-    (fun _b _ofs => if (dec _b b) && ((ofs <=? _ofs) && (_ofs <? (ofs + Z.of_nat (List.length vs))))%Z
-                    then (List.nth_error vs (Z.to_nat (_ofs - ofs))) else ε)
-  .
-  Proof. refl. Qed.
+  Definition points_to_singleton_r (loc: mblock * Z) (v: val): memRA := Auth.white (_points_to_singleton_r loc v).
 
-  Definition points_to_r (loc: mblock * Z) (vs: list val): memRA := Auth.white (_points_to_r loc vs).
+  Definition points_to_singleton (loc: mblock * Z) (v: val): iProp := OwnM (points_to_singleton_r loc v).
 
-  Definition points_to (loc: mblock * Z) (vs: list val): iProp := OwnM (points_to_r loc vs).
+  Definition points_to: (mblock * Z) -> list val -> iProp :=
+    fun '(blk, ofs) vs => ([∗ list] i↦v ∈ vs, points_to_singleton (blk, ofs + i)%Z v)%I.
 
-  Definition var_points_to_r (skenv: SkEnv.t) (var: gname) (v: val): memRA :=
-    match (skenv.(SkEnv.id2blk) var) with
-    | Some  blk => points_to_r (blk, 0%Z) [v]
-    | None => ε
-    end.
-
-  Definition var_points_to (skenv: SkEnv.t) (var: gname) (v: val): iProp :=
-    OwnM (var_points_to_r skenv var v).
-
-  Lemma points_to_r_split
-        blk ofs hd tl
-    :
-      (points_to_r (blk, ofs) (hd :: tl)) = (points_to_r (blk, ofs) [hd]) ⋅ (points_to_r (blk, (ofs + 1)%Z) tl)
-  .
-  Proof.
-    ss. unfold points_to_r. unfold Auth.white. repeat (rewrite URA.unfold_add; ss).
-    f_equal.
-    repeat (apply func_ext; i).
-    des_ifs; bsimpl; des; des_sumbool; subst; ss;
-      try rewrite Z.leb_gt in *; try rewrite Z.leb_le in *; try rewrite Z.ltb_ge in *; try rewrite Z.ltb_lt in *; try lia.
-    - clear_tac. subst. rewrite Zpos_P_of_succ_nat in *. rewrite <- Zlength_correct in *.
-      assert(x0 = ofs). { lia. } subst.
-      rewrite Z.sub_diag in *. ss.
-    - clear_tac. rewrite Zpos_P_of_succ_nat in *. rewrite <- Zlength_correct in *.
-      destruct (Z.to_nat (x0 - ofs)) eqn:T; ss.
-      { exfalso. lia. }
-      rewrite Z.sub_add_distr in *. rewrite Z2Nat.inj_sub in Heq1; ss. rewrite T in *. ss. rewrite Nat.sub_0_r in *. ss.
-    - clear_tac. rewrite Zpos_P_of_succ_nat in *. rewrite <- Zlength_correct in *.
-      destruct (Z.to_nat (x0 - ofs)) eqn:T; ss.
-      { exfalso. lia. }
-      rewrite Z.sub_add_distr in *. rewrite Z2Nat.inj_sub in Heq1; ss. rewrite T in *. ss. rewrite Nat.sub_0_r in *. ss.
-    - clear_tac. rewrite Zpos_P_of_succ_nat in *. rewrite <- Zlength_correct in *.
-      assert(x0 = ofs). { lia. } subst.
-      rewrite Z.sub_diag in *. ss.
-    - clear_tac. rewrite Zpos_P_of_succ_nat in *. rewrite <- Zlength_correct in *.
-      destruct (Z.to_nat (x0 - ofs)) eqn:T; ss.
-      { exfalso. lia. }
-      rewrite Z.sub_add_distr in *. rewrite Z2Nat.inj_sub in Heq1; ss. rewrite T in *. ss. rewrite Nat.sub_0_r in *. ss.
-    - clear_tac. rewrite Zpos_P_of_succ_nat in *. rewrite <- Zlength_correct in *.
-      assert(x0 = ofs). { lia. } subst.
-      rewrite Z.sub_diag in *. ss.
-  Qed.
+  (* Definition points_to (loc: mblock * Z) (vs: list val): iProp := [∗ list] i↦v ∈ vs, points_to_singleton (loc.1, loc.2 + i)%Z v. *)
 
   Lemma points_to_split
         blk ofs hd tl
-      :
-        (points_to (blk, ofs) (hd :: tl)) ⊣⊢ ((points_to (blk, ofs) [hd]) ∗ (points_to (blk, (ofs + 1)%Z) tl))%I
-  .
+    :
+        points_to (blk, ofs) (hd::tl) = (points_to_singleton (blk, ofs) hd ∗ points_to (blk, (ofs + 1)%Z) tl)%I.
   Proof.
-    unfold points_to. rewrite points_to_r_split. iSplit. 
-    - iIntros "[H0 H1]". iFrame.
-    - iIntros "[H0 H1]". iCombine "H0 H1" as "H". eauto.
-  Qed.
+    unfold points_to. ss.
+    replace (ofs + 0)%Z with ofs; [|nia]. do 2 f_equal.
+    extensionalities. do 2 f_equal. nia.
+  Qed. 
 
   Definition _initial_mem_r (csl: gname -> bool) (sk: Sk.t): _memRA :=
     fun blk ofs =>
@@ -142,31 +91,24 @@ Section PROOF.
 
 End PROOF.
 
+Notation "loc ⤇ v" := (points_to_singleton loc v) (at level 20).
 Notation "loc |-> vs" := (points_to loc vs) (at level 20).
-
-
 
 Section AUX.
   Context `{@GRA.inG memRA Σ}.
 
-  Lemma points_to_nil ptr:
-    ptr |-> [] = ε.
-  Proof.
-    unfold points_to, Auth.white.
-    replace (_points_to ptr []) with (ε: Mem1._memRA); eauto.
-    rewrite unfold_points_to. extensionalities b' ofs'.
-    des_ifs. ss. nia.
-  Qed.
+  Lemma points_to_nil ptr: ptr |-> [] = emp%I.
+  Proof. destruct ptr. ss. Qed.
   
   Lemma points_to_disj
         ptr x0 x1
     :
-      ((ptr |-> [x0]) -∗ (ptr |-> [x1]) -* ⌜False⌝)
+      ((ptr |-> [x0]) -∗ (ptr |-> [x1]) -* False)
   .
   Proof.
     destruct ptr as [blk ofs].
-    iIntros "A B". iCombine "A B" as "A". iOwnWf "A" as WF0.
-    unfold points_to_r in WF0. rewrite ! unfold_points_to_r in *. repeat (ur in WF0); ss.
+    iIntros "[A _] [B _]". s. iCombine "A B" as "A". iOwnWf "A" as WF0.
+    unfold points_to_singleton_r in WF0. unfold _points_to_singleton_r in WF0. repeat (ur in WF0); ss.
     specialize (WF0 blk ofs). des_ifs; bsimpl; des; des_sumbool; zsimpl; ss; try lia.
   Qed.
 
@@ -215,13 +157,13 @@ Section AUX.
   (* Global Opaque is_list. *)
 End AUX.
 
-Section POINTS_TO.
+(* Section POINTS_TO.
   Context `{@GRA.inG memRA Σ}.
 
-  Definition PointsTo p v := OwnM (p |-> [v]).
+  Definition PointsTo p v := p |-> [v].
   
   Lemma points_to_conv b ofs l:
-    OwnM ((b,ofs) |-> l) -∗ [∗ list] i↦v ∈ l, PointsTo (b, ofs + i)%Z v.
+    ((b,ofs) |-> l) -∗ [∗ list] i↦v ∈ l, PointsTo (b, ofs + i)%Z v.
   Proof.
     revert b ofs. induction l; eauto; i.
     rewrite points_to_split. s.
@@ -232,18 +174,18 @@ Section POINTS_TO.
   Qed.
 
   Lemma points_to_conv_r b ofs l:
-    ([∗ list] i↦v ∈ l, PointsTo (b, ofs + i)%Z v) -∗ OwnM ((b,ofs) |-> l).
+    ([∗ list] i↦v ∈ l, PointsTo (b, ofs + i)%Z v) -∗ ((b,ofs) |-> l).
   Proof.
     revert b ofs. induction l; i.
     { s. rewrite points_to_nil. apply OwnM_unit. }
     rewrite points_to_split. s.
-    iIntros "(H&T)". rewrite Z.add_0_r. iApply OwnM_combine.
+    iIntros "(H&T)". rewrite Z.add_0_r. 
     iFrame. iApply IHl. clear IHl.
     eapply eq_ind. { iApply "T". }
     f_equal. extensionalities x i. do 2 f_equal. nia.
   Qed.
   
-End POINTS_TO.
+End POINTS_TO. *)
 
 
 
@@ -262,23 +204,23 @@ Section PROOF.
   Definition free_spec: fspec :=
     (mk_simple (fun '(b, ofs) => (
                     (ord_pure 0),
-                    (fun varg => (∃ v, (⌜varg = [Vptr b ofs]↑⌝) ∗ (b, ofs) |-> [v])),
+                    (fun varg => (∃ v, (⌜varg = [Vptr b ofs]↑⌝) ∗ (b, ofs) ⤇ v)),
                     (fun vret => ⌜vret = (Vint 0)↑⌝)
     )))%I.
 
   Definition load_spec: fspec :=
     (mk_simple (fun '(b, ofs, v) => (
                     (ord_pure 0),
-                    (fun varg => (⌜varg = [Vptr b ofs]↑⌝) ∗ (b, ofs) |-> [v]),
-                    (fun vret => (b, ofs) |-> [v] ∗ ⌜vret = v↑⌝)
+                    (fun varg => (⌜varg = [Vptr b ofs]↑⌝) ∗ (b, ofs) ⤇ v),
+                    (fun vret => (b, ofs) ⤇ v ∗ ⌜vret = v↑⌝)
     )))%I.
 
   Definition store_spec: fspec :=
     (mk_simple
        (fun '(b, ofs, v_new) => (
             (ord_pure 0),
-            (fun varg => (∃ v_old, (⌜varg = [Vptr b ofs ; v_new]↑⌝) ∗ (b, ofs) |-> [v_old])),
-            (fun vret => (b, ofs) |-> [v_new] ∗ ⌜vret = (Vint 0)↑⌝)
+            (fun varg => (∃ v_old, (⌜varg = [Vptr b ofs ; v_new]↑⌝) ∗ (b, ofs) ⤇ v_old)),
+            (fun vret => (b, ofs) ⤇ v_new ∗ ⌜vret = (Vint 0)↑⌝)
     )))%I.
 
   (* Is this the best way to define cmp? (points_to is not resource anymore)*)
@@ -337,4 +279,4 @@ Section PROOF.
 End PROOF.
 Global Hint Unfold MemStb: stb.
 
-Global Opaque _points_to_r.
+Global Opaque _points_to_singleton_r.
