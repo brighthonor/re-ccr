@@ -30,23 +30,44 @@ Tactic Notation "simF_init" constr(LS) constr(LT) reference(FS) reference(FT) :=
   i; iIntros "IST"; unfold cfunU, interp_sb_hp, HoareFun, ccallU; s.
 
 Ltac st := repeat _st.
+Ltac st_l := let IT := fresh "__IT" in
+  match goal with [|- _ (_ (_, _) (_, ?itgt))] => set (IT := itgt) end;
+  st;
+  unfold IT; clear IT.
+Ltac st_r := let IT := fresh "__IT" in
+  match goal with [|- _ (_ (_, ?isrc) (_, _))] => set (IT := isrc) end;
+  st;
+  unfold IT; clear IT.
+
 Ltac force_l := try (prep; _force_l).
 Ltac force_r := try (prep; _force_r).
+
 Ltac inline_l := prep; _inline_l; [eauto|]; unfold interp_sb_hp, HoareFun.
 Ltac inline_r := prep; _inline_r; [eauto|]; unfold interp_sb_hp, HoareFun.
+
 Ltac call := prep; _call; iSplitL "IST"; [ |iIntros "% % %"; iIntrosFresh "IST"]. 
 (* Ltac call H := prep; _call; iSplitL H; [ |iIntros "% % %"; iIntrosFresh H]. *) (* Try to overload 'call "string"' *)
-Ltac apc :=
-  st; rewrite interp_hAGEs_hapc;
-  st; unfold HoareAPC; st; rewrite unfold_APC; st;
+Ltac apc_r :=
+  rewrite interp_hAGEs_hapc;
+  st_r; unfold HoareAPC; st_r; rewrite unfold_APC; st_r;
   match goal with [b: bool|-_] => destruct b end;
-  [|unfold guarantee, triggerNB; st;
+  [|unfold guarantee, triggerNB; st_r;
     match goal with [v: void|-_] => destruct v end].
 
 Ltac hss :=
+  ss;
   try (unfold ModSem.run_l; rewrite !Any.pair_split; fold ModSem.run_l);
   try (unfold ModSem.run_r; rewrite !Any.pair_split; fold ModSem.run_r);
-  try (rewrite !Any.upcast_downcast in * ).
+  try (rewrite !Any.upcast_downcast in * );
+  (repeat match goal with [G: Any.downcast _ = Some _ |-_] =>
+    apply Any.downcast_upcast in G; inv G; ss
+   end);
+  (repeat match goal with [G: Any.upcast (_:?T) = Any.upcast (_:?T) |-_] =>
+    apply Any.upcast_inj in G; destruct G as [_ G]; red in G; depdes G; ss
+   end);
+  (repeat match goal with [G: Some _ = Some _ |- _] =>
+    depdes G; ss
+   end).
 
 (***** Temp *****)
 Ltac prep := cbn; ired_both.

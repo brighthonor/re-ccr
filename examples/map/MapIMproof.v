@@ -116,69 +116,97 @@ Section SIMMODSEM.
   Proof.
     simF_init MapM.HMap_unfold MapI.Map_unfold initF MapI.initF.
 
-    ITacticsAux._st.
-    ITacticsAux._st.
-    
-    st. iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)". subst.
-    st. iDestruct "IST" as (? ? ? ?) "(%& [%|(P & _)] &%)"; des; subst; cycle 1.
+    (* SRC: handle the IST of Map and the precond of init *)
+    st_l. hss. iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)".
+    subst. hss. rename y0 into u, y1 into ℓ, x into sz.
+    iDestruct "IST" as (? ? ? ?) "(%& [%|(P & _)] &%)"; des; subst; cycle 1.
     { iExFalso. iApply (pending0_unique with "P P0"). }
-    inline_r.
-    st. force_r.
-    st. force_r.
-    st. force_r. iSplitR; eauto.
-    apc. hss.
-    st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st. hss.
-    st. force_l. st. force_l. iSplitL "W". { iFrame. eauto. }
-    hss. inv G. inv G0. st.
+    hss. st_l.
 
-    (* iPoseProof (points_to_conv with "POINTS") as "POINTS". *)
-    replace (repeat Vundef x) with (repeat (Vint 0) (x-x) ++ repeat Vundef x); cycle 1.
+    (* SRC: prove the postcond of init *)
+    force_l. st_l. force_l.
+    iSplitL "W". { iFrame. eauto. }
+    
+    (* TGT: inline alloc *)
+    inline_r. s.
+
+    (* TGT: prove the precond of alloc *)
+    st_r. force_r. st_r. force_r. st_r. force_r.
+    iSplitR; eauto.
+    st_r.
+    
+    (* TGT: handle the body of alloc *)
+    apc_r. hss. rename y into ord.
+    
+    (* TGT: handle the postcond of alloc *)
+    st_r. iDestruct "GRT" as "[GRT %]".
+    iDestruct "GRT" as ( ? ) "(% & POINTS)". subst.
+    st_r. hss.
+
+    (* prepare and start an induction *)
+    replace (repeat Vundef sz) with (repeat (Vint 0) (sz-sz) ++ repeat Vundef sz); cycle 1.
     { rewrite Nat.sub_diag. eauto. }
-    match goal with |- context[ITree.iter ?f 0%Z] =>
-      replace (ITree.iter f 0%Z) with (ITree.iter f (x-x)%Z) by (f_equal; nia)
-    end.
+    rewrite// -[X in ITree.iter _ X](Z.sub_diag (sz%Z)).
+    iStopProof. cut (sz <= sz); [|lia].
+    generalize sz at 1 4 5 11. intros n.
+    induction n; i; iIntros "(PD & PTS)".
 
-    iStopProof. cut (x <= x); [|lia].
-    generalize x at 1 4 5 11. intros n. induction n; i; iIntros "(PD & PTS)".
+    (* Base case *)
     {
-      rewrite unfold_iter_eq. st. des_ifs. { exfalso. nia. }
+      (* TGT: unwind the loop *)
+      rewrite unfold_iter_eq. st_r. des_ifs; try nia. st_r.
+      (* prove the IST of Map *)
       st. iSplitL; [|eauto].
-      iExists _, _, _, _; iSplitR; eauto; iSplitL; eauto.
-      iRight. iFrame. iExists b, 0%Z, (fun _ => 0%Z), x.
-      iSplit; eauto.
+      iExists _, _, _, _. iSplitR; eauto. iSplitL; eauto.
+      iRight. iFrame. iExists _, _, _, _. iSplitR; eauto.
       rewrite ->app_nil_r, Nat.sub_0_r, repeat_fun_to_list, Nat2Z.id. eauto.
     }
 
-    rewrite unfold_iter_eq. st. des_ifs; cycle 1. { exfalso. nia. }
-    st. unfold scale_int at 1. des_ifs; cycle 1.
-    { exfalso. eapply n0. eapply Z.divide_factor_r. }
-    st. inline_r.
-    st. force_r. instantiate (1:= (b, (x - S n)%Z, Vint 0)).
-    st. force_r. instantiate (1:= [Vptr b (x - (S n))%Z; Vint 0]↑).
-    st. force_r.
-    iPoseProof (big_sepL_insert_acc with "PTS") as "(PT & CTN)".
-    { instantiate (2:= (x - (S n))).
-      rewrite lookup_app_r; rewrite repeat_length; try nia.
-      rewrite Nat.sub_diag. eauto.
-    }
+    (* Inductive case *)
+    {
+      (* TGT: unwind the loop *)
+      rewrite unfold_iter_eq. st_r. des_ifs; try nia. st_r.
+      (* TGT: compute the input to store *)
+      unfold scale_int at 1. des_ifs; cycle 1.
+      { exfalso. eapply n0. eapply Z.divide_factor_r. }
+      st_r.
 
-    rewrite ->!Z.add_0_l, Zpos_P_of_succ_nat, <-Nat2Z.inj_succ, Nat2Z.inj_sub; try nia.
-    iSplitL "PT".
-    { iSplitL; cycle 1.
-      { iPureIntro. do 3 f_equal. rewrite Z.div_mul; nia. }
-      iExists Vundef. iFrame.
-      iPureIntro. do 3 f_equal. rewrite Z.div_mul; nia.
-    }
-    apc.
+      (* TGT: inline store *)
+      inline_r. s.
 
-    st. iDestruct "GRT" as "[[GRT %] %]". subst.
-    st. iSpecialize ("CTN" $! (Vint 0)). iPoseProof ("CTN" with "GRT") as "PTS".
-    rewrite ->!Zpos_P_of_succ_nat, <-!Nat2Z.inj_succ.
-    replace (x - S n + 1)%Z with (x - n)%Z by nia.
-    iApply IHn; try nia. iFrame.
-    rewrite repeat_update.
-    eapply eq_ind. { iApply "PTS". }
-    do 3 f_equal. nia.
+      (* TGT: prove the precond of store *)
+      st_r. force_r. instantiate (1:= (_, (sz - S n)%Z, _)).
+      st_r. force_r. instantiate (3:= [Vptr _ (sz - (S n))%Z; _]↑).
+      st_r. force_r.
+      iPoseProof (big_sepL_insert_acc with "PTS") as "(PT & CTN)".
+      { instantiate (2:= (sz - (S n))).
+        rewrite lookup_app_r; rewrite repeat_length; try nia.
+        rewrite Nat.sub_diag. s. eauto.
+      }
+      rewrite ->!Z.add_0_l, Zpos_P_of_succ_nat, <-Nat2Z.inj_succ, Nat2Z.inj_sub; try nia.
+      iSplitL "PT".
+      { iSplitL; cycle 1.
+        { iPureIntro. do 3 f_equal. rewrite Z.div_mul; nia. }
+        iExists _. iFrame.
+        iPureIntro. do 3 f_equal. rewrite Z.div_mul; nia.
+      }
+      st_r.
+
+      (* TGT: handle the body of store *)
+      apc_r. hss. rename y into ord'.
+
+      (* TGT: handle the postcond of store *)
+      st_r. iDestruct "GRT" as "[[GRT %] %]". subst. st_r.
+      iSpecialize ("CTN" $! (Vint 0)). iPoseProof ("CTN" with "GRT") as "PTS".
+      rewrite ->!Zpos_P_of_succ_nat, <-!Nat2Z.inj_succ.
+      replace (sz - S n + 1)%Z with (sz - n)%Z by nia.
+
+      (* apply the induction hypothesis and complete *)
+      iApply IHn; try nia. iFrame.
+      rewrite repeat_update.
+      eapply eq_ind; [iAssumption |].
+      do 3 f_equal. nia.
+    }
   Qed.
 
   Lemma simF_get:
@@ -187,32 +215,48 @@ Section SIMMODSEM.
       (IstProd Ist IstEq) "get".
   Proof.
     simF_init MapM.HMap_unfold MapI.Map_unfold getF MapI.getF.
-    
-    st. iDestruct "ASM" as "(W & % & %)". subst. st.
-    hss. inv G. inv G0.
+
+    (* SRC: handle the IST of Map and the precond of get *)
+    st_l. hss. iDestruct "ASM" as "(W & % & %)".
+    subst. hss. rename y0 into u, y1 into ℓ, y3 into idx.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
-      des; subst; hss.
-    { st. nia. }
-    st. force_l. instantiate (1:= (Vint (f y3))↑).
+      des; subst; hss; st_l.
+    { nia. }
+
+    (* SRC: prove the postcond of get *)
+    force_l. st_l. force_l.
+    iSplitL "W". { eauto. }
+    st_l.
+
+    (* TGT: compute the input to load *)
+    st_r. hss. st_r. 
     unfold scale_int. des_ifs; cycle 1.
     { exfalso. eapply n. eapply Z.divide_factor_r. }
-    st. force_l. iSplitL "W". { eauto. }
+    st_r. rewrite Z_div_mult; try nia.
 
-    rewrite Z_div_mult; try nia.
+    (* TGT: inline load *)
+    inline_r. s.
+
+    (* TGT: prove the precond of load *)
+    st_r. force_r. instantiate (1:= (_, (ofs + _)%Z, _)).
+    st_r. force_r. st_r. force_r.
     iPoseProof (big_sepL_lookup_acc with "M") as "(IP & M)".
-    { apply fun_to_list_lookup with (i:=Z.to_nat y3). nia. }
-    inline_r.
-    st. force_r. instantiate (1:= (blk, (ofs + y3)%Z, Vint (f y3))).
-    st. force_r.
-    st. force_r. rewrite Z2Nat.id; try nia.
+    { apply fun_to_list_lookup with (i:=Z.to_nat idx). nia. }
+    rewrite Z2Nat.id; try nia.
     iSplitL "IP"; eauto.
-    apc.
+    st_r.
     
-    st. iDestruct "GRT" as "[[GRT %] %]". subst.
+    (* TGT: handle the body of load *)
+    apc_r. rename y into ord.
+
+    (* TGT: handle the postcond of load *)
+    st_r. iDestruct "GRT" as "[[GRT %] %]". subst. st_r.
+
+    (* prove the IST of Map *)
     st. iSplitL; eauto.
-    iExists _, _, _, _; iSplitR; eauto; iSplitL; eauto.
-    iRight. iFrame. iExists blk, ofs, f, sz.
+    iExists _, _, _, _. iSplitR; eauto. iSplitL; eauto.
+    iRight. iFrame. iExists _, _, _, _.
     iPoseProof ("M" with "GRT") as "M". iFrame. eauto.
   Qed.
 
@@ -223,31 +267,47 @@ Section SIMMODSEM.
   Proof.
     simF_init MapM.HMap_unfold MapI.Map_unfold setF MapI.setF.
 
-    st. iDestruct "ASM" as "(W & % & %)". subst. st.
-    hss. inv G. inv G0.
+    (* SRC: handle the IST of Map and the precond of set *)
+    st_l. hss. iDestruct "ASM" as "(W & % & %)".
+    subst. hss. rename y0 into u, y1 into ℓ, y4 into idx, y5 into v.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";      
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
-      des; subst; hss.
-    { st. nia. }
-    st. force_l. instantiate (1:= Vundef↑). hss.
+      des; subst; hss; st_l.
+    { nia. }
+
+    (* SRC: prove the postcond of set *)
+    force_l. st_l. force_l.
+    iSplitL "W". { eauto. }
+    st_l.
+
+    (* TGT: compute the input to store *)
+    st_r. hss. st_r. 
     unfold scale_int. des_ifs; cycle 1.
     { exfalso. eapply n. eapply Z.divide_factor_r. }
-    st. force_l. iSplitL "W". { eauto. }
+    st_r. rewrite Z_div_mult; try nia.
 
-    rewrite Z_div_mult; try nia.
+    (* TGT: inline load *)
+    inline_r. s.
+
+    (* TGT: prove the precond of store *)
+    st_r. force_r. instantiate (1:= (_, _, _)).
+    st_r. force_r. st_r. force_r.
     iPoseProof (big_sepL_insert_acc with "M") as "(IP & M)".
-    { apply fun_to_list_lookup with (i:=Z.to_nat y4). nia. }
-    inline_r.
-    st. force_r. instantiate (1:= (blk, (ofs + y4)%Z, Vint y5)).
-    st. force_r.
-    st. force_r. rewrite Z2Nat.id; try nia.
-    iSplitL "IP"; eauto.
-    apc.
-    st. iDestruct "GRT" as "[[GRT %] %]". subst.
-    st. iSplitL; eauto.
+    { apply fun_to_list_lookup with (i:=Z.to_nat idx). nia. }
+    rewrite Z2Nat.id; try nia.
+    iSplitL "IP". { eauto. }
+    st_r.
 
-    iExists _, _, _, _; iSplitR; eauto; iSplitL; eauto.      
-    iRight. iFrame. iExists blk, ofs, (<[y4:=y5]> f), sz.
+    (* TGT: handle the body of store *)
+    apc_r. rename y into ord.
+    
+    (* TGT: handle the postcond of load *)
+    st_r. iDestruct "GRT" as "[[GRT %] %]". subst. st_r.
+
+    (* prove the IST of Map *)
+    st. iSplitL; eauto.
+    iExists _, _, _, _. iSplitR; eauto. iSplitL; eauto.
+    iRight. iFrame. iExists _, _, _, _.
     iPoseProof ("M" with "GRT") as "M".
     rewrite ->fun_to_list_update, Z2Nat.id; try nia.
     eauto.
@@ -259,17 +319,32 @@ Section SIMMODSEM.
       (IstProd Ist IstEq) "set_by_user".
   Proof.
     simF_init MapM.HMap_unfold MapI.Map_unfold set_by_userF MapI.set_by_userF.
+
+    (* SRC: handle the IST of Map and the precond of set_by_user *)
+    st_l. hss. iDestruct "ASM" as "(W & % & %)".
+    subst. hss. rename y0 into u, y1 into ℓ, y3 into idx.
+
+    (* process an input *)
+    st_r. st. hss.
     
-    st. iDestruct "ASM" as "(W & % & %)". subst.
-    hss. inv G. inv G0.
-    st. rewrite STB_setM. st. unfold HoareCall.
-    force_l. instantiate (1:= mk_meta _ _ (_, _)).
-    force_l.
-    st. force_l. iSplitL "W". { iFrame. eauto. }
+    (* SRC: prove the precond of set *)
+    rewrite STB_setM. st_l. unfold HoareCall.
+    st_l. force_l. instantiate (1:= mk_meta _ _ (_, _)).
+    st_l. force_l. st_l. force_l.
+    iSplitL "W". { iFrame. eauto. }
+    st_l.
+
+    (* make a call to set *)
     call; [eauto|].
-    st. iDestruct "ASM" as "(W & _ & %)". subst.
-    force_l. st. force_l. iSplitL "W". { eauto. } 
-    rewrite G0. st. eauto.
+
+    (* SRC: handle the postcond of set *)
+    st_l. iDestruct "ASM" as "(W & _ & %)". subst. hss.
+
+    (* SRC: prove the postcond of set_by_user *)
+    force_l. st_l. force_l. iSplitL "W". { eauto. }
+
+    (* prove the IST of Map *)
+    st. eauto.
   Qed.
   
   Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) (IstProd Ist IstEq).

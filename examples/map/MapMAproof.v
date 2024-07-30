@@ -168,20 +168,30 @@ Section SIMMODSEM.
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "init".
   Proof.
     simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.initF initF.
-    
-    st.
-    iDestruct "ASM" as "(W & (%Y & %M & P) & %X)". subst.
+
+    (* SRC: handle the IST of Map and the precond of init *)
+    st_l. hss. iDestruct "ASM" as "(W & (%Y & %M & P) & %X)".
+    subst. hss. rename y0 into u, y1 into ℓ, x into sz.
     iDestruct "IST" as "[(P0 & INIT & %)|(P' & _)]"; cycle 1.
     { iExFalso. iApply (pending_unique with "P P'"). }
-    iPoseProof (initial_map_initialize with "INIT") as "(BLACK & INIT & UNALLOC)".    des; subst.
+    des; subst.
+    
+    (* TGT: prove the precond of init *)
     force_r. instantiate (1:= mk_meta _ _ _).
     force_r. force_r.
     iSplitL "P0 W". { iFrame. eauto. }
-    st. force_l. force_l.
-    iDestruct "GRT" as "(CW & %Y)". des. subst.
+    
+    (* TGT: handle the postcond of init *)
+    st_r. iDestruct "GRT" as "(CW & _ & %Y)". subst.
+
+    (* SRC: prove the postcond of init *)
+    force_l. force_l.
+    iPoseProof (initial_map_initialize with "INIT") as "(BLACK & INIT & UNALLOC)".
     iSplitL "CW INIT". { iFrame. eauto. }
+
+    (* prove the IST of Map *)
     st. iSplit; eauto.
-    iRight. iFrame. iExists (λ _ : Z, 0%Z), x. iFrame. eauto.
+    iRight. iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
   Lemma simF_get:
@@ -189,24 +199,35 @@ Section SIMMODSEM.
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "get".
   Proof.
     simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.getF getF.
-    
-    st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
-    hss. inv G. inv G0.
+
+    (* SRC: handle the IST of Map and the precond of get *)
+    st_l. hss. iDestruct "ASM" as "(WORLD & (% & MAP) & %)".
+    subst. hss. rename y0 into u, y1 into ℓ, y3 into idx, x1 into v.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
     iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)".
-    force_r. instantiate (1:= mk_meta y0 y1 y3).
-    force_r. instantiate (1:= [Vint y3]↑).
-    force_r. iSplitL "WORLD". { iFrame. eauto. }
-    des. subst. st. 
-    iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
-    iPoseProof (black_map_get with "BLACK MAP") as "%".
-    subst. force_r. { eauto. } st.
-    iDestruct "GRT" as "(WORLD & %)". des. subst.
+    des; subst. st_l.
+
+    (* TGT: prove the precond of get *)
+    force_r. instantiate (1:= mk_meta _ _ _).
+    force_r. force_r. des. subst.
+    iSplitL "WORLD". { iFrame. eauto. }
+
+    (* TGT: handle the body of get *)
+    st_r. iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
+    force_r. { eauto. }
+
+    (* TGT: handle the postcond of get *)
+    st_r. iDestruct "GRT" as "(WORLD & _ & %)". subst.
+
+    (* SRC: prove the postcond of get *)
     force_l. force_l.
+    iPoseProof (black_map_get with "BLACK MAP") as "%". subst.
     iSplitL "WORLD MAP". { iFrame. eauto. }
+
+    (* prove the IST of Map *)
     st. iSplitL; eauto. iRight.
-    iFrame. iExists f, sz. iFrame. eauto.
+    iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
   Lemma simF_set:
@@ -214,24 +235,35 @@ Section SIMMODSEM.
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "set".
   Proof.
     simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.setF setF.
-    
-    st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst. 
+
+    (* SRC: handle the IST of Map and the precond of set *)
+    st_l. hss. iDestruct "ASM" as "(WORLD & (% & MAP) & %)".
+    subst. hss. rename y0 into u, y1 into ℓ, y4 into idx, x3 into v, y5 into v'.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
-    iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)". 
+    iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)".
+    des; subst. st_l.
+
+    (* TGT: prove the precond of set *)
     force_r. instantiate (1:= mk_meta _ _ (_,_)).
-    force_r.
-    force_r. iSplitL "WORLD". { iFrame. eauto. }
-    des. subst. st. 
-    iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
-    iPoseProof (black_map_set with "BLACK MAP") as ">(BLACK & MAP)". instantiate (1:= y5).
-    subst. force_r. { eauto. } st.
-    iDestruct "GRT" as "(WORLD & %)". des; subst.
-    hss. inv G. inv G0. 
-    force_l. force_l. iSplitL "WORLD MAP". { iFrame. eauto. } 
-    st. iSplit; eauto.
-    iRight. iFrame. iExists (<[y4:=y5]> f), sz.
-    iFrame. eauto.
+    force_r. force_r.
+    iSplitL "WORLD". { iFrame. eauto. }
+
+    (* TGT: handle the body of set *)
+    st_r. iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
+    force_r. { eauto. }
+
+    (* TGT: handle the postcond of set *)
+    st_r. iDestruct "GRT" as "(WORLD & _ & %)". subst.
+    
+    (* SRC: prove the postcond of set *)
+    iPoseProof (black_map_set with "BLACK MAP") as ">(BLACK & MAP)".    
+    force_l. force_l.
+    iSplitL "WORLD MAP". { iFrame. eauto. }
+
+    (* prove the IST of Map *)
+    st. iSplitL; eauto. iRight.
+    iFrame. iExists _, _. iFrame. eauto.
   Qed.
 
   Lemma simF_set_by_user:
@@ -240,29 +272,48 @@ Section SIMMODSEM.
   Proof.
     simF_init MapA.HMap_unfold MapM.HMap_unfold MapM.set_by_userF set_by_userF.
 
-    st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
-    force_r. force_r. force_r. instantiate (1:= mk_meta _ _ _). s.
+    (* SRC: handle the IST of Map and the precond of set_by_user *)
+    st_l. hss. iDestruct "ASM" as "(WORLD & (% & MAP) & %)".
+    subst. hss. rename y0 into u, y1 into ℓ, y3 into idx, x1 into v.
+    
+    (* TGT: prove the precond of set_by_user *)
+    force_r. instantiate (1:= mk_meta _ _ _).
+    force_r. force_r. 
     iSplitL "WORLD". { iFrame. eauto. }
 
-    st. rewrite STB_set. st.
-    rewrite !HoareCall_parse. unfold HoareCallPre.
-    rewrite STB_setM in G2. inv G2.
-    hss. inv G. inv G0.
-    st. iDestruct "GRT" as "[[WORLD [% %]] _]". subst.
-    force_l. instantiate (1:= mk_meta _ _ (_,_,_)).
+    (* process an input *)
+    st_r. st. hss.
+
+    (* TGT: handle the precond of set *)
+    rewrite STB_setM in G0. hss. rewrite !HoareCall_parse. unfold HoareCallPre.
+    st_r. iDestruct "GRT" as "[[WORLD [% %]] _]". subst. hss.
+
+    (* SRC: prove the precond of set *)
+    rewrite STB_set. st_l. rewrite !HoareCall_parse. unfold HoareCallPre.
+    st_l. force_l. instantiate (1:= mk_meta _ _ (_,_,_)).
     force_l. force_l.
     iSplitL "WORLD MAP". { iFrame. eauto. }
+    st_l.
 
-    st. call. { eauto. }
+    (* make a call to set *)
+    call. { eauto. }
 
+    (* SRC: handle the postcond of set *)    
     unfold HoareCallPost.
-    st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
-    hss. inv G.
-    force_r. st. force_r.
+    st_l. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst. hss.
+
+    (* TGT: prove the postcond of set *)
+    force_r. force_r.
     iSplitL "WORLD". { iFrame. eauto. }
-    st. iDestruct "GRT" as "(WORLD & _ & %)". subst.
+
+    (* TGT: handle the postcond of set_by_user *)
+    st_r. iDestruct "GRT" as "(WORLD & _ & %)". subst.
+    
+    (* SRC: prove the postcond of set_by_user *)
     force_l. force_l.
     iSplitL "MAP WORLD". { iFrame. eauto. }
+
+    (* prove the IST of Map *)
     st. eauto.
   Qed.
   
@@ -278,4 +329,3 @@ Section SIMMODSEM.
     Qed.
 
 End SIMMODSEM.
-
