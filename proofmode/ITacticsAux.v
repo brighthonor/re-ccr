@@ -43,8 +43,6 @@ Ltac _force_l :=
     iApply isim_choose_src
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, trigger (Guarantee _) >>= _) (_, _)) ] =>
     iApply isim_guarantee_src
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _)) ] =>
-    unfold guarantee; prep; iApply wsim_guarantee_src
   | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, trigger (Choose _) >>= _) (_, _)) ] =>
     iApply wsim_choose_src
   | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, trigger (Guarantee _) >>= _) (_, _)) ] =>
@@ -72,8 +70,6 @@ match goal with
     iApply isim_take_tgt
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, trigger (Assume _) >>= _)) ] =>
     iApply isim_assume_tgt
-  | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _)) ] =>
-    unfold assume; prep; iApply wsim_assume_tgt
   | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, _) (_, trigger (Take _) >>= _)) ] =>
     iApply wsim_take_tgt
   | [ |- environments.envs_entails _ (wsim _ _ _ _ _ _ _ _ _ _ _  (_, _) (_, trigger (Assume _) >>= _)) ] =>
@@ -99,19 +95,14 @@ match goal with
     match goal with
     | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in *
     end
-| [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, assume ?P >>= _) (_, _)) ] =>
-    unfold assume; prep; iApply isim_take_src; iIntros "%";
-    match goal with
-    | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
-    end
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, tau;; _) (_, _)) ] =>
     iApply isim_tau_src
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (SUpdate _) >>= _) (_, _)) ] =>
     iApply isim_supdate_src
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (sPut _) >>= _) (_, _)) ] =>
-    unfold sPut; iApply isim_supdate_src
+    iApply isim_sput_src
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger sGet >>= _) (_, _)) ] =>
-    unfold sGet; iApply isim_supdate_src
+    iApply isim_sget_src
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Take _) >>= _) (_, _)) ] =>
     let name := fresh "y" in
     iApply isim_take_src; iIntros (name)
@@ -124,19 +115,14 @@ match goal with
     match goal with
     | [ H: _ |- _ ] => let name := fresh "G" in rename H into name; try rewrite name in *
     end
-| [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, guarantee ?P >>= _)) ] =>
-    unfold guarantee; prep; iApply isim_choose_tgt; iIntros "%";
-    match goal with
-    | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
-    end
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, tau;; _)) ] =>
     iApply isim_tau_tgt
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (SUpdate _) >>= _)) ] =>
     iApply isim_supdate_tgt
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (sPut _) >>= _)) ] =>
-    unfold sPut; iApply isim_supdate_tgt
+    iApply isim_sput_tgt
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger sGet >>= _)) ] =>
-    unfold sGet; iApply isim_supdate_tgt
+    iApply isim_sget_tgt
 | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, trigger (Choose _) >>= _)) ] =>
     let name := fresh "y" in
     iApply isim_choose_tgt; iIntros (name)
@@ -272,6 +258,16 @@ Ltac _steps :=
 
 Ltac _st :=
   match goal with
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (assume _)) >>= _) (_, _)) ] =>
+    prep; rewrite translate_emb_asm; iApply isim_asm_src; iIntros "%";
+    match goal with
+    | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
+    end
+  | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (translate _ (guarantee _)) >>= _)) ] =>
+    prep; rewrite translate_emb_guar; iApply isim_guar_tgt; iIntros "%";
+    match goal with
+    | [ H: _ |- _ ] => let name := fresh "G" in rename H into name
+    end
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, (translate _ (trigger (Assume _))) >>= _) (_, _)) ] =>
     rewrite translate_emb_assume; step
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, (translate _ (trigger (Assume _))) >>= _)) ] =>

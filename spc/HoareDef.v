@@ -1663,6 +1663,34 @@ Section AUX.
     extensionalities. rewrite translate_emb_ret. et.
   Qed.
 
+  Lemma translate_emb_asm
+    run_ P
+  :
+    translate (HModSem.emb_ run_) (assume P) = assume P
+  .
+  Proof.
+    unfold assume, trigger.
+    rewrite translate_emb_bind.
+    rewrite translate_emb_ret.
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). ss.
+    do 3 f_equal.
+    extensionalities. rewrite translate_emb_ret. et.
+  Qed.
+
+  Lemma translate_emb_guar
+    run_ P
+  :
+    translate (HModSem.emb_ run_) (guarantee P) = guarantee P
+  .
+  Proof.
+    unfold guarantee, trigger.
+    rewrite translate_emb_bind.
+    rewrite translate_emb_ret.
+    rewrite (bisim_is_eq (translate_vis _ _ _ _)). ss.
+    do 3 f_equal.
+    extensionalities. rewrite translate_emb_ret. et.
+  Qed.
+  
   Lemma translate_emb_ext
     T run_ (itr0 itr1: itree _ T)
     (EQ: itr0 = itr1)

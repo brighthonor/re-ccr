@@ -43,6 +43,9 @@ Ltac apc :=
   [|unfold guarantee, triggerNB; st;
     match goal with [v: void|-_] => destruct v end].
 
+Ltac hss :=
+  try (unfold ModSem.run_l; rewrite !Any.pair_split; fold ModSem.run_l);
+  try (unfold ModSem.run_r; rewrite !Any.pair_split; fold ModSem.run_r).
 
 (***** Temp *****)
 Ltac prep := cbn; ired_both.

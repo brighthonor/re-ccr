@@ -115,6 +115,9 @@ Section SIMMODSEM.
       (IstProd Ist IstEq) "init".
   Proof.
     simF_init MapM.HMap_unfold MapI.Map_unfold initF MapI.initF.
+
+    ITacticsAux._st.
+    ITacticsAux._st.
     
     st. iDestruct "ASM" as "(W & (%Y & %M & P0) & %X)". subst.
     st. iDestruct "IST" as (? ? ? ?) "(%& [%|(P & _)] &%)"; des; subst; cycle 1.
@@ -123,10 +126,8 @@ Section SIMMODSEM.
     st. force_r.
     st. force_r.
     st. force_r. iSplitR; eauto.
-    apc.
-    unfold ModSem.run_l. rewrite !Any.pair_split. fold ModSem.run_l.
-    st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st.
-    unfold ModSem.run_l. rewrite ! Any.pair_split. fold ModSem.run_l.
+    apc. hss.
+    st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st. hss.
     st. force_l. st. force_l. iSplitL "W". { iFrame. eauto. }
     rewrite Any.upcast_downcast in G. inv G. inv G0. st.
 
@@ -191,7 +192,7 @@ Section SIMMODSEM.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
-      des; subst; unfold ModSem.run_l, assume; rewrite ! Any.pair_split.
+      des; subst; hss.
     { st. nia. }
     st. force_l. instantiate (1:= (Vint (f y3))↑).
     unfold scale_int. des_ifs; cycle 1.
@@ -226,10 +227,9 @@ Section SIMMODSEM.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     iDestruct "IST" as (? ? ? ?) "(%& [%|(P & IST)] &%)";      
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
-      des; subst; unfold ModSem.run_l, assume; rewrite ! Any.pair_split.
+      des; subst; hss.
     { st. nia. }
-    st. force_l. instantiate (1:= Vundef↑).
-    rewrite ! Any.pair_split.
+    st. force_l. instantiate (1:= Vundef↑). hss.
     unfold scale_int. des_ifs; cycle 1.
     { exfalso. eapply n. eapply Z.divide_factor_r. }
     st. force_l. iSplitL "W". { eauto. }
@@ -340,11 +340,10 @@ End SIMMODSEM.
     iIntros "K". prep.
     iEval (rewrite unfold_APC).
     force. instantiate (1:= false). steps.
-    force. instantiate (1:= next). unfold guarantee.
-    force. steps.
+    force. instantiate (1:= next).
+    force. { eauto. } steps.
     force. instantiate (1:= (fn, vargs)). steps.
     rewrite SPEC. steps. grind.
-    Unshelve. eauto.
   Qed.
 
   Lemma hcall_clo Σ

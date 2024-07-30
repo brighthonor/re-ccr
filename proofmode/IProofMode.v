@@ -442,6 +442,26 @@ Section SIM.
     iIntros "H". iApply (H with "H").
   Qed.
 
+  Lemma isim_take_tgt
+    X x r g ps pt {R} RR st_src st_tgt i_src k_tgt 
+  :
+    bi_entails
+      (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt x))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt)).
+  Proof. 
+    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
+  Qed.
+  
+  Lemma isim_choose_src
+    X x r g ps pt {R} RR st_src st_tgt k_src i_tgt
+  :
+    bi_entails
+      (@isim r g R RR true pt (st_src, k_src x) (st_tgt, i_tgt))
+      (@isim r g R RR ps pt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt)).
+  Proof. 
+    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
+  Qed.
+
   Lemma isim_choose_tgt
     X r g ps pt {R} RR st_src st_tgt i_src k_tgt 
   :
@@ -454,26 +474,30 @@ Section SIM.
     iIntros "H". iApply (H with "H").
   Qed.
 
-  Lemma isim_choose_src
-    X x r g ps pt {R} RR st_src st_tgt k_src i_tgt
+  Lemma isim_asm_src
+    (P: Prop) r g ps pt {R} RR st_src st_tgt k_src i_tgt 
   :
     bi_entails
-      (@isim r g R RR true pt (st_src, k_src x) (st_tgt, i_tgt))
-      (@isim r g R RR ps pt (st_src, trigger (Choose X) >>= k_src) (st_tgt, i_tgt)).
-  Proof. 
-    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
+      (∀ (_: P), @isim r g R RR true pt (st_src, k_src ()) (st_tgt, i_tgt))
+      (@isim r g R RR ps pt (st_src, assume P >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    i. iIntros "H". unfold assume. rewrite bind_bind.
+    iApply isim_take_src. rewrite bind_ret_l. eauto.
   Qed.
-
-  Lemma isim_take_tgt
-    X x r g ps pt {R} RR st_src st_tgt i_src k_tgt 
+  
+  Lemma isim_asm_tgt
+    (P: Prop) r g ps pt {R} RR st_src st_tgt i_src k_tgt 
   :
+    P ->
     bi_entails
-      (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt x))
-      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Take X) >>= k_tgt)).
-  Proof. 
-    uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
+      (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt ()))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, assume P >>= k_tgt)).
+  Proof.
+    i. iIntros "H". unfold assume. rewrite bind_bind.
+    iApply isim_take_tgt. rewrite bind_ret_l. eauto.
+    Unshelve. eauto.
   Qed.
-
+  
   Lemma isim_guar_src
     (P: Prop) r g ps pt {R} RR st_src st_tgt k_src i_tgt
   :
@@ -487,17 +511,15 @@ Section SIM.
     Unshelve. eauto.
   Qed.
 
-  Lemma isim_asm_tgt
+  Lemma isim_guar_tgt
     (P: Prop) r g ps pt {R} RR st_src st_tgt i_src k_tgt 
   :
-    P ->
     bi_entails
-      (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt ()))
-      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, assume P >>= k_tgt)).
-  Proof.
-    i. iIntros "H". unfold assume. rewrite bind_bind.
-    iApply isim_take_tgt. rewrite bind_ret_l. eauto.
-    Unshelve. eauto.
+      (∀ (_:P), @isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt ()))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, guarantee P >>= k_tgt)).
+  Proof. 
+    i. iIntros "H". unfold guarantee. rewrite bind_bind.
+    iApply isim_choose_tgt. rewrite bind_ret_l. eauto.
   Qed.
   
   Lemma isim_supdate_src
@@ -525,6 +547,46 @@ Section SIM.
     uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
     destruct (run st_tgt); eauto.
   Qed.
+
+  Lemma isim_sput_src
+    r g ps pt {R} RR st_src st_tgt k_src i_tgt v
+  :
+    bi_entails
+      (@isim r g R RR true pt (v, k_src ()) (st_tgt, i_tgt))
+      (@isim r g R RR ps pt (st_src, trigger (sPut v) >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    iIntros "H". unfold sPut. iApply isim_supdate_src. eauto.
+  Qed.
+  
+  Lemma isim_sput_tgt
+    r g ps pt {R} RR st_src st_tgt i_src k_tgt v
+  :
+    bi_entails
+      (@isim r g R RR ps true (st_src, i_src) (v, k_tgt ()))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (sPut v) >>= k_tgt)).
+  Proof.
+    iIntros "H". unfold sPut. iApply isim_supdate_tgt. eauto.
+  Qed.
+
+  Lemma isim_sget_src
+    r g ps pt {R} RR st_src st_tgt k_src i_tgt
+  :
+    bi_entails
+      (@isim r g R RR true pt (st_src, k_src st_src) (st_tgt, i_tgt))
+      (@isim r g R RR ps pt (st_src, trigger sGet >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    iIntros "H". unfold sGet. iApply isim_supdate_src. eauto.
+  Qed.
+  
+  Lemma isim_sget_tgt
+    r g ps pt {R} RR st_src st_tgt i_src k_tgt
+  :
+    bi_entails
+      (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt st_tgt))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger sGet >>= k_tgt)).
+  Proof.
+    iIntros "H". unfold sGet. iApply isim_supdate_tgt. eauto.
+  Qed.
   
   Lemma isim_assume_src
     r g ps pt {R} RR iP st_src st_tgt k_src i_tgt 
@@ -546,26 +608,23 @@ Section SIM.
     - eapply Own_Upd. ii. apply H3 in H2. eapply URA.wf_extends; eauto.
       rewrite (URA.add_comm a b). repeat apply URA.extends_add. eauto.
   Qed.
-  
-  Lemma isim_guarantee_tgt
+
+  Lemma isim_assume_tgt
     r g ps pt {R} RR iP st_src st_tgt i_src k_tgt 
   :
     bi_entails
-      (iP -∗ (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
-      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt)).
-  Proof. 
-    uiprop. i. guclo hpsimC_spec. econs; esplits; i; eauto.
-    econs; eauto. i.
-    guclo hpsim_updateC_spec. econs; ii; esplits; eauto.
-    uiprop in NEW. edestruct NEW; eauto; try refl. des.
-    guclo hpsim_updateC_spec. econs. ii. subst.
-    esplits.
-    - eapply H; eauto.
-      eapply URA.wf_extends.
-      { eapply URA.extends_add. eauto. }
-      specialize (H3 ε). rewrite URA.add_comm. revert H3. r_solve. eauto.
-    - eapply Own_Upd. ii. apply H3 in H2. eapply URA.wf_extends; eauto.
-      rewrite (URA.add_comm a b). repeat apply URA.extends_add. eauto.
+      (iP ∗ (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt)).
+  Proof.
+    uiprop. i. des. subst. 
+    guclo hpsimC_spec. econs; esplits; eauto. econs; eauto; i.
+    { instantiate (1:= (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))).
+      eapply iProp_Own in H0.
+      iIntros "[A B]". iPoseProof (H0 with "A") as "A". iFrame. iStopProof.
+      eapply iProp_Own. uiprop. eauto.
+    }
+    eapply isim_init; eauto.
+    iIntros "H". iApply isim_upd. iStopProof; eauto.
   Qed.
 
   Lemma isim_guarantee_src
@@ -586,22 +645,25 @@ Section SIM.
     iIntros "H". iApply isim_upd. iStopProof; eauto.
   Qed.
 
-  Lemma isim_assume_tgt
+  Lemma isim_guarantee_tgt
     r g ps pt {R} RR iP st_src st_tgt i_src k_tgt 
   :
     bi_entails
-      (iP ∗ (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
-      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Assume iP) >>= k_tgt)).
-  Proof.
-    uiprop. i. des. subst. 
-    guclo hpsimC_spec. econs; esplits; eauto. econs; eauto; i.
-    { instantiate (1:= (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt))).
-      eapply iProp_Own in H0.
-      iIntros "[A B]". iPoseProof (H0 with "A") as "A". iFrame. iStopProof.
-      eapply iProp_Own. uiprop. eauto.
-    }
-    eapply isim_init; eauto.
-    iIntros "H". iApply isim_upd. iStopProof; eauto.
+      (iP -∗ (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt tt)))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, trigger (Guarantee iP) >>= k_tgt)).
+  Proof. 
+    uiprop. i. guclo hpsimC_spec. econs; esplits; i; eauto.
+    econs; eauto. i.
+    guclo hpsim_updateC_spec. econs; ii; esplits; eauto.
+    uiprop in NEW. edestruct NEW; eauto; try refl. des.
+    guclo hpsim_updateC_spec. econs. ii. subst.
+    esplits.
+    - eapply H; eauto.
+      eapply URA.wf_extends.
+      { eapply URA.extends_add. eauto. }
+      specialize (H3 ε). rewrite URA.add_comm. revert H3. r_solve. eauto.
+    - eapply Own_Upd. ii. apply H3 in H2. eapply URA.wf_extends; eauto.
+      rewrite (URA.add_comm a b). repeat apply URA.extends_add. eauto.
   Qed.
 
   Lemma isim_progress
