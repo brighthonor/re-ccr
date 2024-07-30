@@ -171,24 +171,21 @@ Section SIMMODSEM.
     pattern (MapM.HMap GlobalStbM) at 1. rewrite MapM.HMap_unfold. s. i. iIntros "IST".
     
     unfold cfunU, initF, MapM.initF, interp_sb_hp, HoareFun. s.
-    take. instantiate (1:= x). destruct x. 
-    take. instantiate (1:= x0).
-    asm. iDestruct "ASM" as "(W & (%Y & %M & P) & %X)". subst.
+    st.
+    iDestruct "ASM" as "(W & (%Y & %M & P) & %X)". subst.
     iDestruct "IST" as "[(P0 & INIT & %)|(P' & _)]"; cycle 1.
-    { iExFalso. iApply (pending_unique with "P P'"). } 
-    iPoseProof (initial_map_initialize with "INIT") as "(BLACK & INIT & UNALLOC)". instantiate (1:= x).
-    iSplitL "P0 W".
-    { iFrame. esplits; eauto. }  
-    st. des. subst. rewrite Any.upcast_downcast in G. inv G.
-    force. instantiate (1:= y).
-    force. iDestruct "GRT" as "(CW & %Y)". des. subst. iSplitL "CW INIT". 
-    { iFrame. iSplit; eauto. }
+    { iExFalso. iApply (pending_unique with "P P'"). }
+    iPoseProof (initial_map_initialize with "INIT") as "(BLACK & INIT & UNALLOC)".    des; subst.
+    force_r. instantiate (1:= mk_meta _ _ _).
+    force_r. force_r.
+    iSplitL "P0 W". { iFrame. eauto. }
+    st. force_l. force_l.
+    iDestruct "GRT" as "(CW & %Y)". des. subst.
+    iSplitL "CW INIT". { iFrame. eauto. }
     st. iSplit; eauto.
     iRight. iFrame. iExists (λ _ : Z, 0%Z), x. iFrame. eauto.
   Qed.
 
-  Variable FFF : forall (P: Prop), P.
-  
   Lemma simF_get:
     HModPair.sim_fun
       (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist "get".
