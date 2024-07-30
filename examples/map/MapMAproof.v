@@ -199,19 +199,18 @@ Section SIMMODSEM.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
     iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)".
-    force. instantiate (1:= mk_meta y0 y1 y3).
-    force. instantiate (1:= [Vint y3]↑).
-    force. iSplitL "WORLD". { iFrame. eauto. }
+    force_r. instantiate (1:= mk_meta y0 y1 y3).
+    force_r. instantiate (1:= [Vint y3]↑).
+    force_r. iSplitL "WORLD". { iFrame. eauto. }
     des. subst. st. 
     iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
     iPoseProof (black_map_get with "BLACK MAP") as "%".
-    subst. force. st.
+    subst. force_r. { eauto. } st.
     iDestruct "GRT" as "(WORLD & %)". des. subst.
-    force. iSplitL "WORLD MAP". { iFrame. eauto. }
+    force_l. force_l.
+    iSplitL "WORLD MAP". { iFrame. eauto. }
     st. iSplitL; eauto. iRight.
     iFrame. iExists f, sz. iFrame. eauto.
-
-    Unshelve. all: eauto.
   Qed.
 
   Lemma simF_set:
@@ -226,21 +225,19 @@ Section SIMMODSEM.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
     iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)". 
-    force. instantiate (1:= mk_meta y0 y1 (x2, x1)).
-    force. instantiate (1:= [Vint x2; Vint x1]↑).
-    force. iSplitL "WORLD". { iFrame. eauto. }
+    force_r. instantiate (1:= mk_meta _ _ (_,_)).
+    force_r.
+    force_r. iSplitL "WORLD". { iFrame. eauto. }
     des. subst. st. 
     iPoseProof (unallocated_range with "UNALLOC MAP") as "%".
     iPoseProof (black_map_set with "BLACK MAP") as ">(BLACK & MAP)". instantiate (1:= y5).
-    subst. force. st.
+    subst. force_r. { eauto. } st.
     iDestruct "GRT" as "(WORLD & %)". des; subst.
     rewrite Any.upcast_downcast in G. inv G. inv G0. 
-    force. iSplitL "WORLD MAP". { iFrame. eauto. } 
+    force_l. force_l. iSplitL "WORLD MAP". { iFrame. eauto. } 
     st. iSplit; eauto.
     iRight. iFrame. iExists (<[y4:=y5]> f), sz.
     iFrame. eauto.
-
-    Unshelve. all: eauto.
   Qed.
 
   Lemma simF_set_by_user:
@@ -256,19 +253,18 @@ Section SIMMODSEM.
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
     iDestruct "IST" as (? ?) "(% & BLACK & UNALLOC)". des. subst.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
-    force. instantiate (1:= mk_meta y0 y1 y3).
-    force. instantiate (1:= [Vint y3]↑).
-    force. iSplitL "WORLD". { iFrame. eauto. }
+    force_r. instantiate (1:= mk_meta _ _ _).
+    force_r.
+    force_r. iSplitL "WORLD". { iFrame. eauto. }
     st. unfold ccallU. st. rewrite STB_set. st.
     rewrite STB_setM in G0. inv G0.
     apply Any.downcast_upcast in G. des. subst.
     rewrite! HoareCall_parse. unfold HoareCallPre.
     st. iDestruct "GRT" as "[[WORLD [% %]] _]". subst.
     apply Any.upcast_inj in H3. des. depdes EQ0.
-    force. instantiate (1:= mk_meta _ _ (_, _, _)).
-    force. instantiate (1:= Any.upcast [Vint _; Vint _]).
-    st. force. iSplitL "WORLD MAP".
-    { iFrame. eauto. }
+    force_l. instantiate (1:= mk_meta _ _ (_, _, _)).
+    force_l. st. force_l.
+    iSplitL "WORLD MAP". { iFrame. eauto. }
     st. iCombine "P BLACK UNALLOC" as "IST". call.
     { iRight. iDestruct "IST" as "(P & B & U)".
       iFrame. iExists f, sz. iFrame. eauto.
@@ -276,12 +272,12 @@ Section SIMMODSEM.
     unfold HoareCallPost.
     st. iDestruct "ASM" as "(WORLD & (% & MAP) & %)". subst.
     rewrite Any.upcast_downcast in G. depdes G.
-    force. force_r.
+    force_l. force_r.
     iDestruct "IST" as "[(_ & INIT & _)|(P & IST)]".
     { iExFalso. iApply (initial_map_no_points_to with "INIT MAP"). }
-    iSplitL "WORLD". { iFrame. eauto. }
+    force_r. iSplitL "WORLD". { iFrame. eauto. }
     st. iDestruct "GRT" as "(WORLD & %)".
-    force. des. subst. iSplitL "WORLD MAP". { iFrame. eauto. }
+    force_l. des. subst. iSplitL "WORLD MAP". { iFrame. eauto. }
     st. iSplitL; eauto.
     iRight. iFrame.    
   Qed.

@@ -38,7 +38,7 @@ Ltac prep := cbn; ired_both.
 Ltac _force_l :=
   match goal with
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, guarantee ?P >>= _) (_, _)) ] =>
-    unfold guarantee; prep; iApply isim_choose_src
+    prep; iApply isim_guar_src
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, trigger (Choose _) >>= _) (_, _)) ] =>
     iApply isim_choose_src
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, trigger (Guarantee _) >>= _) (_, _)) ] =>
@@ -67,7 +67,7 @@ Ltac _force_l :=
 Ltac _force_r :=
 match goal with
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _ (_, _) (_, assume ?P >>= _)) ] =>
-    unfold assume; prep; iApply isim_take_tgt
+    prep; iApply isim_asm_tgt
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, trigger (Take _) >>= _)) ] =>
     iApply isim_take_tgt
   | [ |- environments.envs_entails _ (isim _ _ _ _ _ _ _ _  (_, _) (_, trigger (Assume _) >>= _)) ] =>

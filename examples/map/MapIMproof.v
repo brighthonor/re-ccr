@@ -122,14 +122,14 @@ Section SIMMODSEM.
     st. iDestruct "IST" as (? ? ? ?) "(%& [%|(P & _)] &%)"; des; subst; cycle 1.
     { iExFalso. iApply (pending0_unique with "P P0"). }
     inline_r.
-    st. force. instantiate (1:= x).
-    st. force. instantiate (1:= [Vint x]↑).
-    st. force. iSplitR; eauto.
+    st. force_r.
+    st. force_r.
+    st. force_r. iSplitR; eauto.
     apc.
     unfold ModSem.run_l. rewrite !Any.pair_split. fold ModSem.run_l.
     st. iDestruct "GRT" as "[GRT %]". iDestruct "GRT" as ( ? ) "(% & POINTS)". subst. st.
     unfold ModSem.run_l. rewrite ! Any.pair_split. fold ModSem.run_l.
-    st. force. st. force. iSplitL "W". { iFrame. eauto. }
+    st. force_l. st. force_l. iSplitL "W". { iFrame. eauto. }
     rewrite Any.upcast_downcast in G. inv G. inv G0. st.
 
     (* iPoseProof (points_to_conv with "POINTS") as "POINTS". *)
@@ -154,9 +154,9 @@ Section SIMMODSEM.
     st. unfold scale_int at 1. des_ifs; cycle 1.
     { exfalso. eapply n0. eapply Z.divide_factor_r. }
     st. inline_r.
-    st. force. instantiate (1:= (b, (x - S n)%Z, Vint 0)).
-    st. force. instantiate (1:= [Vptr b (x - (S n))%Z; Vint 0]↑).
-    st. force.
+    st. force_r. instantiate (1:= (b, (x - S n)%Z, Vint 0)).
+    st. force_r. instantiate (1:= [Vptr b (x - (S n))%Z; Vint 0]↑).
+    st. force_r.
     iPoseProof (big_sepL_insert_acc with "PTS") as "(PT & CTN)".
     { instantiate (2:= (x - (S n))).
       rewrite lookup_app_r; rewrite repeat_length; try nia.
@@ -197,18 +197,18 @@ Section SIMMODSEM.
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
       des; subst; unfold ModSem.run_l, assume; rewrite ! Any.pair_split.
     { st. nia. }
-    st. force. instantiate (1:= (Vint (f y3))↑).
+    st. force_l. instantiate (1:= (Vint (f y3))↑).
     unfold scale_int. des_ifs; cycle 1.
     { exfalso. eapply n. eapply Z.divide_factor_r. }
-    st. force. iSplitL "W". { eauto. }
+    st. force_l. iSplitL "W". { eauto. }
 
     rewrite Z_div_mult; try nia.
     iPoseProof (big_sepL_lookup_acc with "M") as "(IP & M)".
     { apply fun_to_list_lookup with (i:=Z.to_nat y3). nia. }
     inline_r.
-    st. force. instantiate (1:= (blk, (ofs + y3)%Z, Vint (f y3))).
-    st. force.
-    st. force. rewrite Z2Nat.id; try nia.
+    st. force_r. instantiate (1:= (blk, (ofs + y3)%Z, Vint (f y3))).
+    st. force_r.
+    st. force_r. rewrite Z2Nat.id; try nia.
     iSplitL "IP"; eauto.
     apc.
     
@@ -234,19 +234,19 @@ Section SIMMODSEM.
       [|iDestruct "IST" as (? ? ? ?) "(% & M)"];
       des; subst; unfold ModSem.run_l, assume; rewrite ! Any.pair_split.
     { st. nia. }
-    st. force. instantiate (1:= Vundef↑).
+    st. force_l. instantiate (1:= Vundef↑).
     rewrite ! Any.pair_split.
     unfold scale_int. des_ifs; cycle 1.
     { exfalso. eapply n. eapply Z.divide_factor_r. }
-    st. force. iSplitL "W". { eauto. }
+    st. force_l. iSplitL "W". { eauto. }
 
     rewrite Z_div_mult; try nia.
     iPoseProof (big_sepL_insert_acc with "M") as "(IP & M)".
     { apply fun_to_list_lookup with (i:=Z.to_nat y4). nia. }
     inline_r.
-    st. force. instantiate (1:= (blk, (ofs + y4)%Z, Vint y5)).
-    st. force.
-    st. force. rewrite Z2Nat.id; try nia.
+    st. force_r. instantiate (1:= (blk, (ofs + y4)%Z, Vint y5)).
+    st. force_r.
+    st. force_r. rewrite Z2Nat.id; try nia.
     iSplitL "IP"; eauto.
     apc.
     st. iDestruct "GRT" as "[[GRT %] %]". subst.
@@ -271,12 +271,12 @@ Section SIMMODSEM.
     st. iDestruct "ASM" as "(W & % & %)". subst.
     rewrite Any.upcast_downcast in G. inv G. inv G0.
     st. rewrite STB_setM. st. unfold HoareCall.
-    force. instantiate (1:= mk_meta y0 y1 (y3, y)).
-    force. instantiate (1:= [Vint y3; Vint y]↑).
-    st. force. iSplitL "W". { iFrame. eauto. }
+    force_l. instantiate (1:= mk_meta _ _ (_, _)).
+    force_l.
+    st. force_l. iSplitL "W". { iFrame. eauto. }
     call; [eauto|].
     st. iDestruct "ASM" as "(W & _ & %)". subst.
-    force. st. force. iSplitL "W". { eauto. } 
+    force_l. st. force_l. iSplitL "W". { eauto. } 
     rewrite G0. st. eauto.
   Qed.
   

@@ -473,6 +473,32 @@ Section SIM.
   Proof. 
     uiprop. i. guclo hpsimC_spec. econs; esplits; eauto. econs; eauto.
   Qed.
+
+  Lemma isim_guar_src
+    (P: Prop) r g ps pt {R} RR st_src st_tgt k_src i_tgt
+  :
+    P ->
+    bi_entails
+      (@isim r g R RR true pt (st_src, k_src ()) (st_tgt, i_tgt))
+      (@isim r g R RR ps pt (st_src, guarantee P >>= k_src) (st_tgt, i_tgt)).
+  Proof.
+    i. iIntros "H". unfold guarantee. rewrite bind_bind.
+    iApply isim_choose_src. rewrite bind_ret_l. eauto.
+    Unshelve. eauto.
+  Qed.
+
+  Lemma isim_asm_tgt
+    (P: Prop) r g ps pt {R} RR st_src st_tgt i_src k_tgt 
+  :
+    P ->
+    bi_entails
+      (@isim r g R RR ps true (st_src, i_src) (st_tgt, k_tgt ()))
+      (@isim r g R RR ps pt (st_src, i_src) (st_tgt, assume P >>= k_tgt)).
+  Proof.
+    i. iIntros "H". unfold assume. rewrite bind_bind.
+    iApply isim_take_tgt. rewrite bind_ret_l. eauto.
+    Unshelve. eauto.
+  Qed.
   
   Lemma isim_supdate_src
     X
