@@ -1,7 +1,7 @@
  Require Import Coqlib AList.
 Require Import STS.
 Require Import Behavior.
-Require Import ModSemFacts ModSem.
+Require Import ModSemFacts ModSem ModSemE.
 Require Import Skeleton.
 Require Import PCM.
 From Ordinal Require Export Ordinal Arithmetic Inaccessible.
@@ -452,9 +452,19 @@ Section TRANSL.
   Definition prog_unit: callE ~> itree Es :=
     fun _ '(Call _ _) => Ret tt↑.
 
-  Definition cond_to_st (P: iProp): itree eventE Σ :=
-    let itr := '(r, _) <- handle_Assume P ε;; Ret r in
-    '(_, r) <- interp_Es prog_unit itr tt↑;; Ret r.
+
+  (* move later *)
+  Definition assume_init {E} `{takeE -< E} (P: Prop): itree E unit := trigger (ModSemE.take P) ;;; Ret tt.
+
+  Definition handle_Assume_init P: stateT (Σ) (itree takeE) unit :=
+    fun fr =>
+      r <- trigger (ModSemE.take Σ);;
+      assume_init (URA.wf (r ⋅ fr ));;;
+      assume_init (Own r ⊢ P);;; 
+      Ret (r ⋅ fr, tt).
+
+  Definition cond_to_st (P: iProp): itree takeE Σ :=
+    '(r, _) <- handle_Assume_init P ε;; Ret r.
  
 End TRANSL.
 
@@ -594,7 +604,7 @@ Section SMODSEM.
   .
 
   (* Compile directly to ModSem. Maybe deprecated? *)
-  Definition compile (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> itree eventE Any.t) (ms: t) : ModSem.t := {|
+  Definition compile (tr: fspecbody -> (Any.t -> itree Es Any.t)) (mst: t -> itree takeE Any.t) (ms: t) : ModSem.t := {|
     ModSem.fnsems := List.map (fun '(fn, sb) => (fn, tr sb)) ms.(fnsems);
     ModSem.initial_st := mst ms;
   |}
@@ -636,7 +646,7 @@ Section SMOD.
   |}
   .
 
-  Definition compile (tr: Sk.t -> fspecbody -> (Any.t -> itree Es Any.t)) (mst: SModSem.t -> itree eventE Any.t) (md: t) : Mod.t := {|
+  Definition compile (tr: Sk.t -> fspecbody -> (Any.t -> itree Es Any.t)) (mst: SModSem.t -> itree takeE Any.t) (md: t) : Mod.t := {|
     Mod.get_modsem := fun sk => SModSem.compile (tr sk) mst (md.(get_modsem) sk);
     Mod.sk := md.(sk);
   |}
