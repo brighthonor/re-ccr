@@ -966,7 +966,7 @@ Proof. ss. destruct xs; ss. Qed.
     end. *)
 
 
-  Lemma add_list_initial_mrs (mdl: list t) (ske: Sk.t)
+  (* Lemma add_list_initial_mrs (mdl: list t) (ske: Sk.t)
      :
        ModSem.initial_st (Mod.get_modsem (add_list mdl) ske)
        =
@@ -994,7 +994,7 @@ Proof.
     rewrite ! map_app. rewrite ! List.map_map.
     rewrite fun_fst_trans_l, fun_fst_trans_r. 
     f_equal.
-Qed.
+Qed. *)
 
 
 End BEH.
