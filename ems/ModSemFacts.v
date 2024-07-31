@@ -3,7 +3,7 @@ Require Export sflib.
 Require Export ITreelib.
 Require Import STS Behavior.
 Require Import ModSem.
-Require Import SimGlobal.
+Require Import SimGlobal SimInitial.
 Require Import Skeleton.
 Require Import STS Behavior.
 Require Import Any.
@@ -28,13 +28,9 @@ Require Import Any.
 
 Set Implicit Arguments.
 
-
-
 Module ModSemFacts.
 Import ModSem.
 Section COMM.
-
-  (* TODO: Current definition of module linking is not commutative. (add ms1 ms2).(initial_st) ≠ (add ms2 ms1).(initial_st) *)
 
   Inductive comm_emb : IFun Es Es -> IFun Es Es -> Prop := 
     |comm_emb_1 : comm_emb emb_l emb_r
@@ -48,6 +44,15 @@ Section COMM.
   Definition comm_st (stp: Any.t * Any.t) : Prop :=
     exists a b, fst stp = Any.pair a b /\ 
     snd stp = Any.pair b a.
+
+  Lemma simT_comm (itr0 itr1: itree takeE Any.t) :
+      simT (fun x y : Any.t => exists _ : (), comm_st (x, y)) false false 
+        (` st1 : Any.t <- itr1;; ` st2 : Any.t <- itr0;; Ret (Any.pair st1 st2))
+        (` st1 : Any.t <- itr0;; ` st2 : Any.t <- itr1;; Ret (Any.pair st1 st2)).
+  Proof. 
+    ginit. { eapply cpn7_wcompat. eapply simT_mon. }
+     
+  Admitted.
 
   Lemma add_comm_aux
         fl fr itl itr stl str (w: unit)
@@ -133,13 +138,12 @@ Section COMM.
   <<COMM: Beh.of_program (compile (add ms0 ms1) (Some P0)) <1= Beh.of_program (compile (add ms1 ms0) (Some P1))>>
   .
   Proof.
-  Admitted.
-    (* destruct (classic (P1)); cycle 1.
+    destruct (classic (P1)); cycle 1.
     { ii. eapply initial_itr_not_wf;et. }
     replace P0 with P1.
     2: { eapply prop_ext. split; auto. }
-    unfold compile. red. eapply adequacy_local_aux; et.
-    (* - admit.  *)
+    unfold compile. red. eapply adequacy_local_aux; et; cycle 1.
+    - eapply simT_comm.
     - i. s.
       unfold add_fnsems. rewrite ! alist_find_app_o.
       destruct (alist_find fn (fnsems ms1)) eqn:MS1; destruct (alist_find fn (fnsems ms0)) eqn: MS0.
@@ -159,7 +163,7 @@ Section COMM.
           -- replace fn with (fst (fn, i0)); et.
              rewrite fun_fst_trans_r.
              apply in_map. apply alist_find_some in MS0. et.
-        * instantiate (1:= top2). instantiate (1:= unit). instantiate (1:=(fun _ => comm_st)).
+        * instantiate (1:= top2). 
           unfold sim_fsem, "==>". i. eapply add_comm_aux; et.
           rewrite H0. econs. econs.
       + right. unfold trans_l.
@@ -185,124 +189,122 @@ Section COMM.
           rewrite H0. econs. econs.
       + left. unfold trans_l, trans_r.
         rewrite ! alist_find_map. rewrite MS1, MS0. et.
-
-    - (* initial_st has 'Take' only *) admit.
-Qed. *)
+  Qed.
 
 End COMM.
+
 Section ASSOC.
 
-Inductive assoc_emb : IFun Es Es -> IFun Es Es -> Prop := 
-  |assoc_emb_1 : assoc_emb emb_l (emb_l >>> emb_l)
-  |assoc_emb_2 : assoc_emb (emb_l >>> emb_r ) (emb_r >>> emb_l)
-  |assoc_emb_3 : assoc_emb (emb_r >>> emb_r) emb_r
-.
+  Inductive assoc_emb : IFun Es Es -> IFun Es Es -> Prop := 
+    |assoc_emb_1 : assoc_emb emb_l (emb_l >>> emb_l)
+    |assoc_emb_2 : assoc_emb (emb_l >>> emb_r ) (emb_r >>> emb_l)
+    |assoc_emb_3 : assoc_emb (emb_r >>> emb_r) emb_r
+  .
 
-Inductive assoc_ems : itree Es Any.t -> itree Es Any.t -> Prop := 
-  | assoc_ems_intro emb_l emb_r it (EMB: assoc_emb emb_l emb_r) :
-      assoc_ems (translate emb_l it) (translate emb_r it).
+  Inductive assoc_ems : itree Es Any.t -> itree Es Any.t -> Prop := 
+    | assoc_ems_intro emb_l emb_r it (EMB: assoc_emb emb_l emb_r) :
+        assoc_ems (translate emb_l it) (translate emb_r it).
      
-Definition assoc_st (stp: Any.t * Any.t) : Prop :=
-  exists a b c, fst stp = Any.pair a (Any.pair b c) /\ 
-  snd stp = Any.pair (Any.pair a b) c
-.
+  Definition assoc_st (stp: Any.t * Any.t) : Prop :=
+    exists a b c, fst stp = Any.pair a (Any.pair b c) /\ 
+    snd stp = Any.pair (Any.pair a b) c
+  .
 
-Definition assoc_rev_st (stp: Any.t * Any.t) : Prop :=
-  exists a b c, fst stp = Any.pair (Any.pair a b) c /\ 
-  snd stp = Any.pair a (Any.pair b c)
-.
+  Definition assoc_rev_st (stp: Any.t * Any.t) : Prop :=
+    exists a b c, fst stp = Any.pair (Any.pair a b) c /\ 
+    snd stp = Any.pair a (Any.pair b c)
+  .
 
-Lemma add_assoc_aux
+  Lemma add_assoc_aux
         fl fr itl itr stl str (w: unit)
         (ASSOC: assoc_ems itl itr)
         (STATE: assoc_st (stl, str))
-
-  :
+    :
       sim_itree (fun _ => assoc_st) top2 fl fr false false w (stl, itl) (str, itr).
-Proof.
-  destruct ASSOC, STATE. des. ss.
-  (* unfold assoc_st. *)
-  ginit. 
-  generalize it as itr. 
-  clarify.
-  generalize x as a0.
-  generalize b as b0.
-  generalize c as c0.
-  gcofix CIH. i.
-  rewrite (itree_eta_ itr).
-  destruct (observe itr).
-  - erewrite ! (bisimulation_is_eq _ _ (translate_ret _ _)).
-    gstep. apply sim_itree_ret.
-    unfold lift_rel. 
-    exists tt. splits; et.
-    unfold assoc_st. exists a0, b0, c0; et.
-  - erewrite ! (bisimulation_is_eq _ _ (translate_tau _ _)).
-    gstep. 
-    apply sim_itree_tau_src. apply sim_itree_tau_tgt. 
-    eapply sim_itree_progress; et.
-    gfinal. left. eapply CIH; et.
-  - erewrite ! (bisimulation_is_eq _ _ (translate_vis _ _ _ _)).
-    rewrite <- ! bind_trigger.
-    destruct e as [c'|[s|e]].
-    + (* callE *)
-      gstep. destruct c', EMB. 
-      (* SIMPLIFY BELOW *)
-      * apply sim_itree_call; clarify.
-        -- exists a0, b0, c0; et.
-        -- i. destruct WF, H, H, H. ss. clarify.
-        econs. gfinal. left. eapply CIH.
-      * apply sim_itree_call; clarify.
-        -- eexists a0, b0, c0; et.
-        -- i. unfold assoc_st in WF. des. ss. clarify.
-           econs. gfinal. left. eapply CIH.
-      * apply sim_itree_call; clarify.
-        -- eexists a0, b0, c0; et.
-        -- i. unfold assoc_st in WF. des. ss. clarify.
-           econs. gfinal. left. eapply CIH. 
-    + (* sE *)
-      gstep. destruct s, EMB.
-      * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
-        eapply sim_itree_progress; et.
-        unfold run_l, run_r. rewrite ! Any.pair_split.
-        gfinal. left. destruct (run a0). eapply CIH.
-      * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
-        eapply sim_itree_progress; et.
-        unfold run_l, run_r. rewrite ! Any.pair_split.
-        gfinal. left. destruct (run b0). eapply CIH.
-      * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
-        eapply sim_itree_progress; et.
-        unfold run_l, run_r. rewrite ! Any.pair_split.
-        gfinal. left. destruct (run c0). eapply CIH.        
-    + (* eventE *)
-      gstep. destruct e, EMB.
-      (* Choose *)
-      * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
-        eapply sim_itree_progress; et.
-        gfinal. left. eapply CIH.
-      * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
-        eapply sim_itree_progress; et.
-        gfinal. left. eapply CIH.
-      * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
-        eapply sim_itree_progress; et.
-        gfinal. left. eapply CIH.
-      (* Take *)
-      * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
-        eapply sim_itree_progress; et.
-        gfinal. left. eapply CIH. 
-      * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
-        eapply sim_itree_progress; et.
-        gfinal. left. eapply CIH. 
-      * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
-        eapply sim_itree_progress; et.
-        gfinal. left. eapply CIH.
-      (* Syscall *)
-      * apply sim_itree_syscall. i.
-        econs. gfinal. left. eapply CIH. 
-      * apply sim_itree_syscall. i.
-        econs. gfinal. left. eapply CIH.
-      * apply sim_itree_syscall. i.
-        econs. gfinal. left. eapply CIH.
-Qed. 
+  Proof.
+    destruct ASSOC, STATE. des. ss.
+    (* unfold assoc_st. *)
+    ginit. 
+    generalize it as itr. 
+    clarify.
+    generalize x as a0.
+    generalize b as b0.
+    generalize c as c0.
+    gcofix CIH. i.
+    rewrite (itree_eta_ itr).
+    destruct (observe itr).
+    - erewrite ! (bisimulation_is_eq _ _ (translate_ret _ _)).
+      gstep. apply sim_itree_ret.
+      unfold lift_rel. 
+      exists tt. splits; et.
+      unfold assoc_st. exists a0, b0, c0; et.
+    - erewrite ! (bisimulation_is_eq _ _ (translate_tau _ _)).
+      gstep. 
+      apply sim_itree_tau_src. apply sim_itree_tau_tgt. 
+      eapply sim_itree_progress; et.
+      gfinal. left. eapply CIH; et.
+    - erewrite ! (bisimulation_is_eq _ _ (translate_vis _ _ _ _)).
+      rewrite <- ! bind_trigger.
+      destruct e as [c'|[s|e]].
+      + (* callE *)
+        gstep. destruct c', EMB. 
+        (* SIMPLIFY BELOW *)
+        * apply sim_itree_call; clarify.
+          -- exists a0, b0, c0; et.
+          -- i. destruct WF, H, H, H. ss. clarify.
+          econs. gfinal. left. eapply CIH.
+        * apply sim_itree_call; clarify.
+          -- eexists a0, b0, c0; et.
+          -- i. unfold assoc_st in WF. des. ss. clarify.
+            econs. gfinal. left. eapply CIH.
+        * apply sim_itree_call; clarify.
+          -- eexists a0, b0, c0; et.
+          -- i. unfold assoc_st in WF. des. ss. clarify.
+            econs. gfinal. left. eapply CIH. 
+      + (* sE *)
+        gstep. destruct s, EMB.
+        * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
+          eapply sim_itree_progress; et.
+          unfold run_l, run_r. rewrite ! Any.pair_split.
+          gfinal. left. destruct (run a0). eapply CIH.
+        * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
+          eapply sim_itree_progress; et.
+          unfold run_l, run_r. rewrite ! Any.pair_split.
+          gfinal. left. destruct (run b0). eapply CIH.
+        * apply sim_itree_supdate_src. apply sim_itree_supdate_tgt.
+          eapply sim_itree_progress; et.
+          unfold run_l, run_r. rewrite ! Any.pair_split.
+          gfinal. left. destruct (run c0). eapply CIH.        
+      + (* eventE *)
+        gstep. destruct e, EMB.
+        (* Choose *)
+        * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
+          eapply sim_itree_progress; et.
+          gfinal. left. eapply CIH.
+        * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
+          eapply sim_itree_progress; et.
+          gfinal. left. eapply CIH.
+        * apply sim_itree_choose_tgt. i. eapply sim_itree_choose_src.
+          eapply sim_itree_progress; et.
+          gfinal. left. eapply CIH.
+        (* Take *)
+        * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
+          eapply sim_itree_progress; et.
+          gfinal. left. eapply CIH. 
+        * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
+          eapply sim_itree_progress; et.
+          gfinal. left. eapply CIH. 
+        * apply sim_itree_take_src. i. eapply sim_itree_take_tgt.
+          eapply sim_itree_progress; et.
+          gfinal. left. eapply CIH.
+        (* Syscall *)
+        * apply sim_itree_syscall. i.
+          econs. gfinal. left. eapply CIH. 
+        * apply sim_itree_syscall. i.
+          econs. gfinal. left. eapply CIH.
+        * apply sim_itree_syscall. i.
+          econs. gfinal. left. eapply CIH.
+  Qed. 
 
 Lemma add_assoc_rev_aux
         fl fr itl itr stl str (w: unit)
@@ -413,11 +415,19 @@ Proof.
   replace P0 with P1.
   2: { eapply prop_ext. split; auto. }
   unfold compile. red. 
-  eapply adequacy_local_aux; et.
+  eapply adequacy_local_aux; et; cycle 1.
+  {
+    instantiate (1:= fun _ => assoc_st). instantiate (1:= unit).
+    s. ginit. { eapply cpn7_wcompat. eapply simT_mon. }
+    i. rewrite bind_bind. guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT. i. refl. }
+    i. grind. guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT. i. refl. }
+    i. grind. guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT. i. refl. }
+    i. grind. gstep. econs. exists tt. econs; eauto.
+  }
 
-  (* 2: { exists tt. instantiate (1:= top2). instantiate (1:=(fun _ => assoc_st)).  econs; et; clarify. 
-       unfold assoc_st. ss. exists (initial_st ms0), (initial_st ms1), (initial_st ms2). splits; et. } *)
-  (* { admit. }
   i. s.
   unfold add_fnsems, trans_l, trans_r. s. unfold add_fnsems, trans_l, trans_r. 
   rewrite ! alist_find_app_o. rewrite ! alist_find_map. 
@@ -479,9 +489,8 @@ Proof.
     rewrite H0.
     erewrite <- ! (@bisimulation_is_eq _ _ _ _ (@translate_cmpE _ _ _ _ _ _ _)).
     econs. econs.
-  - s. et. *)
-  Admitted.
-(* Qed. *)
+  - s. et. 
+Qed.
 
 Theorem add_assoc_rev
         ms0 ms1 ms2
@@ -492,15 +501,23 @@ Theorem add_assoc_rev
             Beh.of_program (compile (add (add ms0 ms1) ms2) (Some P1))>>
 .
 Proof.
-  (* destruct (classic (P1)); cycle 1.
+  destruct (classic (P1)); cycle 1.
   { ii. eapply initial_itr_not_wf;et. }
   replace P0 with P1.
   2: { eapply prop_ext. split; auto. }
   unfold compile. red. 
-  eapply adequacy_local_aux; et.
-  (* 2: { exists tt. instantiate (1:= top2). instantiate (1:=(fun _ => assoc_rev_st)).  econs; et; clarify. 
-       unfold assoc_rev_st. ss. exists (initial_st ms0), (initial_st ms1), (initial_st ms2). splits; et. } *)
-  { admit. }
+  eapply adequacy_local_aux; et; cycle 1.
+  {
+    instantiate (1:= fun _ => assoc_rev_st). instantiate (1:= unit).
+    s. ginit. { eapply cpn7_wcompat. eapply simT_mon. }
+    i. rewrite bind_bind. guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT. i. refl. }
+    i. grind. guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT. i. refl. }
+    i. grind. guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT. i. refl. }
+    i. grind. gstep. econs. exists tt. econs; eauto.
+  }
   i. s.
   unfold add_fnsems, trans_l, trans_r. s. unfold add_fnsems, trans_l, trans_r. 
   rewrite ! alist_find_app_o. rewrite ! alist_find_map. 
@@ -510,9 +527,8 @@ Proof.
   destruct (alist_find fn (fnsems ms1)) eqn:MS1; 
   destruct (alist_find fn (fnsems ms2)) eqn: MS2;
   ( ss; et; right; esplits; et; s; et; unfold sim_fsem, "==>"; i; eapply add_assoc_rev_aux; et; rewrite H0;
-    erewrite <- ! (@bisimulation_is_eq _ _ _ _ (@translate_cmpE _ _ _ _ _ _ _)); econs; econs). *)
-  Admitted.
-(* Qed. *)
+    erewrite <- ! (@bisimulation_is_eq _ _ _ _ (@translate_cmpE _ _ _ _ _ _ _)); econs; econs).
+Qed.
 
 End ASSOC.
 
@@ -667,15 +683,24 @@ Theorem add_empty
           Beh.of_program (compile ms (Some P1))>>
 .
 Proof. 
-Admitted.
-  (* destruct (classic (P1)); cycle 1.
+  destruct (classic (P1)); cycle 1.
   { ii. eapply initial_itr_not_wf;et. }
   replace P0 with P1.
   2: { eapply prop_ext. split; auto. }
   unfold compile. red. 
-  eapply adequacy_local_aux; et.
-  2: { exists tt. instantiate (1:= top2). instantiate (1:= (fun _ => empty_st)). econs; et; clarify.
-       unfold empty_st. ss. exists (initial_st ms). et. }
+  eapply adequacy_local_aux; et; cycle 1.
+  {
+    instantiate (1:= (fun _ => empty_st)). instantiate (1:= unit).
+    s. ginit. { eapply cpn7_wcompat. eapply simT_mon. }
+    generalize (initial_st ms).
+    gcofix CIH. i.
+    ides i.
+    { grind. stepT. exists tt. econs; eauto. }
+    { grind. stepT. stepT. }
+    rewrite <- bind_trigger. destruct e. grind.
+    stepT. stepT. gstep. econs; eauto. instantiate (1:= x).
+    gbase. eauto.
+  }
   i. s.
   unfold add_fnsems, trans_l, trans_r. s.
   rewrite ! alist_find_app_o. rewrite ! alist_find_map. 
@@ -684,7 +709,7 @@ Admitted.
   - ss. right. esplits; et.
     unfold sim_fsem, "==>". i. apply add_empty_aux; et.
     rewrite H0. econs. econs.
-Qed. *)
+Qed.
 
 Theorem add_empty_rev
       ms
@@ -695,15 +720,24 @@ Theorem add_empty_rev
           Beh.of_program (compile (add ms empty) (Some P1))>>
 .
 Proof. 
-Admitted.
-  (* destruct (classic (P1)); cycle 1.
+  destruct (classic (P1)); cycle 1.
   { ii. eapply initial_itr_not_wf;et. }
   replace P0 with P1.
   2: { eapply prop_ext. split; auto. }
   unfold compile. red. 
-  eapply adequacy_local_aux; et.
-  2: { exists tt. instantiate (1:= top2). instantiate (1:= (fun _ => empty_rev_st)). econs; et; clarify.
-       unfold empty_st. ss. exists (initial_st ms). et. }
+  eapply adequacy_local_aux; et; cycle 1.
+  {
+    instantiate (1:= (fun _ => empty_rev_st)). instantiate (1:= unit).
+    s. ginit. { eapply cpn7_wcompat. eapply simT_mon. }
+    generalize (initial_st ms).
+    gcofix CIH. i.
+    ides i.
+    { grind. stepT. exists tt. econs; eauto. }
+    { grind. stepT. stepT. }
+    rewrite <- bind_trigger. destruct e. grind.
+    stepT. stepT. gstep. econs; eauto. instantiate (1:= x).
+    gbase. eauto.
+  }
   i. s.
   unfold add_fnsems, trans_l, trans_r. s.
   rewrite ! alist_find_app_o. rewrite ! alist_find_map. 
@@ -712,7 +746,7 @@ Admitted.
   - ss. right. esplits; et.
     unfold sim_fsem, "==>". i. apply add_empty_rev_aux; et.
     rewrite H0. econs. econs.
-Qed. *)
+Qed.
 End EMPTY.
 
 

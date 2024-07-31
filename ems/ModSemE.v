@@ -82,11 +82,6 @@ Goal (tt ↑↓?) = Ret tt. rewrite Any.upcast_downcast. ss. Qed.
 Goal (tt ↑↓ǃ) = Ret tt. rewrite Any.upcast_downcast. ss. Qed.
 
 
-
-
-
-
-
 (* Not used? *)
 Section EVENTSCOMMON.
 
@@ -246,6 +241,58 @@ End DEFINES.
   (* Opaque interp_Es. *)
 End EVENTS.
 Opaque interp_Es.
+
+
+
+
+Section EVENTSINIT.
+  (* take-only event type to define the simplest & commutative initial_st of modules *)
+  Variant takeE: Type -> Type :=
+  | take X: takeE X.
+
+  Section INTERP.
+    Definition handle_takeE: takeE ~> itree eventE :=
+      fun _ '(take X) => trigger (Take X). 
+
+    Definition interp_takeE: itree takeE ~> itree eventE :=
+      interp handle_takeE.
+
+    Lemma interp_takeE_bind
+          A B
+          (itr: itree takeE A) (ktr: A -> itree takeE B)
+      :
+        interp_takeE (v <- itr ;; ktr v) = 
+        v <- interp_takeE itr;; interp_takeE (ktr v).
+    Proof. 
+      unfold interp_takeE. grind. 
+    Qed.
+
+    Lemma interp_takeE_ret
+          T (v: T)
+      :
+        interp_takeE (Ret v: itree takeE _) = Ret v.
+    Proof. 
+      unfold interp_takeE. grind. 
+    Qed.
+
+    Lemma interp_takeE_tau
+          T (itr: itree takeE T)
+      :
+        interp_takeE (tau;; itr) = tau;; interp_takeE itr.
+    Proof. 
+      unfold interp_takeE. grind. 
+    Qed.
+
+    Lemma interp_takeE_take
+          X (e: takeE X)
+      :
+        interp_takeE (trigger e) = (handle_takeE e) >>= (fun r => tau;; Ret r).
+    Proof.
+      unfold interp_takeE. rewrite interp_trigger. grind.
+    Qed.
+  End INTERP.
+
+End EVENTSINIT.
 
 
 (* Lemma translate_triggerUB T (f: forall T, Es T -> Es T) (g: forall T, (Any.t -> Any.t * T) -> (Any.t -> Any.t * T))

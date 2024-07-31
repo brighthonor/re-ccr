@@ -506,6 +506,28 @@ Proof.
   intros. eapply wrespect7_uclo; eauto with paco. eapply bindC_wrespectful.
 Qed.
 
+Lemma self_simg:
+  forall (wf: Any.t -> Any.t -> Prop) (WF: forall x, wf x x) (itr: itree eventE Any.t), simg wf false false itr itr.
+Proof.
+  ginit. gcofix CIH. i. ides itr.
+  { gstep. econs; eauto. }
+  { gstep. econs; eauto. econs; eauto. econs; eauto. gbase. eauto. }
+  destruct e; rewrite <- bind_trigger; resub.
+  { 
+    gstep. econs 6; eauto. i. econs 5; eauto. exists x. 
+    econs; eauto. gbase. eauto.
+  }
+  {
+    gstep. econs; eauto. i. econs; eauto. exists x.
+    econs; eauto. gbase. eauto. 
+  }
+  {
+    gstep. econs; eauto. i. subst.
+    eapply simg_flag_down. gbase. eauto.  
+  }
+Qed.
+
+
 
 
 Lemma step_trigger_choose_iff X k itr e

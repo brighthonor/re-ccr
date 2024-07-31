@@ -16,7 +16,7 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 Require Import Any.
 
-Require Import SimGlobal.
+Require Import SimGlobal SimInitial.
 Require Import Red IRed.
 
 
@@ -749,31 +749,6 @@ Proof.
   }
 Qed.
 
-(*  
-  - Need clearer statement about 'wf'.
-  - Move to SimGlobal? 
-*)
-Lemma self_sim_global:
-  forall (wf: Any.t -> Any.t -> Prop) (WF: forall x, wf x x) (itr: itree eventE Any.t), simg wf false false itr itr.
-Proof.
-  ginit. { i. eapply cpn7_wcompat. eapply simg_mon. }
-  gcofix CIH. i. ides itr.
-  { gstep. econs; eauto. }
-  { gstep. econs; eauto. econs; eauto. econs; eauto. gbase. eauto. }
-  destruct e; rewrite <- bind_trigger; resub.
-  { 
-    gstep. econs 6; eauto. i. econs 5; eauto. exists x. 
-    econs; eauto. gbase. eauto.
-  }
-  {
-    gstep. econs; eauto. i. econs; eauto. exists x.
-    econs; eauto. gbase. eauto. 
-  }
-  {
-    gstep. econs; eauto. i. subst.
-    eapply simg_flag_down. gbase. eauto.  
-  }
-Qed.
 
 
 (*** desiderata: (1) state-aware simulation relation !!!! ***)
@@ -800,7 +775,7 @@ Section SIMMODSEM.
     le: world -> world -> Prop;
     le_PreOrder: PreOrder le;
     sim_fnsems: Forall2 (sim_fnsem wf le fl_src fl_tgt) ms_src.(ModSem.fnsems) ms_tgt.(ModSem.fnsems);
-    sim_initial: simg (fun x y => exists w, wf w (x, y)) false false init_src init_tgt;
+    sim_initial: simT (fun x y => exists w, wf w (x, y)) false false init_src init_tgt;
     (* sim_initial: exists w_init,
                  sim_itree_init wf le [] [] w_init (tt↑, resum_itr ms_src.(ModSem.init_st)) (tt↑, resum_itr ms_tgt.(ModSem.init_st)); *)
                   (* init_st will be given as 'itree eventE Any.t', why not directly using sim_global?*)
@@ -818,7 +793,7 @@ Proof.
     induction a; ii; ss.
     econs; et. econs; ss. ii; clarify.
     destruct w. exploit self_sim_itree; et.
-  - eapply self_sim_global. ss.
+  - eapply self_simT. ss.
 Qed.
 
 End ModSemPair.
@@ -1006,7 +981,7 @@ Section SEMPAIR.
   Context `{CONF: EMSConfig}.
 
   Hypothesis INIT:
-    simg (fun x y => exists w, wf w (x, y)) false false ms_src.(ModSem.initial_st) ms_tgt.(ModSem.initial_st).
+    simT (fun x y => exists w, wf w (x, y)) false false ms_src.(ModSem.initial_st) ms_tgt.(ModSem.initial_st).
 
   Lemma adequacy_local_aux (P Q: Prop)
         (* (wf: world -> W -> Prop)  *)
@@ -1028,7 +1003,7 @@ Section SEMPAIR.
       i. grind. 
       unfold ITree.map, unwrapU, triggerUB.
       steps. guclo bindC_spec. econs.
-      { gfinal. right. eapply INIT. }
+      { gfinal. right. eapply simT_adequacy. eapply INIT. }
       i. rewrite NONE. steps. ss.
     }
     {
@@ -1036,7 +1011,7 @@ Section SEMPAIR.
       { steps. force. exists (WF x). steps. ss. }
       i. grind.
       unfold ITree.map. steps. guclo bindC_spec. econs.
-      { gfinal. right. eapply INIT. }
+      { gfinal. right. eapply simT_adequacy. eapply INIT. }
       i. unfold unwrapU. rewrite SRC, TGT. grind.
       inv SIM0.
       guclo bindC_spec. econs.
@@ -1285,12 +1260,12 @@ Proof.
   inv SIM.
   econs; et; cycle 1.
   { 
-    s. ginit. { eapply cpn7_wcompat. eapply simg_mon. }
-    guclo bindC_spec. econs.
+    s. ginit. { eapply cpn7_wcompat. eapply simT_mon. }
+    guclo tbindC_spec. econs.
     { gfinal. right. eauto. }
     i. subst.
-    guclo bindC_spec. econs.
-    { gfinal. right. eapply self_sim_global; ss. }
+    guclo tbindC_spec. econs.
+    { gfinal. right. eapply self_simT; ss. }
     i. subst.
     gstep. econs; ss. inv SIM.
     instantiate (1:= wf_lift wf0). exists x.

@@ -17,7 +17,7 @@ Module ModSem.
 Section MODSEM.
 
   Record t: Type := mk {
-    initial_st : itree eventE Any.t;
+    initial_st : itree takeE Any.t;
     fnsems : alist gname (Any.t -> itree Es Any.t);
   }
   .
@@ -326,7 +326,7 @@ Section INTERP.
     | None => Ret tt
     | Some P' => assume (<<WF: P'>>)
     end;;; 
-    snd <$> (initial_st ms >>= interp_Es prog (prog (Call "main" initial_arg))) .
+    snd <$> (interp_takeE (initial_st ms) >>= interp_Es prog (prog (Call "main" initial_arg))) .
 
   Let state: Type := itree eventE Any.t.
 

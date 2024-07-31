@@ -1,78 +1,20 @@
 Require Import Coqlib.
 Require Import ITreelib.
-Require Import Skeleton.
-Require Import ModSem.
+Require Import Any.
+Require Import STS.
 Require Import Behavior.
-Require Import Relation_Definitions.
-
-(*** TODO: export these in Coqlib or Universe ***)
+Require Import ModSem.
+Require Import Skeleton.
+Require Import PCM.
+Require Import Coq.Relations.Relation_Definitions.
 Require Import Relation_Operators.
 Require Import RelationPairs.
-From ITree Require Import
-     Events.MapDefault.
-From ExtLib Require Import
-     Core.RelDec
-     Structures.Maps
-     Data.Map.FMapAList.
-Require Import Any.
-
-Require Import SimGlobal.
-Require Import Red IRed.
-
+From Ordinal Require Import Ordinal Arithmetic.
+Require Import SimSTS SimGlobal.
 
 Set Implicit Arguments.
 
 Local Open Scope nat_scope.
-
-
-Section EVENTS.
-  (* take-only event type to define the simplest initial_st of modules *)
-  Variant takeE: Type -> Type :=
-  | take X: takeE X.
-
-  Section INTERP.
-    Definition handle_takeE: takeE ~> itree eventE :=
-      fun _ '(take X) => trigger (Take X). 
-
-    Definition interp_takeE: itree takeE ~> itree eventE :=
-      interp handle_takeE.
-
-    Lemma interp_takeE_bind
-          A B
-          (itr: itree takeE A) (ktr: A -> itree takeE B)
-      :
-        interp_takeE (v <- itr ;; ktr v) = 
-        v <- interp_takeE itr;; interp_takeE (ktr v).
-    Proof. 
-      unfold interp_takeE. grind. 
-    Qed.
-
-    Lemma interp_takeE_ret
-          T (v: T)
-      :
-        interp_takeE (Ret v: itree takeE _) = Ret v.
-    Proof. 
-      unfold interp_takeE. grind. 
-    Qed.
-
-    Lemma interp_takeE_tau
-          T (itr: itree takeE T)
-      :
-        interp_takeE (tau;; itr) = tau;; interp_takeE itr.
-    Proof. 
-      unfold interp_takeE. grind. 
-    Qed.
-
-    Lemma interp_takeE_take
-          X (e: takeE X)
-      :
-        interp_takeE (trigger e) = (handle_takeE e) >>= (fun r => tau;; Ret r).
-    Proof.
-      unfold interp_takeE. rewrite interp_trigger. grind.
-    Qed.
-  End INTERP.
-
-End EVENTS.
 
 (***
   Relation of initial_st will be given as 'simT _ _' 
@@ -375,6 +317,56 @@ Section SIM.
     intros. eapply wrespect7_uclo; eauto with paco. eapply tbindC_wrespectful.
   Qed.
 
+
+  (*******************)
+  Definition add_tau R (itr itr': itree takeE R) :=
+    exists Q i (k: Q -> _),
+      itr = (i >>= k) /\ itr' = (x <- i;; tau;; k x).
+  Hint Unfold add_tau.
+
+  Variant simT_add_tau (r: forall R0 R1 (RR: R0 -> R1 -> Prop), bool -> bool -> (itree takeE R0) -> (itree takeE R1) -> Prop):
+    forall R0 R1 (RR: R0 -> R1 -> Prop), bool -> bool -> (itree takeE R0) -> (itree takeE R1) -> Prop 
+  :=
+  | simT_add_middle_intro R0 R1 RR ps pt is is' it it'
+      (SIM: r R0 R1 RR ps pt is it)
+      (SRC: add_tau is is') 
+      (TGT: add_tau it it')
+    :
+    simT_add_tau r RR ps pt is' it'
+  .
+
+  Lemma simT_add_tau_mon 
+        r1 r2 
+        (LE: r1 <7= r2)
+    :
+    simT_add_tau r1 <7= simT_add_tau r2.
+  Proof.
+    i. destruct PR; econs; eauto. 
+  Qed.
+
+  Lemma simT_add_tau_compatible:
+    compatible7 _simT simT_add_tau.
+  Proof. Admitted.
+  
+  Lemma simT_add_tau_spec:
+    simT_add_tau <8= gupaco7 _simT (cpn7 _simT).
+  Proof.
+    i. gclo. econs; eauto using simT_add_tau_compatible.
+    eapply simT_add_tau_mon, PR; eauto with paco.
+  Qed.
+  (*******************)
+
+
+  Lemma self_simT: 
+    forall (wf: Any.t -> Any.t -> Prop) (WF: forall x, wf x x) (itr: itree takeE Any.t), simT wf false false itr itr.
+  Proof.
+    ginit. gcofix CIH. i. ides itr.
+    { gstep. econs. eauto. }
+    { gstep. econs; eauto. econs; eauto. econs; eauto. gbase. eauto. }
+    destruct e; rewrite <- bind_trigger; resub.
+    gstep. econs; eauto. econs; eauto. econs; eauto. gbase. eauto.
+  Qed. 
+
   Theorem simT_adequacy
           T wf (its itt: itree takeE T) ps pt
           (SIM: simT wf ps pt its itt)
@@ -403,3 +395,15 @@ Section SIM.
   Qed.
 
 End SIM.
+
+Ltac stepT := guclo simT_indC_spec; econs; eauto; i.
+
+Hint Constructors _simT.
+Hint Unfold simT.
+Hint Resolve simT_mon: paco.
+Hint Constructors tflagC: core.
+Hint Resolve tflagC_mon: paco.
+Hint Constructors tbindR: core.
+Hint Unfold tbindC: core.
+Hint Constructors simT_indC: core.
+Hint Resolve simT_indC_mon: paco.
