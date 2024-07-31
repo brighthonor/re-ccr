@@ -156,8 +156,7 @@ Section SIMMODSEM.
       (* TGT: unwind the loop *)
       rewrite unfold_iter_eq. st_r. des_ifs; try nia. st_r.
       (* prove the IST of Map *)
-      st. iSplitL; [|eauto].
-      iExists _, _, _, _. iSplitR; eauto. iSplitL; eauto.
+      st. repeat (iSplit; eauto); repeat iExists _; repeat (iSplit; eauto).
       iRight. iFrame. iExists _, _, _, _. iSplitR; eauto.
       rewrite ->app_nil_r, Nat.sub_0_r, repeat_fun_to_list, Nat2Z.id. eauto.
     }
@@ -254,8 +253,7 @@ Section SIMMODSEM.
     st_r. iDestruct "GRT" as "[[GRT %] %]". subst. st_r.
 
     (* prove the IST of Map *)
-    st. iSplitL; eauto.
-    iExists _, _, _, _. iSplitR; eauto. iSplitL; eauto.
+    st. repeat (iSplit; eauto); repeat iExists _; repeat (iSplit; eauto).
     iRight. iFrame. iExists _, _, _, _.
     iPoseProof ("M" with "GRT") as "M". iFrame. eauto.
   Qed.
@@ -305,8 +303,7 @@ Section SIMMODSEM.
     st_r. iDestruct "GRT" as "[[GRT %] %]". subst. st_r.
 
     (* prove the IST of Map *)
-    st. iSplitL; eauto.
-    iExists _, _, _, _. iSplitR; eauto. iSplitL; eauto.
+    st. repeat (iSplit; eauto); repeat iExists _; repeat (iSplit; eauto).
     iRight. iFrame. iExists _, _, _, _.
     iPoseProof ("M" with "GRT") as "M".
     rewrite ->fun_to_list_update, Z2Nat.id; try nia.
