@@ -105,7 +105,7 @@ Section SIMMODSEM.
        ((⌜st_src = (fun (_: Z) => 0%Z, 0%Z)↑ /\ st_tgt = Vnullptr↑⌝)
         ∨
         (pending0 ∗ ∃ blk ofs (f: Z -> Z) (sz: Z), 
-            ⌜st_src = (f, sz)↑ /\  st_tgt = (Vptr blk ofs)↑⌝ 
+            ⌜st_src = (f, sz)↑ /\ st_tgt = (Vptr blk ofs)↑⌝ 
             ∗ (blk, ofs) |-> (fun_to_list f (Z.to_nat sz)))
        )%I.
 
@@ -347,9 +347,10 @@ Section SIMMODSEM.
   Theorem sim: HModPair.sim (HMod.add (MapM.HMap GlobalStbM) Mem) (HMod.add MapI.Map Mem) (IstProd Ist IstEq).
   Proof.
     sim_init.
-    - iIntros "[H0 H1]". iFrame.
+    - rewrite// MapM.HMap_unfold MapI.Map_unfold. s.
+      iIntros "[H0 H1]". iFrame.
       iExists _, _, _, _; iSplitR; eauto; iSplitL; eauto.
-      iLeft; eauto.
+      iLeft. eauto.
     - iApply simF_init. eauto.
     - iApply simF_get. eauto.
     - iApply simF_set. eauto.

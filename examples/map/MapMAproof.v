@@ -320,7 +320,9 @@ Section SIMMODSEM.
   Theorem sim: HModPair.sim (MapA.HMap GlobalStb) (MapM.HMap GlobalStbM) Ist.
   Proof.
     sim_init.
-    - iIntros "(IST & P & INIT0)"; s. iSplitL "INIT0"; eauto.
+    - rewrite// MapA.HMap_unfold MapM.HMap_unfold. s.
+      unfold Map_initial_cond, Map0_initial_cond.
+      iIntros "(IST & P & INIT0)"; s. iSplitL "INIT0"; eauto.
       iLeft. iFrame. eauto.
     - iApply simF_init. eauto.
     - iApply simF_get. eauto.
