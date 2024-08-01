@@ -1,7 +1,7 @@
  Require Import Coqlib AList.
 Require Import STS.
 Require Import Behavior.
-Require Import ModSemFacts ModSem ModSemE.
+Require Import ModSemFacts ModSem Events.
 Require Import Skeleton.
 Require Import PCM.
 From Ordinal Require Export Ordinal Arithmetic Inaccessible.
@@ -120,64 +120,6 @@ Notation "'update_and_discard' fr0" :=
    Ret (fr1, rarg)) (at level 60)
 .  
 
-
-(* Section PROOF.
-
-  Context {Σ: GRA.t}.
-
-
-  Definition HoareCall
-             (tbr: bool)
-             (ord_cur: ord)
-             (fsp: fspec):
-    gname -> Any.t -> stateT (Σ) (itree Es) Any.t :=
-    fun fn varg_src fr0 =>
-
-      '(fr1, rarg) <- update_and_discard fr0;;
-
-      x <- trigger (Choose fsp.(meta));; 
-      
-      (* ASSERT *)
-      varg_tgt <- trigger (Choose Any_tgt);;
-      (*** precondition ***)
-      guarantee(fsp.(precond) x varg_src varg_tgt rarg);;; 
-
-      let ord_next := fsp.(measure) x in
-      guarantee(ord_lt ord_next ord_cur /\ (tbr = true -> is_pure ord_next) /\ (tbr = false -> ord_next = ord_top));;;
-
-      vret_tgt <- trigger (Call fn varg_tgt);; (*** call ***)
-
-      (* ASSUME *)
-      rret <- trigger (Take Σ);;
-      mr2 <- mget;;
-      assume (URA.wf (rret ⋅ fr1 ⋅ mr2));;;
-
-      vret_src <- trigger (Take Any.t);;
-      assume(fsp.(postcond) x vret_src vret_tgt rret);;; (*** postcondition ***)
-
-      Ret (rret ⋅ fr1, vret_src)
-  .  
-
-
-End PROOF. *)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(*** TODO: Move to Coqlib. TODO: Somehow use case_ ??? ***)
-(* Definition map_fst A0 A1 B (f: A0 -> A1): (A0 * B) -> (A1 * B) := fun '(a, b) => (f a, b). *)
-(* Definition map_snd A B0 B1 (f: B0 -> B1): (A * B0) -> (A * B1) := fun '(a, b) => (a, f b). *)
 
 Section CANCEL.
 
@@ -454,11 +396,11 @@ Section TRANSL.
 
 
   (* move later *)
-  Definition assume_init {E} `{takeE -< E} (P: Prop): itree E unit := trigger (ModSemE.take P) ;;; Ret tt.
+  Definition assume_init {E} `{takeE -< E} (P: Prop): itree E unit := trigger (Events.take P) ;;; Ret tt.
 
   Definition handle_Assume_init P: stateT (Σ) (itree takeE) unit :=
     fun fr =>
-      r <- trigger (ModSemE.take Σ);;
+      r <- trigger (Events.take Σ);;
       assume_init (URA.wf (r ⋅ fr ));;;
       assume_init (Own r ⊢ P);;; 
       Ret (r ⋅ fr, tt).

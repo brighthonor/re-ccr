@@ -1,7 +1,7 @@
 Require Import Coqlib.
 Require Export sflib.
 Require Export ITreelib.
-Require Export ModSemE.
+Require Export Events.
 Require Export AList.
 Require Import Skeleton.
 Require Import STS Behavior.

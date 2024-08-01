@@ -3,7 +3,7 @@ Require Import Coqlib.
 Require Import ImpPrelude.
 Require Import Skeleton.
 Require Import PCM.
-Require Import ModSem ModSemE Behavior.
+Require Import ModSem Events Behavior.
 Require Import Relation_Definitions.
 
 (*** TODO: export these in Coqlib or Universe ***)
