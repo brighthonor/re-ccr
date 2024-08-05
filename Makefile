@@ -1,4 +1,4 @@
-COQMODULE    := SimComp
+COQMODULE    := CCR
 COQTHEORIES  := $(shell find . -not -path "./deprecated/*" -not -path "./_opam/*" -iname '*.v')
 
 .PHONY: all proof proof-quick graph
@@ -21,11 +21,12 @@ proof: Makefile.coq $(COQTHEORIES)
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R lib $(COQMODULE)"; \
-         echo "-R ems $(COQMODULE)"; \
-         echo "-R spc $(COQMODULE)"; \
+         echo "-R modules $(COQMODULE)"; \
+         echo "-R simulations $(COQMODULE)"; \
+         echo "-R WET $(COQMODULE)"; \
+         echo "-R iris_system $(COQMODULE)"; \
          echo "-R proofmode $(COQMODULE)"; \
-         echo "-R imp $(COQMODULE)"; \
-         echo "-R mem $(COQMODULE)"; \
+         echo "-R imp_system $(COQMODULE)"; \
          echo "-R examples $(COQMODULE)"; \
          echo "-R extract $(COQMODULE)"; \
    echo $(COQTHEORIES)) > _CoqProject
