@@ -7,7 +7,7 @@ Require Import STS Behavior.
 Require Import Any.
 Require Import Program.
 
-Require Import ModuleInternal.
+Require Export ModuleInternal.
 Require Import BasicEvents.
 
 

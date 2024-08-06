@@ -21,6 +21,8 @@ Require Import Mem1.
 
 
 Require Import ISim.
+Require Import HMod Mod SimModSemFacts HModAdequacy.
+
 
 Require Import sProp sWorld World SRF.
 From stdpp Require Import coPset gmap namespaces.

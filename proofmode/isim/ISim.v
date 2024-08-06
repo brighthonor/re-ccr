@@ -16,8 +16,6 @@ From ExtLib Require Import
 Require Import Red IRed.
 Require Import HPSim.
 Require Import World sWorld.
-Require Import Red IRed.
-
 From stdpp Require Import coPset gmap.
 
 Require Import ModuleInternal HMod BasicEvents.

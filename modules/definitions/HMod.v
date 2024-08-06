@@ -4,7 +4,8 @@ Require Export ITreelib.
 Require Export AList.
 Require Import Skeleton.
 Require Import Any.
-Require Import ModuleInternal Mod.
+Require Export ModuleInternal.
+Require Import Mod.
 Require Import Events.
 Require Import PCM IPM.
 Require Import Red IRed.
