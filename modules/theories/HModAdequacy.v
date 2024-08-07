@@ -142,6 +142,6 @@ Section ADEQUACY.
       rewrite sim_sk. et.
   Qed.
 
-      
+  End HMODSEM.
 
 End ADEQUACY.
