@@ -89,10 +89,11 @@ Section SIMMODSEM.
       unfold IstProd, Ist, IstFairTgt. iFrame.
       iExists (st_srcL), (st_tgtL), (isrc↑), (next↑). iSplit.
       - iPureIntro. esplits; ss.
-      - iSplit; ss. iPureIntro. esplits; et. ii.
+      - iSplit; ss. iPureIntro. esplits; et. ii. 
         specialize (H2 f i). specialize (H i).
         unfold fair_update, mirror_update in *. 
         des_ifs; ss.
+        3:{}
         + admit.
         + rewrite H. ss.
         +

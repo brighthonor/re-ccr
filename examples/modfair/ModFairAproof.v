@@ -110,10 +110,10 @@ Section SIMMODSEM.
 
   (* IST when target's imap only have a progress *)
 
-  Definition mirror_update isrc itgt f: iimap id owf := 
+  Definition middle_update_src isrc itgt f: iimap id owf := 
     (fun x => match f x with
-              | Flag.success => (kappa)%ord
-              | Flag.fail => (Ord.omega + Ord.from_nat (itgt x))%ord
+              | Flag.success => Ord.omega
+              | Flag.fail => itgt x
               | _ => isrc x 
               end).
 
@@ -121,7 +121,7 @@ Section SIMMODSEM.
     fun st_src st_tgt => 
       (⌜exists (itgt: iimap id nat_wf) (isrc: iimap id owf), 
         st_tgt = itgt↑ ∧ st_src = isrc↑
-        ∧ forall f, fair_update id owf isrc (mirror_update isrc itgt f) f⌝)%I.
+        ∧ exists nsrc, (forall f, fair_update id owf isrc nsrc f ∧ fair_update id owf nsrc itgt f)⌝)%I.
   
   Definition i_kappa: iimap id owf := fun x => kappa.
 
@@ -146,15 +146,18 @@ Section SIMMODSEM.
     st. unfold Fair. st.
     iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]". subst.
     force_l. 
-    instantiate (1:=mirror_update isrc itgt y3).
+    
+    instantiate (1:=(middle_update_src isrc nsrc y3)).
     st. force_l. iSplitR.
     { 
-      iPureIntro. unfold fair_update in *. i. specialize (H i). specialize (H1 y3 i). unfold mirror_update in *. des_ifs.
+      iPureIntro. unfold middle_update_src. unfold fair_update. i. des_ifs. 
+      specialize (H1 y3). des. specialize (H1 i). rewrite Heq in H1. et.
     }
 
     st. force_l. force_l. iSplitL "W"; iFrame; et. st. iSplit; et.
 
     unfold IstFairTgt. iPureIntro. esplits; et.
+    i. 
     ii. unfold fair_update, mirror_update in *. specialize (H i). des_ifs.
     - apply OrdArith.lt_add_r. apply OrdArith.lt_from_nat. ss.
     - ss. specialize (H1 f i). rewrite Heq in H1. rewrite H. ss.
