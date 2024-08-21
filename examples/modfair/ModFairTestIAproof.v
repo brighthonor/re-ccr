@@ -140,7 +140,7 @@ Section SIMMODSEM.
   Theorem sim: 
     forall i_tgt: iimap nat nat_wf,
       HModPair.sim 
-        (HMod.add (ModFairTestA.HFair GlobalStb) (ModFairNot.HUnFair i_tgt GlobalStb))
+        (HMod.add (ModFairTestA.HFair GlobalStb) (ModFairNot.HUnFair i_tgt (GlobalStb)))
         (HMod.add ModFairTestI.Fair (ModFairA.HFair i_tgt)) 
         (IstProd Ist (IstFairTgt nat)).
   Proof.
@@ -149,8 +149,7 @@ Section SIMMODSEM.
       iIntros "E"; iFrame. unfold IstProd. iExists _, _, _, _.
       iSplit; ss. iSplit; ss. unfold IstFairTgt. iPureIntro. et.
     - iApply simF_test. ss.
-    - iDestruct "IST" as (? ? ? ?) "[_ [_ IST]]". admit.
-      (* iApply simF_fair_tgt. *)
-  Admitted.
+    - iApply isim_fair_tgt. ss.
+  Qed.
   
 End SIMMODSEM.

@@ -152,5 +152,34 @@ Section SIMMODSEM.
       iIntros "E"; iFrame. unfold IstFairTgt. iPureIntro. esplits; et.
     - iApply simF_fair_tgt. ss.
   Qed.
+
+  (* for use *)
+
+  Lemma isim_fair_tgt Ist fnsems_src fnsems_tgt st_src st_tgt y sk:
+    IstProd Ist IstFairTgt st_src st_tgt -∗
+      isim (IstProd Ist IstFairTgt) fnsems_src fnsems_tgt ibot ibot
+      (λ '(st_src, v_src) '(st_tgt, v_tgt), IstProd Ist IstFairTgt st_src st_tgt ** ⌜v_src = v_tgt⌝) false false
+      (st_src, translate (HModSem.emb_ ModSem.run_r) (interp_sb_hp (GlobalStb sk) {| fsb_fspec := unfair_spec id; fsb_body := cfunU (unfairF (id:=id)) |} y))
+      (st_tgt, translate (HModSem.emb_ ModSem.run_r) (interp_sb_hp (to_stb []) {| fsb_fspec := fair_spec id; fsb_body := cfunU (fairF (id:=id) nat_wf) |} y)).
+  Proof.
+    iIntros "IST". unfold unfairF, fairF.
+    unfold interp_sb_hp, HoareFun. s.
+    st. iDestruct "ASM" as "[W [% %]]"; des; subst.
+
+    force_r. instantiate (1:=mk_meta y1 y2 ()). force_r. st_r. force_r. iSplitR "IST".
+    { iFrame; et. }
+    st. unfold cfunU. st. iDestruct "IST" as (? ? ? ?) "[% [IST %]]". des; subst. hss. hss.
+    st. unfold Fair. st.
+    iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]". subst.
+
+    force_l. hss. hss. st_l. force_l. iSplitL "W".
+    { iFrame; et. }
+
+    st. iSplit; et.
+    unfold IstProd. iExists _, _, _, _. iSplit; et. iFrame. unfold IstFairTgt. et.
+
+  Qed.
+
+
   
 End SIMMODSEM.
