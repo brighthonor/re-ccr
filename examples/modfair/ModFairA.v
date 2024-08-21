@@ -18,21 +18,24 @@ Set Implicit Arguments.
 Section A.
   Context `{_W: CtxWD.t}.
 
-  Variable initial_map: iimap nat nat_wf.
+  Variable id: ID.
+  Variable wf: WF.
+
+  Variable initial_map: iimap id wf.
 
   (* Let Es := (hAPCE +' Es). *)
 
-  Definition fargs (args: list (nat -> Flag.t)) :=
+  Definition fargs (args: list (id -> Flag.t)) :=
     match args with
     | [] => None
     | hd :: _ => Some hd
     end.
     
-  Definition fairF: list (nat -> Flag.t) -> itree hEs val :=
+  Definition fairF: list (id -> Flag.t) -> itree hEs val :=
     fun args =>
-      `f: (nat -> Flag.t) <- (fargs args)?;;
+      `f: (id -> Flag.t) <- (fargs args)?;;
       prev <- trigger sGet;; prev <- prev↓?;;
-      next <- trigger (Choose (iimap nat nat_wf));;
+      next <- trigger (Choose (iimap id wf));;
       _ <- trigger (Fair f prev next);;
       _ <- trigger (sPut next↑);;
       Ret Vundef
@@ -44,8 +47,13 @@ Section A.
         mk_simple (X := unit)
           (fun _ =>
             (ord_top,
-            (fun varg => (⌜exists ii: nat -> Flag.t, varg = [ii]↑⌝)%I),
+            (fun varg => (⌜exists ff: id -> Flag.t, varg = [ff]↑⌝)%I),
             (fun _ => (True)%I)))).
+
+  Definition FairStb: list (gname * fspec).
+    eapply (Seal.sealing "stb").
+    apply [("fair", fair_spec)].
+  Defined.
 
   Definition FairSbtb: list (string * fspecbody) :=
     [("fair", mk_specbody fair_spec (cfunU fairF))].
@@ -63,8 +71,7 @@ Section A.
   |}
   .
 
-  Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Definition _HFair: HMod.t := (SMod.to_hmod GlobalStb SFair).
+  Definition _HFair: HMod.t := (SMod.to_hmod (fun _ => to_stb []) SFair).
   Definition HFair := _HFair.
 
   Lemma HFair_unfold: HFair = _HFair.
@@ -73,3 +80,4 @@ Section A.
   Global Opaque HFair.
 
 End A.
+Global Hint Unfold FairStb: stb.
