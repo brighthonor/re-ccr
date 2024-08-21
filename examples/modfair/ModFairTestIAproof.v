@@ -1,4 +1,4 @@
-Require Import ModFairTestA ModFairTestI ModFairA ModFairAproof.
+Require Import ModFairTestA ModFairTestI ModFairA ModFairNot ModFairANotproof.
 Require Import HoareDef SimModSem.
 Require Import Coqlib.
 Require Import ImpPrelude.
@@ -35,7 +35,7 @@ Section SIMMODSEM.
   Context `{_W: CtxWD.t}.
         
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Hypothesis STBINCLM: forall sk, stb_incl (to_stb (FairStb nat)) (GlobalStb sk).
+  Hypothesis STBINCLM: forall sk, stb_incl (to_stb (UnFairStb nat)) (GlobalStb sk).
 
   Definition Ist: Any.t -> Any.t -> iProp :=
     fun st_src st_tgt => (⌜True⌝)%I.
@@ -47,12 +47,10 @@ Section SIMMODSEM.
       iApply ("CIH" $! (@existT _ (λ _, _) st_src st_tgt)); eauto
     end.
 
-  Definition i_kappa: iimap nat owf := @i_kappa nat.
-
   Lemma simF_test:
     forall i_tgt: iimap nat nat_wf,
     HModPair.sim_fun
-      (HMod.add (ModFairTestA.HFair GlobalStb) (ModFairA.HFair i_kappa))
+      (HMod.add (ModFairTestA.HFair GlobalStb) (ModFairNot.HUnFair i_tgt GlobalStb))
       (HMod.add ModFairTestI.Fair (ModFairA.HFair i_tgt))
       (IstProd Ist (IstFairTgt nat)) "test".
   Proof.
@@ -89,17 +87,7 @@ Section SIMMODSEM.
       unfold IstProd, Ist, IstFairTgt. iFrame.
       iExists (st_srcL), (st_tgtL), (isrc↑), (next↑). iSplit.
       - iPureIntro. esplits; ss.
-      - iSplit; ss. iPureIntro. esplits; et. ii. 
-        specialize (H2 f i). specialize (H i).
-        unfold fair_update, mirror_update in *. 
-        des_ifs; ss.
-        3:{}
-        + admit.
-        + rewrite H. ss.
-        +
-        + etrans. apply OrdArith.lt_from_nat. eapply H. ss.
-        + rewrite H. ss.
-        + 
+      - iSplit; ss. iPureIntro. esplits; et.
     }
     (* CASE 2: unfair case *)
     {
@@ -130,7 +118,7 @@ Section SIMMODSEM.
           iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]"; des; subst. st.
           coapply. iClear "CIH".
           unfold IstProd, Ist, IstFairTgt. iFrame.
-          iExists (st_srcL), (st_tgtL), (st_srcR), (y↑). iSplit; [|iSplit; esplits; et].
+          iExists (st_srcL), (st_tgtL), (isrc↑), (y↑). iSplit; [|iSplit; esplits; et].
           iPureIntro. esplits; ss.
         }
 
@@ -150,22 +138,19 @@ Section SIMMODSEM.
   Qed.
   
   Theorem sim: 
-    forall ii, 
+    forall i_tgt: iimap nat nat_wf,
       HModPair.sim 
-        (ModFairTestA.HFair GlobalStb)
-        (HMod.add ModFairTestI.Fair (ModFairA.HFair ii)) 
-        (IstProd Ist IstFairTgt).
+        (HMod.add (ModFairTestA.HFair GlobalStb) (ModFairNot.HUnFair i_tgt GlobalStb))
+        (HMod.add ModFairTestI.Fair (ModFairA.HFair i_tgt)) 
+        (IstProd Ist (IstFairTgt nat)).
   Proof.
-    ii. 
-    econs; eauto; ii.
-    - Locate HModSemPair.sim.
-    econs. cycle 1; [s|sim_split].
-    sim_init.
+    ii. sim_init.
     - rewrite// ModFairTestA.HFair_unfold ModFairTestI.Fair_unfold. s.
       iIntros "E"; iFrame. unfold IstProd. iExists _, _, _, _.
       iSplit; ss. iSplit; ss. unfold IstFairTgt. iPureIntro. et.
     - iApply simF_test. ss.
-    - 
-  Qed.
+    - iDestruct "IST" as (? ? ? ?) "[_ [_ IST]]". admit.
+      (* iApply simF_fair_tgt. *)
+  Admitted.
   
 End SIMMODSEM.

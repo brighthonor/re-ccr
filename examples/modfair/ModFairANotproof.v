@@ -1,4 +1,4 @@
-Require Import ModFairA.
+Require Import ModFairA ModFairNot.
 Require Import HoareDef SimModSem.
 Require Import Coqlib.
 Require Import ImpPrelude.
@@ -37,9 +37,9 @@ Section SIMMODSEM.
   Variable id: ID.
         
   Variable GlobalStb: Sk.t -> gname -> option fspec.
-  Hypothesis STBINCLM: forall sk, stb_incl (to_stb (FairStb id)) (GlobalStb sk).
+  Hypothesis STBINCLM: forall sk, stb_incl (to_stb (UnFairStb id)) (GlobalStb sk).
 
-  (* IST when iimap of the src and tgt change at the same time *)
+  (* proof for fun *)
 
   Definition middle_update isrc itgt f: iimap id owf := 
     (fun x => match f x with
@@ -110,72 +110,46 @@ Section SIMMODSEM.
 
   (* IST when target's imap only have a progress *)
 
-  Definition middle_update_src isrc itgt f: iimap id owf := 
-    (fun x => match f x with
-              | Flag.success => Ord.omega
-              | Flag.fail => itgt x
-              | _ => isrc x 
-              end).
-
   Definition IstFairTgt: Any.t -> Any.t -> iProp :=
     fun st_src st_tgt => 
-      (⌜exists (itgt: iimap id nat_wf) (isrc: iimap id owf), 
-        st_tgt = itgt↑ ∧ st_src = isrc↑
-        ∧ exists nsrc, (forall f, fair_update id owf isrc nsrc f ∧ fair_update id owf nsrc itgt f)⌝)%I.
+      (⌜exists (itgt: iimap id nat_wf) (isrc: iimap id nat_wf), 
+        st_tgt = itgt↑ ∧ st_src = isrc↑⌝)%I.
   
-  Definition i_kappa: iimap id owf := fun x => kappa.
-
   Lemma simF_fair_tgt:
     forall (i_tgt: iimap id nat_wf),
     HModPair.sim_fun
-      (ModFairA.HFair i_kappa)
+      (ModFairNot.HUnFair i_tgt GlobalStb)
       (ModFairA.HFair i_tgt)
       IstFairTgt "fair".
   Proof.
-    simF_init HFair_unfold HFair_unfold fairF fairF.
+    simF_init HUnFair_unfold HFair_unfold unfairF fairF.
     st. iDestruct "ASM" as "[W [% %]]"; des; subst.
     
-    rewrite Any.upcast_downcast in G. inv G. ss. inv G0.
+    rewrite Any.upcast_downcast in G. inv G.
 
     force_r. instantiate (1:=mk_meta y0 y1 ()). force_r. force_r. iSplitR "IST".
     { iFrame; et. }
-    st. iDestruct "IST" as "%"; des; subst.
+    st. iDestruct "IST" as "%"; des; subst. st.
     
-    rewrite Any.upcast_downcast in G1. symmetry in G1. inv G1.
-
-    st. unfold Fair. st.
+    unfold Fair. st.
     iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]". subst.
-    force_l. 
-    
-    instantiate (1:=(middle_update_src isrc nsrc y3)).
-    st. force_l. iSplitR.
-    { 
-      iPureIntro. unfold middle_update_src. unfold fair_update. i. des_ifs. 
-      specialize (H1 y3). des. specialize (H1 i). rewrite Heq in H1. et.
-    }
 
-    st. force_l. force_l. iSplitL "W"; iFrame; et. st. iSplit; et.
+    force_l. force_l. iSplitL.
+    { iFrame; et. }
 
-    unfold IstFairTgt. iPureIntro. esplits; et.
-    i. 
-    ii. unfold fair_update, mirror_update in *. specialize (H i). des_ifs.
-    - apply OrdArith.lt_add_r. apply OrdArith.lt_from_nat. ss.
-    - ss. specialize (H1 f i). rewrite Heq in H1. rewrite H. ss.
-    - ss. apply kappa_inaccessible_add. apply kappa_inaccessible_omega. apply kappa_inaccessible_nat.
+    st. iSplit; et.
   Qed.
 
   Theorem sim_tgt: 
     forall (i_tgt: iimap id nat_wf),
     HModPair.sim
-      (ModFairA.HFair i_kappa)
+      (ModFairNot.HUnFair i_tgt GlobalStb)
       (ModFairA.HFair i_tgt)
       IstFairTgt.
   Proof.
-    ii. sim_init.
-    - rewrite// HFair_unfold. rewrite// HFair_unfold. s.
-      iIntros "E"; iFrame. unfold IstFairTgt. iPureIntro. exists i_tgt. esplits; ss.
-      i. unfold fair_update, mirror_update. i. des_ifs.
-      apply kappa_inaccessible_add. apply kappa_inaccessible_omega. apply kappa_inaccessible_nat.
+    i. sim_init.
+    - rewrite// HFair_unfold. rewrite// HUnFair_unfold. s.
+      iIntros "E"; iFrame. unfold IstFairTgt. iPureIntro. esplits; et.
     - iApply simF_fair_tgt. ss.
   Qed.
   
