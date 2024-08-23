@@ -108,6 +108,70 @@ Section SIMMODSEM.
   Qed.
 
 
+  (* IST when source's imap only have a progress *)
+
+  Definition IstFairSrc: Any.t -> Any.t -> iProp :=
+    fun st_src st_tgt => 
+      (⌜exists (itgt: iimap id nat_wf) (isrc: iimap id owf), 
+        st_tgt = itgt↑ ∧ st_src = isrc↑
+        ∧ (forall i, (itgt i <= isrc i)%ord)⌝)%I.
+
+  Definition i_zero: iimap id nat_wf := fun x => 0.
+
+  Lemma simF_fair_src:
+    forall (i_src: iimap id owf),
+    HModPair.sim_fun
+      (ModFairA.HFair i_src)
+      (ModFairA.HFair i_zero)
+      IstFairSrc "fair".
+  Proof.
+    simF_init HFair_unfold HFair_unfold fairF fairF.
+    st. iDestruct "ASM" as "[W [% %]]"; des; subst.
+    
+    rewrite Any.upcast_downcast in G. inv G. ss. inv G0.
+
+    force_r. instantiate (1:=mk_meta y0 y1 ()). force_r. force_r. iSplitR "IST".
+    { iFrame; et. }
+    st. iDestruct "IST" as "%"; des; subst.
+    
+    rewrite Any.upcast_downcast in G1. symmetry in G1. inv G1.
+
+    st. unfold Fair. st.
+    iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]". subst.
+    force_l. 
+    instantiate (1:=middle_update isrc y y3).
+    st. force_l. iSplitR.
+    { 
+      iPureIntro. unfold middle_update. ii. specialize (H i). des_ifs. eapply Ord.lt_le_lt; et.
+      apply OrdArith.lt_from_nat. ss.
+    }
+
+    st. force_l. force_l. iSplitL "W"; iFrame; et. st. iSplit; et.
+
+    unfold IstFair. iPureIntro.
+    exists y, (middle_update isrc y y3).
+    esplits; et. ii. unfold middle_update in *.
+    des_ifs.
+    - refl.
+    - specialize (H i). rewrite Heq in H. etrans. instantiate (1:=itgt i). rewrite H. refl. et.
+    - apply Ord.lt_le. apply Ord.omega_upperbound.
+  Qed.
+
+  Theorem sim_src: 
+    forall (i_src: iimap id owf),
+    HModPair.sim
+      (ModFairA.HFair i_src)
+      (ModFairA.HFair i_zero)
+      IstFairSrc.
+  Proof.
+    ii. sim_init.
+    - rewrite// HFair_unfold. rewrite// HFair_unfold. s.
+      iIntros "E"; iFrame. unfold IstFairSrc. iPureIntro. exists i_zero, i_src. esplits; ss.
+      ii. unfold i_zero. apply Ord.O_is_O.
+    - iApply simF_fair_src. ss.
+  Qed.
+
+
   (* IST when target's imap only have a progress *)
 
   Definition IstFairTgt: Any.t -> Any.t -> iProp :=

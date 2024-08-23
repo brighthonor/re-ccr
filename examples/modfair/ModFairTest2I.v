@@ -19,30 +19,16 @@ Section I.
 
   Context `{_W: CtxWD.t}.
 
-  Definition ff (b: bool): nat -> Flag.t :=
-    fun n => 
-      if (n =? 0) 
-      then (if b then Flag.success else Flag.fail)
-      else Flag.emp.
-
   Definition testF: list val -> itree hAGEs val :=
     fun varg =>
-      (* tau for progress *)
       tau;; _ <- 
-      (ITree.iter
-        (fun (_: unit) =>
-          `b: bool <- trigger (Choose bool);;
-          if b
-          then
-            `_: val <- (ccallU "fair" [ff true]);;
+        (ITree.iter
+          (fun (_: unit) =>
             _ <- trigger (Syscall "print" [Vint 42]↑ top1);;
             Ret (inl tt: unit + unit)
-          else 
-            `_: val <- (ccallU "fair" [ff false]);;
-            Ret (inl tt: unit + unit)
-      ) tt);;
+        ) tt);;
       Ret Vundef
-  .
+    .
 
   Definition FairSem: HModSem.t := {|
     HModSem.fnsems := [("test", cfunU testF)];

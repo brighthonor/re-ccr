@@ -100,9 +100,9 @@ Section SIMMODSEM.
       st_r. hss. st_r. unfold Fair. st_r. hss. hss.
       rename itgt into prev. rename y into next.
       iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]"; des; subst. st_r.
-      unfold FairCounter.fair_update, ff in H. specialize (H 1). ss.
+      unfold FairCounter.fair_update, ff in H. specialize (H 0). ss.
 
-      remember (prev 1) as chance. clear Heqchance. gen next.
+      remember (prev 0) as chance. clear Heqchance. gen next.
       induction chance.
       { ii. inv H. }
       {
@@ -131,7 +131,7 @@ Section SIMMODSEM.
           unfold Fair. st_r. hss. hss.
           iDestruct "GRT" as "%". iDestruct "GRT'" as "[W [_ %]]"; des; subst. st_r.
           apply IHchance. clear IHchance.
-          specialize (H0 1). ss. nia.
+          specialize (H0 0). des_ifs. ss. nia.
         }
       }
     }
